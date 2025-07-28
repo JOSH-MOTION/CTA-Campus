@@ -18,6 +18,7 @@ import {Badge} from '@/components/ui/badge';
 import {FileText, BookOpen, ArrowRight} from 'lucide-react';
 import Link from 'next/link';
 import {Button} from '@/components/ui/button';
+import type {User} from 'firebase/auth';
 
 const upcomingClasses = [
   {time: '09:00 AM', course: 'CS101: Intro to Computer Science', room: 'Hall A', type: 'Lecture'},
@@ -31,12 +32,16 @@ const recentResources = [
   {title: 'Lab Safety Guidelines', type: 'PDF', icon: FileText, course: 'Classical Mechanics'},
 ];
 
-export default function StudentDashboard() {
+interface StudentDashboardProps {
+  user: User | null;
+}
+
+export default function StudentDashboard({user}: StudentDashboardProps) {
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-3xl font-bold tracking-tight">Student Dashboard</h1>
-        <p className="text-muted-foreground">Welcome back! Here's your overview for today.</p>
+        <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user?.displayName || 'Student'}!</h1>
+        <p className="text-muted-foreground">Here's your overview for today.</p>
       </div>
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card className="lg:col-span-2">

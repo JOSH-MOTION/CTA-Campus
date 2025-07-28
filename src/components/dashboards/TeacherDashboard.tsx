@@ -6,14 +6,19 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import {Users, BookOpen, BarChart2} from 'lucide-react';
+import type {User} from 'firebase/auth';
 
-export default function TeacherDashboard() {
+interface TeacherDashboardProps {
+  user: User | null;
+}
+
+export default function TeacherDashboard({user}: TeacherDashboardProps) {
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-3xl font-bold tracking-tight">Teacher Dashboard</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Welcome, {user?.displayName || 'Teacher'}!</h1>
         <p className="text-muted-foreground">
-          Welcome! Manage your classes and students.
+          Manage your classes and students.
         </p>
       </div>
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

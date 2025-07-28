@@ -6,12 +6,17 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import {Users, UserCheck, Building} from 'lucide-react';
+import type {User} from 'firebase/auth';
 
-export default function AdminDashboard() {
+interface AdminDashboardProps {
+  user: User | null;
+}
+
+export default function AdminDashboard({user}: AdminDashboardProps) {
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Welcome, {user?.displayName || 'Admin'}!</h1>
         <p className="text-muted-foreground">
           Oversee and manage the entire CTA Portal.
         </p>

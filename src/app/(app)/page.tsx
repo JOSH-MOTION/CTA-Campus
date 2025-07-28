@@ -5,9 +5,10 @@ import StudentDashboard from '@/components/dashboards/StudentDashboard';
 import TeacherDashboard from '@/components/dashboards/TeacherDashboard';
 import AdminDashboard from '@/components/dashboards/AdminDashboard';
 import {useEffect, useState} from 'react';
+import type {User} from 'firebase/auth';
 
 export default function DashboardPage() {
-  const {role} = useAuth();
+  const {user, role} = useAuth();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -21,11 +22,11 @@ export default function DashboardPage() {
   const renderDashboard = () => {
     switch (role) {
       case 'student':
-        return <StudentDashboard />;
+        return <StudentDashboard user={user} />;
       case 'teacher':
-        return <TeacherDashboard />;
+        return <TeacherDashboard user={user} />;
       case 'admin':
-        return <AdminDashboard />;
+        return <AdminDashboard user={user} />;
       default:
         return <div>Please select a role.</div>;
     }
