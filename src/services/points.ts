@@ -8,7 +8,8 @@ import {
     serverTimestamp,
     query,
     where,
-    writeBatch
+    writeBatch,
+    collectionGroup
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
@@ -28,6 +29,9 @@ export const awardPoint = async (userId: string, points: number, reason: string,
     throw new Error('duplicate');
   }
 
+  // Firestore requires a separate addDoc call to get an auto-generated ID,
+  // but for an idempotent operation, we want a predictable ID.
+  // We'll use setDoc with the activityId as the document ID.
   await addDoc(collection(db, 'users', userId, 'points'), {
     points,
     reason,
@@ -54,38 +58,29 @@ export const getTotalPointsForUser = async (userId: string): Promise<number> => 
 };
 
 /**
- * Retrieves total points for all students efficiently.
- * @param studentUids - An array of student UIDs.
+ * Retrieves total points for all students efficiently using a collectionGroup query.
  * @returns A map of student UID to their total points.
  */
-export const getPointsForAllStudents = async (studentUids: string[]): Promise<{[key: string]: number}> => {
-    if (studentUids.length === 0) {
-        return {};
-    }
-
+export const getPointsForAllStudents = async (): Promise<{[key: string]: number}> => {
     const pointsMap: {[key: string]: number} = {};
-    studentUids.forEach(uid => pointsMap[uid] = 0);
+    
+    // Use a collection group query to get all 'points' documents across all users.
+    const pointsQuery = query(collectionGroup(db, 'points'));
+    const querySnapshot = await getDocs(pointsQuery);
 
-    // Firestore 'in' query is limited to 30 items. We need to batch our requests.
-    const batchSize = 30;
-    for (let i = 0; i < studentUids.length; i += batchSize) {
-        const batchUids = studentUids.slice(i, i + batchSize);
-        const pointsCol = collection(db, 'users');
+    querySnapshot.forEach(doc => {
+        const data = doc.data();
+        // The parent of a document in a subcollection is one level up.
+        // The path is 'users/{userId}/points/{pointId}'
+        const userId = doc.ref.parent.parent?.id; 
         
-        // This is a bit of a workaround because we can't query subcollections directly
-        // across different parent documents. We fetch all point documents for the users in the batch.
-        const pointPromises = batchUids.map(uid => getDocs(collection(pointsCol, uid, 'points')));
-        const snapshots = await Promise.all(pointPromises);
-
-        snapshots.forEach((snapshot, index) => {
-            const uid = batchUids[index];
-            let totalPoints = 0;
-            snapshot.forEach(doc => {
-                totalPoints += doc.data().points || 0;
-            });
-            pointsMap[uid] = totalPoints;
-        });
-    }
+        if (userId) {
+            if (!pointsMap[userId]) {
+                pointsMap[userId] = 0;
+            }
+            pointsMap[userId] += data.points || 0;
+        }
+    });
 
     return pointsMap;
 }

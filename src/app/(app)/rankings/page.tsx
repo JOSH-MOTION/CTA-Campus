@@ -34,7 +34,7 @@ export default function RankingsPage() {
       const students = users.filter(u => u.role === 'student');
       setAllStudents(students);
       
-      const points = await getPointsForAllStudents(students.map(s => s.uid));
+      const points = await getPointsForAllStudents();
       setStudentPoints(points);
 
       setLoading(false);
