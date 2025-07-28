@@ -12,6 +12,8 @@ import {Chat} from '@/components/chat/Chat';
 import {useAuth, UserData} from '@/contexts/AuthContext';
 import {Message, getChatId, sendMessage, onMessages} from '@/services/chat';
 import {Unsubscribe} from 'firebase/firestore';
+import {useToast} from '@/hooks/use-toast';
+import {Badge} from '@/components/ui/badge';
 
 type ChatEntity = {id: string; name: string; avatar?: string; dataAiHint: string};
 
@@ -19,6 +21,8 @@ export default function ChatPage() {
   const {user: currentUser, fetchAllUsers, userData, role} = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const {toast} = useToast();
+
   const [allUsers, setAllUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -26,6 +30,9 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeTab, setActiveTab] = useState<'dms' | 'groups'>('dms');
   const [messageUnsubscribe, setMessageUnsubscribe] = useState<Unsubscribe | null>(null);
+
+  const [unreadCounts, setUnreadCounts] = useState<{[chatId: string]: number}>({});
+  const [allChatListeners, setAllChatListeners] = useState<Unsubscribe[]>([]);
 
   const directMessageUserId = searchParams.get('dm');
   const groupChatId = searchParams.get('group');
@@ -41,18 +48,14 @@ export default function ChatPage() {
   }, [fetchAllUsers]);
 
   const allStudents = useMemo(() => allUsers.filter(u => u.role === 'student'), [allUsers]);
+  const otherUsers = useMemo(() => allUsers.filter(u => u.uid !== currentUser?.uid), [allUsers, currentUser]);
 
   const groupChats = useMemo(() => {
     const groups: ChatEntity[] = [];
-    const allGens = new Set(allStudents.map(student => student.gen).filter(Boolean));
-
     if (role === 'teacher' || role === 'admin') {
+      const allGens = new Set(allStudents.map(student => student.gen).filter(Boolean));
       allGens.forEach(gen => {
-        groups.push({
-          id: `group-${gen}`,
-          name: `${gen} Hub`,
-          dataAiHint: 'group students',
-        });
+        groups.push({id: `group-${gen}`, name: `${gen} Hub`, dataAiHint: 'group students'});
       });
     } else if (role === 'student' && userData?.gen) {
       groups.push({
@@ -61,7 +64,6 @@ export default function ChatPage() {
         dataAiHint: 'group students',
       });
     }
-
     return groups.sort((a, b) => a.name.localeCompare(b.name));
   }, [role, userData, allStudents]);
 
@@ -77,6 +79,7 @@ export default function ChatPage() {
       }
       
       setSelectedChat({...entity, id: chatId});
+      setUnreadCounts(prev => ({...prev, [chatId]: 0}));
 
       const unsubscribe = onMessages(chatId, newMessages => {
         setMessages(newMessages);
@@ -96,7 +99,39 @@ export default function ChatPage() {
   
   useEffect(() => {
     if (loading || !currentUser) return;
+    
+    // Setup listeners for all chats for notifications
+    const allPossibleChats = [...otherUsers.map(u => ({...u, chatId: getChatId(currentUser.uid, u.uid)})), ...groupChats.map(g => ({...g, chatId: g.id}))];
+    
+    const listeners = allPossibleChats.map(({chatId, name}) => {
+      return onMessages(chatId, (newMessages) => {
+        if(newMessages.length > 0) {
+            const lastMessage = newMessages[newMessages.length - 1];
+            // If the chat is not selected and the last message is not from the current user
+            if (chatId !== selectedChat?.id && lastMessage.senderId !== currentUser.uid) {
+                setUnreadCounts(prev => ({...prev, [chatId]: (prev[chatId] || 0) + 1 }));
 
+                toast({
+                  title: `New message from ${lastMessage.senderName}`,
+                  description: lastMessage.text,
+                  action: (
+                    <Button variant="link" onClick={() => {
+                        const entityToSelect = allPossibleChats.find(c => c.chatId === chatId);
+                        if (entityToSelect) {
+                          handleSelectChat({id: entityToSelect.id, name: entityToSelect.name, avatar: (entityToSelect as UserData).photoURL, dataAiHint: 'user portrait'});
+                        }
+                    }}>
+                      View
+                    </Button>
+                  ),
+                });
+            }
+        }
+      });
+    });
+    setAllChatListeners(listeners);
+
+    // Initial chat selection based on URL params
     if (groupChatId) {
       const groupToSelect = groupChats.find(g => g.id === `group-${groupChatId}`);
       if (groupToSelect) {
@@ -117,11 +152,11 @@ export default function ChatPage() {
     }
     
     return () => {
-        if(messageUnsubscribe) {
-            messageUnsubscribe();
-        }
+        if(messageUnsubscribe) messageUnsubscribe();
+        allChatListeners.forEach(unsubscribe => unsubscribe());
     }
-  }, [loading, allUsers, groupChats, directMessageUserId, groupChatId, handleSelectChat, currentUser, messageUnsubscribe]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, currentUser]);
 
 
   const handleSendMessage = async (text: string, replyTo?: Message) => {
@@ -147,11 +182,7 @@ export default function ChatPage() {
   const handleTabChange = (value: string) => {
       const newTab = value as 'dms' | 'groups';
       setActiveTab(newTab);
-      // Optional: clear selection when changing tabs
-      // setSelectedChat(null);
-      // if (messageUnsubscribe) messageUnsubscribe();
   }
-
 
   return (
     <div className="grid h-[calc(100vh-8rem)] grid-cols-1 md:grid-cols-3 xl:grid-cols-4">
@@ -187,23 +218,30 @@ export default function ChatPage() {
                 </div>
               ) : (
                 <div className="space-y-1 p-2">
-                  {allUsers.filter(u => u.uid !== userData?.uid).map(user => (
-                    <Button
-                      key={user.uid}
-                      variant={selectedChat?.id === getChatId(currentUser!.uid, user.uid) ? 'secondary' : 'ghost'}
-                      className="h-auto w-full justify-start p-3"
-                      onClick={() => handleSelectChat({id: user.uid, name: user.displayName, avatar: user.photoURL, dataAiHint: 'student portrait'})}
-                    >
-                      <Avatar className="mr-3 h-10 w-10">
-                        <AvatarImage src={user.photoURL} alt={user.displayName} />
-                        <AvatarFallback>{user.displayName.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                      <div className="text-left">
-                        <p className="font-semibold">{user.displayName}</p>
-                        <p className="text-xs text-muted-foreground capitalize">{user.role}</p>
-                      </div>
-                    </Button>
-                  ))}
+                  {otherUsers.map(user => {
+                    const chatId = getChatId(currentUser!.uid, user.uid);
+                    const unreadCount = unreadCounts[chatId] || 0;
+                    return (
+                        <Button
+                        key={user.uid}
+                        variant={selectedChat?.id === chatId ? 'secondary' : 'ghost'}
+                        className="h-auto w-full justify-start p-3 relative"
+                        onClick={() => handleSelectChat({id: user.uid, name: user.displayName, avatar: user.photoURL, dataAiHint: 'student portrait'})}
+                        >
+                        <Avatar className="mr-3 h-10 w-10">
+                            <AvatarImage src={user.photoURL} alt={user.displayName} />
+                            <AvatarFallback>{user.displayName.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <div className="text-left">
+                            <p className="font-semibold">{user.displayName}</p>
+                            <p className="text-xs text-muted-foreground capitalize">{user.role}</p>
+                        </div>
+                        {unreadCount > 0 && (
+                            <Badge className="absolute right-3 top-1/2 -translate-y-1/2">{unreadCount}</Badge>
+                        )}
+                        </Button>
+                    )
+                  })}
                 </div>
               )}
             </TabsContent>
@@ -214,21 +252,27 @@ export default function ChatPage() {
                 </div>
               ) : (
                 <div className="space-y-1 p-2">
-                  {groupChats.map(group => (
-                    <Button
-                      key={group.id}
-                      variant={selectedChat?.id === group.id ? 'secondary' : 'ghost'}
-                      className="h-auto w-full justify-start p-3"
-                      onClick={() => handleSelectChat(group)}
-                    >
-                      <Avatar className="mr-3 h-10 w-10">
-                        <AvatarFallback>G</AvatarFallback>
-                      </Avatar>
-                      <div className="text-left">
-                        <p className="font-semibold">{group.name}</p>
-                      </div>
-                    </Button>
-                  ))}
+                  {groupChats.map(group => {
+                     const unreadCount = unreadCounts[group.id] || 0;
+                     return (
+                        <Button
+                        key={group.id}
+                        variant={selectedChat?.id === group.id ? 'secondary' : 'ghost'}
+                        className="h-auto w-full justify-start p-3 relative"
+                        onClick={() => handleSelectChat(group)}
+                        >
+                        <Avatar className="mr-3 h-10 w-10">
+                            <AvatarFallback>G</AvatarFallback>
+                        </Avatar>
+                        <div className="text-left">
+                            <p className="font-semibold">{group.name}</p>
+                        </div>
+                         {unreadCount > 0 && (
+                            <Badge className="absolute right-3 top-1/2 -translate-y-1/2">{unreadCount}</Badge>
+                        )}
+                        </Button>
+                     )
+                  })}
                 </div>
               )}
             </TabsContent>

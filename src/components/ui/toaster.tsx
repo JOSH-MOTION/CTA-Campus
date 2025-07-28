@@ -8,7 +8,9 @@ import {
   ToastProvider,
   ToastTitle,
   ToastViewport,
+  ToastActionElement,
 } from "@/components/ui/toast"
+import { Button } from "./button";
 
 export function Toaster() {
   const { toasts } = useToast()
