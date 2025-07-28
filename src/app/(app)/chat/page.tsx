@@ -45,7 +45,22 @@ export default function ChatPage() {
     loadUsers();
   }, [fetchAllUsers]);
 
-  const otherUsers = useMemo(() => allUsers.filter(u => u.uid !== currentUser?.uid), [allUsers, currentUser]);
+  const otherUsers = useMemo(() => {
+    if (!currentUser || !role) return [];
+
+    if (role === 'student') {
+      const studentGen = userData?.gen;
+      return allUsers.filter(u => {
+        if (u.uid === currentUser.uid) return false; // Exclude self
+        if (u.role === 'teacher' || u.role === 'admin') return true; // Include all teachers/admins
+        if (u.role === 'student' && u.gen === studentGen) return true; // Include students from the same gen
+        return false;
+      });
+    }
+
+    // For teachers and admins, show everyone else
+    return allUsers.filter(u => u.uid !== currentUser.uid);
+  }, [allUsers, currentUser, role, userData?.gen]);
 
   const groupChats = useMemo(() => {
     const groups: Omit<ChatEntity, 'type'>[] = [];
