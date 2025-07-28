@@ -1,7 +1,7 @@
 // src/app/(app)/chat/page.tsx
 'use client';
 
-import {useState, useEffect} from 'react';
+import {useState, useEffect, useMemo} from 'react';
 import {Avatar, AvatarFallback, AvatarImage} from '@/components/ui/avatar';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
@@ -11,7 +11,7 @@ import {Chat} from '@/components/chat/Chat';
 import {useAuth, UserData} from '@/contexts/AuthContext';
 
 const initialMessages: Record<string, Message[]> = {
-  g1: [
+  'group-Gen 30': [
     {sender: 'Alice Johnson', text: 'Hello everyone! Just a reminder about the group project deadline on Friday.', time: '9:00 AM'},
     {sender: 'Charlie Brown', text: 'Thanks for the reminder, Alice!', time: '9:05 AM'},
   ],
@@ -21,10 +21,10 @@ type ChatEntity = {id: string; name: string; avatar?: string; dataAiHint: string
 type Message = {sender: string; text: string; time: string};
 
 export default function ChatPage() {
-  const {fetchAllUsers, userData} = useAuth();
+  const {fetchAllUsers, userData, role} = useAuth();
   const [allStudents, setAllStudents] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   const [selectedChat, setSelectedChat] = useState<ChatEntity | null>(null);
   const [messages, setMessages] = useState<Record<string, Message[]>>(initialMessages);
 
@@ -39,8 +39,26 @@ export default function ChatPage() {
     loadUsers();
   }, [fetchAllUsers]);
 
-  const userGen = userData?.gen;
-  const gen30Group: ChatEntity | null = userGen ? {id: `group-${userGen}`, name: `${userGen} Hub`, dataAiHint: 'group students'} : null;
+  const groupChats = useMemo(() => {
+    const groups: ChatEntity[] = [];
+    if (role === 'teacher' && userData?.gensTaught) {
+      const taughtGens = userData.gensTaught.split(',').map(g => g.trim()).filter(Boolean);
+      taughtGens.forEach(gen => {
+        groups.push({
+          id: `group-${gen}`,
+          name: `${gen} Hub`,
+          dataAiHint: 'group students',
+        });
+      });
+    } else if (role === 'student' && userData?.gen) {
+      groups.push({
+        id: `group-${userData.gen}`,
+        name: `${userData.gen} Hub`,
+        dataAiHint: 'group students',
+      });
+    }
+    return groups;
+  }, [role, userData]);
 
   const handleSelectChat = (entity: ChatEntity) => {
     setSelectedChat(entity);
@@ -95,7 +113,7 @@ export default function ChatPage() {
                       key={user.uid}
                       variant={selectedChat?.id === user.uid ? 'secondary' : 'ghost'}
                       className="h-auto w-full justify-start p-3"
-                      onClick={() => handleSelectChat({ id: user.uid, name: user.displayName, avatar: user.photoURL, dataAiHint: 'student portrait'})}
+                      onClick={() => handleSelectChat({id: user.uid, name: user.displayName, avatar: user.photoURL, dataAiHint: 'student portrait'})}
                     >
                       <Avatar className="mr-3 h-10 w-10">
                         <AvatarImage src={user.photoURL} alt={user.displayName} />
@@ -113,25 +131,26 @@ export default function ChatPage() {
               )}
             </TabsContent>
             <TabsContent value="groups" className="m-0">
-               {gen30Group && (
-                  <div className="space-y-1 p-2">
-                    <Button
-                      variant={selectedChat?.id === gen30Group.id ? 'secondary' : 'ghost'}
-                      className="h-auto w-full justify-start p-3"
-                      onClick={() => handleSelectChat(gen30Group)}
-                    >
-                      <Avatar className="mr-3 h-10 w-10">
-                        <AvatarFallback>G</AvatarFallback>
-                      </Avatar>
-                      <div className="text-left">
-                        <p className="font-semibold">{gen30Group.name}</p>
-                         <p className="text-xs text-muted-foreground">
-                            {messages[gen30Group.id]?.slice(-1)[0]?.text || 'No messages yet'}
-                          </p>
-                      </div>
-                    </Button>
-                  </div>
-                )}
+              <div className="space-y-1 p-2">
+                {groupChats.map(group => (
+                  <Button
+                    key={group.id}
+                    variant={selectedChat?.id === group.id ? 'secondary' : 'ghost'}
+                    className="h-auto w-full justify-start p-3"
+                    onClick={() => handleSelectChat(group)}
+                  >
+                    <Avatar className="mr-3 h-10 w-10">
+                      <AvatarFallback>G</AvatarFallback>
+                    </Avatar>
+                    <div className="text-left">
+                      <p className="font-semibold">{group.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {messages[group.id]?.slice(-1)[0]?.text || 'No messages yet'}
+                      </p>
+                    </div>
+                  </Button>
+                ))}
+              </div>
             </TabsContent>
           </div>
         </Tabs>
