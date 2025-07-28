@@ -65,39 +65,22 @@ export default function ProfilePage() {
 
   if (loading || !user) return <p>Loading...</p>;
 
-  const getRoleBasedInfo = () => {
+  const getRoleBasedDescription = () => {
     switch (role) {
       case 'student':
-        return {
-          name: user.displayName || 'Alex Doe',
-          email: user.email || 'alex.doe@university.edu',
-          fallback: user.displayName ? user.displayName.charAt(0).toUpperCase() : 'AD',
-          description: 'Update your profile picture and personal information.',
-        };
+        return 'Update your profile picture and personal information.';
       case 'teacher':
-        return {
-          name: user.displayName || 'Dr. Evelyn Reed',
-          email: user.email || 'e.reed@university.edu',
-          fallback: user.displayName ? user.displayName.charAt(0).toUpperCase() : 'ER',
-          description: 'Manage your public profile and contact details.',
-        };
+        return 'Manage your public profile and contact details.';
       case 'admin':
-        return {
-          name: user.displayName || 'Admin User',
-          email: user.email || 'admin@university.edu',
-          fallback: user.displayName ? user.displayName.charAt(0).toUpperCase() : 'AU',
-          description: 'System-wide administrative profile.',
-        };
+        return 'System-wide administrative profile.';
     }
   };
-
-  const userInfo = getRoleBasedInfo();
 
   return (
     <div className="container mx-auto max-w-2xl space-y-6 py-8">
       <div className="space-y-1">
         <h1 className="text-3xl font-bold tracking-tight">Profile</h1>
-        <p className="text-muted-foreground">{userInfo.description}</p>
+        <p className="text-muted-foreground">{getRoleBasedDescription()}</p>
       </div>
       <Card>
         <CardHeader>
@@ -108,7 +91,9 @@ export default function ProfilePage() {
           <div className="relative">
             <Avatar className="h-32 w-32 border-4 border-background shadow-md">
               <AvatarImage src={previewUrl ?? undefined} alt="Profile picture" />
-              <AvatarFallback className="text-4xl">{userInfo.fallback}</AvatarFallback>
+              <AvatarFallback className="text-4xl">
+                {user.displayName ? user.displayName.charAt(0).toUpperCase() : 'U'}
+              </AvatarFallback>
             </Avatar>
             <Button size="icon" className="absolute bottom-1 right-1 rounded-full" onClick={handleUploadClick}>
               <Camera className="h-5 w-5" />
@@ -116,8 +101,8 @@ export default function ProfilePage() {
             <Input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" />
           </div>
           <div className="text-center">
-            <h2 className="text-2xl font-semibold">{userInfo.name}</h2>
-            <p className="text-muted-foreground">{userInfo.email}</p>
+            <h2 className="text-2xl font-semibold">{user.displayName || 'User'}</h2>
+            <p className="text-muted-foreground">{user.email}</p>
           </div>
           <Button onClick={handleSave} disabled={!selectedFile || isUploading}>
             {isUploading ? 'Saving...' : 'Save Changes'}
