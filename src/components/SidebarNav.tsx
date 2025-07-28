@@ -32,6 +32,7 @@ import {SidebarMenu, SidebarMenuItem, SidebarMenuButton} from '@/components/ui/s
 import Link from 'next/link';
 import {usePathname} from 'next/navigation';
 import {useAuth} from '@/contexts/AuthContext';
+import {useSidebar} from '@/components/ui/sidebar';
 
 export const studentNavItems = [
   {href: '/', label: 'Dashboard', icon: LayoutDashboard},
@@ -85,6 +86,7 @@ export const adminNavItems = [
 export function SidebarNav() {
   const pathname = usePathname();
   const {role} = useAuth();
+  const {setOpenMobile} = useSidebar();
 
   let navItems;
   switch (role) {
@@ -101,6 +103,10 @@ export function SidebarNav() {
       navItems = [];
   }
 
+  const handleLinkClick = () => {
+    setOpenMobile(false);
+  };
+
   return (
     <SidebarMenu className="mt-8">
       {navItems.map(item => {
@@ -110,7 +116,7 @@ export function SidebarNav() {
         return (
           <SidebarMenuItem key={item.label}>
             <SidebarMenuButton asChild isActive={isActive} tooltip={item.label}>
-              <Link href={item.href}>
+              <Link href={item.href} onClick={handleLinkClick}>
                 <item.icon />
                 <span>{item.label}</span>
               </Link>
