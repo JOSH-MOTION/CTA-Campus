@@ -1,3 +1,4 @@
+
 // src/app/(app)/temp-update/page.tsx
 'use client';
 
@@ -14,73 +15,25 @@ import { Award, CheckCircle, Code, Edit, Film, GitBranch, Handshake, Loader2, Pl
 import { useAuth, UserData } from '@/contexts/AuthContext';
 import { awardPoint } from '@/services/points';
 import { v4 as uuidv4 } from 'uuid';
+import { Input } from '@/components/ui/input';
 
 const gradingData = [
-    { 
-        title: "Class Attendance", 
-        points: 1, 
-        description: "1 point per weekly class attendance",
-        icon: CheckCircle,
-    },
-    { 
-        title: "Class Assignments", 
-        points: 1, 
-        description: "1 point per assignment",
-        icon: Edit,
-    },
-    { 
-        title: "Class Exercises", 
-        points: 1, 
-        description: "1 point per exercise",
-        icon: Edit,
-    },
-    { 
-        title: "Weekly Projects", 
-        points: 1, 
-        description: "1 point per project completion",
-        icon: Projector
-    },
-    { 
-        title: "Monthly Personal Projects", 
-        points: 1, 
-        description: "1 point per project",
-        icon: Projector
-    },
-    { 
-        title: "Soft Skills & Product Training", 
-        points: 1, 
-        description: "1 point per attendance",
-        icon: Handshake
-    },
-    { 
-        title: "Mini Demo Days", 
-        points: 5, 
-        description: "5 points per demo",
-        icon: Presentation
-    },
-    { 
-        title: "100 Days of Code", 
-        points: 0.5, 
-        description: "0.5 points per day",
-        icon: Code
-    },
-    { 
-        title: "Code Review", 
-        points: 1, 
-        description: "1 point per contribution",
-        icon: GitBranch
-    },
-    { 
-        title: "Final Project Completion", 
-        points: 10, 
-        description: "Awarded upon completion",
-        icon: Award
-    },
+    { title: "Class Attendance" },
+    { title: "Class Assignments" },
+    { title: "Class Exercises" },
+    { title: "Weekly Projects" },
+    { title: "Monthly Personal Projects" },
+    { title: "Soft Skills & Product Training" },
+    { title: "Mini Demo Days" },
+    { title: "100 Days of Code" },
+    { title: "Code Review" },
+    { title: "Final Project Completion" },
 ];
 
 const tempUpdateSchema = z.object({
   studentId: z.string().nonempty('Please select a student.'),
-  activityIndex: z.string().nonempty('Please select an activity.'),
+  activityTitle: z.string().nonempty('Please select an activity.'),
+  points: z.coerce.number().min(0.1, 'Please enter a valid point value.'),
 });
 
 type TempUpdateFormValues = z.infer<typeof tempUpdateSchema>;
@@ -110,20 +63,15 @@ export default function TempUpdatePage() {
   const onSubmit = async (data: TempUpdateFormValues) => {
     setIsSubmitting(true);
     try {
-      const activity = gradingData[parseInt(data.activityIndex)];
-      if (!activity) {
-        throw new Error("Invalid activity selected.");
-      }
-
       // Generate a unique ID for this manual entry to ensure idempotency
-      const activityId = `manual-${activity.title.toLowerCase().replace(/\s+/g, '-')}-${uuidv4()}`;
+      const activityId = `manual-${data.activityTitle.toLowerCase().replace(/\s+/g, '-')}-${uuidv4()}`;
       
-      await awardPoint(data.studentId, activity.points, activity.title, activityId);
+      await awardPoint(data.studentId, data.points, data.activityTitle, activityId);
       
       const selectedStudent = students.find(s => s.uid === data.studentId);
       toast({
         title: 'Points Awarded!',
-        description: `${activity.points} points awarded to ${selectedStudent?.displayName} for "${activity.title}".`,
+        description: `${data.points} points awarded to ${selectedStudent?.displayName} for "${data.activityTitle}".`,
       });
       form.reset();
     } catch (error: any) {
@@ -147,7 +95,7 @@ export default function TempUpdatePage() {
       <Card className="max-w-2xl mx-auto">
         <CardHeader>
           <CardTitle>Award Points</CardTitle>
-          <CardDescription>Select a student and the activity for which to award points.</CardDescription>
+          <CardDescription>Select a student, activity, and enter the points to award.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -176,30 +124,46 @@ export default function TempUpdatePage() {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="activityIndex"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Activity</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select an activity to award points for" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {gradingData.map((activity, index) => (
-                          <SelectItem key={activity.title} value={index.toString()}>
-                            {activity.title} ({activity.points} points)
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                    control={form.control}
+                    name="activityTitle"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Activity</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                            <SelectTrigger>
+                            <SelectValue placeholder="Select an activity" />
+                            </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                            {gradingData.map((activity) => (
+                            <SelectItem key={activity.title} value={activity.title}>
+                                {activity.title}
+                            </SelectItem>
+                            ))}
+                        </SelectContent>
+                        </Select>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+
+                <FormField
+                    control={form.control}
+                    name="points"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Points to Award</FormLabel>
+                            <FormControl>
+                                <Input type="number" placeholder="e.g., 5" {...field} step="0.5"/>
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+              </div>
 
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <PlusCircle className="mr-2 h-4 w-4" />}
