@@ -41,9 +41,14 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
     loadUsers();
   }, [fetchAllUsers]);
 
-  const taughtGens = useMemo(() => {
-    return userData?.gensTaught?.split(',').map(g => g.trim()).filter(Boolean) || [];
-  }, [userData?.gensTaught]);
+  const availableGens = useMemo(() => {
+    const taughtGens = userData?.gensTaught?.split(',').map(g => g.trim()).filter(Boolean) || [];
+    const studentGens = allUsers
+        .filter(u => u.role === 'student' && u.gen)
+        .map(u => u.gen!);
+    const allGens = [...new Set([...taughtGens, ...studentGens])];
+    return allGens.sort();
+  }, [userData?.gensTaught, allUsers]);
 
   const studentsInSelectedGen = useMemo(() => {
     if (!selectedGen) return [];
@@ -51,10 +56,10 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
   }, [allUsers, selectedGen]);
 
   useEffect(() => {
-    if (taughtGens.length > 0 && !selectedGen) {
-      setSelectedGen(taughtGens[0]);
+    if (availableGens.length > 0 && !selectedGen) {
+      setSelectedGen(availableGens[0]);
     }
-  }, [taughtGens, selectedGen]);
+  }, [availableGens, selectedGen]);
 
   return (
     <div className="space-y-6">
@@ -63,7 +68,7 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
           <h1 className="text-3xl font-bold tracking-tight">Welcome, {user?.displayName || 'Teacher'}!</h1>
           <p className="text-muted-foreground">Manage your classes and students.</p>
         </div>
-        {taughtGens.length > 0 && (
+        {availableGens.length > 0 && (
           <div className="flex items-center gap-2">
             <p className="text-sm font-medium">Viewing:</p>
             <Select value={selectedGen} onValueChange={setSelectedGen}>
@@ -71,7 +76,7 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
                 <SelectValue placeholder="Select a Generation" />
               </SelectTrigger>
               <SelectContent>
-                {taughtGens.map(gen => (
+                {availableGens.map(gen => (
                   <SelectItem key={gen} value={gen}>
                     {gen}
                   </SelectItem>
@@ -148,7 +153,7 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
           ) : (
              <div className="flex h-48 items-center justify-center rounded-lg border-2 border-dashed">
                 <p className="text-muted-foreground">
-                  {taughtGens.length > 0 ? 'Select a generation to get started.' : 'No generations assigned to your profile.'}
+                  {loading ? 'Loading...' : 'No student generations found.'}
                 </p>
              </div>
           )}
