@@ -19,6 +19,10 @@ import {
   PencilRuler,
   UserCog,
   User,
+  CalendarPlus,
+  Rocket,
+  Code,
+  BookOpen,
 } from 'lucide-react';
 import {SidebarMenu, SidebarMenuItem, SidebarMenuButton} from '@/components/ui/sidebar';
 import Link from 'next/link';
@@ -27,16 +31,18 @@ import {useAuth} from '@/contexts/AuthContext';
 
 const studentNavItems = [
   {href: '/', label: 'Dashboard', icon: LayoutDashboard},
-  {href: '/chat', label: 'Chat', icon: MessageSquare},
+  {href: '/chat', label: 'Campus Connect', icon: MessageSquare},
   {href: '/announcements', label: 'Announcements', icon: Megaphone},
   {href: '/assignments', label: 'Assignments', icon: ListOrdered},
-  {href: '/exercises', label: 'Exercises', icon: PencilRuler},
   {href: '/projects', label: 'Projects', icon: BookMarked},
-  {href: '/materials', label: 'Class Materials', icon: BookCopy},
-  {href: '/submissions', label: 'Submissions', icon: Upload},
-  {href: '/timetable', label: 'Timetable', icon: CalendarCheck},
-  {href: '/directory', label: 'Directory', icon: Users},
+  {href: '/exercises', label: 'Exercises', icon: PencilRuler},
+  {href: '/attendance', label: 'Attendance', icon: UserCheck},
+  {href: '/100-days-of-code', label: '100 Days of Code', icon: Code},
   {href: '/roadmap', label: 'Roadmap', icon: Map},
+  {href: '/materials', label: 'Class Materials', icon: BookCopy},
+  {href: '/resources', label: 'Resources Library', icon: BookOpen},
+  {href: '/book-session', label: 'Book a Session', icon: CalendarPlus},
+  {href: '/work-ready', label: 'Work Ready', icon: Rocket},
 ];
 
 const teacherNavItems = [
