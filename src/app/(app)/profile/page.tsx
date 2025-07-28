@@ -1,7 +1,7 @@
 // src/app/(app)/profile/page.tsx
 'use client';
 
-import {useState, useRef} from 'react';
+import {useState, useRef, useEffect} from 'react';
 import {Avatar, AvatarImage, AvatarFallback} from '@/components/ui/avatar';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
@@ -19,9 +19,15 @@ export default function ProfilePage() {
   const {user, userData, role, loading} = useAuth();
   const {toast} = useToast();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(user?.photoURL || null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (user?.photoURL) {
+      setPreviewUrl(user.photoURL);
+    }
+  }, [user]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -65,7 +71,13 @@ export default function ProfilePage() {
     await auth.signOut();
   };
 
-  if (loading || !user || !userData) return <p>Loading...</p>;
+  if (loading || !user || !userData) {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <p>Loading...</p>
+      </div>
+    );
+  }
 
   const getRoleBasedDescription = () => {
     switch (role) {

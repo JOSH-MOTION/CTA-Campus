@@ -66,7 +66,7 @@ export function AuthProvider({children}: {children: ReactNode}) {
                  const fetchedData = delayedSnap.data() as UserData;
                  setUserData(fetchedData);
               }
-            }, 1000);
+            }, 2000); // Increased delay to ensure Firestore has time to write
           }
         }
       } else {
@@ -86,8 +86,12 @@ export function AuthProvider({children}: {children: ReactNode}) {
     if (user) {
       const docRef = doc(db, 'users', user.uid);
       try {
+        // When setting a role, we'll optimistically create/merge the role in the user's document.
+        // This is especially useful during the sign-up flow.
         await setDoc(docRef, { role: newRole }, { merge: true });
-        // After successfully setting the role in the DB, update the local userData state
+        
+        // After successfully setting the role, let's fetch the full document
+        // to update our local state completely.
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           setUserData(docSnap.data() as UserData);
