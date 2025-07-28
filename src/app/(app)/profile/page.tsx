@@ -7,12 +7,18 @@ import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
 import {useAuth} from '@/contexts/AuthContext';
-import {Camera} from 'lucide-react';
+import {Camera, LogOut} from 'lucide-react';
+import {auth, storage} from '@/lib/firebase';
+import {ref, uploadBytes, getDownloadURL} from 'firebase/storage';
+import {updateProfile} from 'firebase/auth';
+import {useToast} from '@/hooks/use-toast';
 
 export default function ProfilePage() {
-  const {role} = useAuth();
+  const {user, role, loading} = useAuth();
+  const {toast} = useToast();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(user?.photoURL || null);
+  const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -31,35 +37,55 @@ export default function ProfilePage() {
     fileInputRef.current?.click();
   };
 
-  const handleSave = () => {
-    if (selectedFile) {
-      // Here you would typically upload the file to Firebase Storage
-      console.log('Uploading file:', selectedFile.name);
-      alert(`Simulating upload for ${selectedFile.name}`);
+  const handleSave = async () => {
+    if (selectedFile && user) {
+      setIsUploading(true);
+      const storageRef = ref(storage, `profile-pictures/${user.uid}/${selectedFile.name}`);
+      try {
+        const snapshot = await uploadBytes(storageRef, selectedFile);
+        const downloadURL = await getDownloadURL(snapshot.ref);
+
+        await updateProfile(user, {photoURL: downloadURL});
+
+        setPreviewUrl(downloadURL);
+        setSelectedFile(null);
+        toast({title: 'Success', description: 'Profile picture updated!'});
+      } catch (error) {
+        console.error('Error uploading file:', error);
+        toast({variant: 'destructive', title: 'Error', description: 'Failed to update profile picture.'});
+      } finally {
+        setIsUploading(false);
+      }
     }
   };
+
+  const handleSignOut = async () => {
+    await auth.signOut();
+  };
+
+  if (loading || !user) return <p>Loading...</p>;
 
   const getRoleBasedInfo = () => {
     switch (role) {
       case 'student':
         return {
-          name: 'Alex Doe',
-          email: 'alex.doe@university.edu',
-          fallback: 'AD',
+          name: user.displayName || 'Alex Doe',
+          email: user.email || 'alex.doe@university.edu',
+          fallback: user.displayName ? user.displayName.charAt(0).toUpperCase() : 'AD',
           description: 'Update your profile picture and personal information.',
         };
       case 'teacher':
         return {
-          name: 'Dr. Evelyn Reed',
-          email: 'e.reed@university.edu',
-          fallback: 'ER',
+          name: user.displayName || 'Dr. Evelyn Reed',
+          email: user.email || 'e.reed@university.edu',
+          fallback: user.displayName ? user.displayName.charAt(0).toUpperCase() : 'ER',
           description: 'Manage your public profile and contact details.',
         };
       case 'admin':
         return {
-          name: 'Admin User',
-          email: 'admin@university.edu',
-          fallback: 'AU',
+          name: user.displayName || 'Admin User',
+          email: user.email || 'admin@university.edu',
+          fallback: user.displayName ? user.displayName.charAt(0).toUpperCase() : 'AU',
           description: 'System-wide administrative profile.',
         };
     }
@@ -84,27 +110,29 @@ export default function ProfilePage() {
               <AvatarImage src={previewUrl ?? undefined} alt="Profile picture" />
               <AvatarFallback className="text-4xl">{userInfo.fallback}</AvatarFallback>
             </Avatar>
-            <Button
-              size="icon"
-              className="absolute bottom-1 right-1 rounded-full"
-              onClick={handleUploadClick}
-            >
+            <Button size="icon" className="absolute bottom-1 right-1 rounded-full" onClick={handleUploadClick}>
               <Camera className="h-5 w-5" />
             </Button>
-            <Input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              className="hidden"
-              accept="image/*"
-            />
+            <Input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" />
           </div>
           <div className="text-center">
             <h2 className="text-2xl font-semibold">{userInfo.name}</h2>
             <p className="text-muted-foreground">{userInfo.email}</p>
           </div>
-          <Button onClick={handleSave} disabled={!selectedFile}>
-            Save Changes
+          <Button onClick={handleSave} disabled={!selectedFile || isUploading}>
+            {isUploading ? 'Saving...' : 'Save Changes'}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Account</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Button variant="destructive" onClick={handleSignOut}>
+            <LogOut className="mr-2" />
+            Sign Out
           </Button>
         </CardContent>
       </Card>

@@ -11,7 +11,9 @@ import {
 import {Label} from '@/components/ui/label';
 
 export function UserRoleSwitcher() {
-  const {role, setRole} = useAuth();
+  const {role, setRole, user} = useAuth();
+
+  if (!user) return null;
 
   return (
     <div className="flex items-center gap-2">
