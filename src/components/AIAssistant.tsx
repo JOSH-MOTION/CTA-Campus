@@ -18,6 +18,7 @@ import {Avatar, AvatarFallback} from '@/components/ui/avatar';
 import {faqChatbot} from '@/ai/flows/faq-chatbot';
 import {cn} from '@/lib/utils';
 import {useToast} from '@/hooks/use-toast';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -71,12 +72,20 @@ export function AIAssistant() {
 
   return (
     <Sheet>
-      <SheetTrigger asChild>
-        <Button>
-          <Bot className="mr-2 h-5 w-5" />
-          AI Assistant
-        </Button>
-      </SheetTrigger>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <SheetTrigger asChild>
+              <Button size="icon" className="h-14 w-14 rounded-full shadow-lg">
+                <Bot className="h-7 w-7" />
+              </Button>
+            </SheetTrigger>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>AI Assistant</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       <SheetContent className="flex w-full flex-col sm:max-w-lg">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
