@@ -41,9 +41,11 @@ export default function ChatPage() {
 
   const groupChats = useMemo(() => {
     const groups: ChatEntity[] = [];
-    if (role === 'teacher' && userData?.gensTaught) {
-      const taughtGens = userData.gensTaught.split(',').map(g => g.trim()).filter(Boolean);
-      taughtGens.forEach(gen => {
+
+    if (role === 'teacher') {
+      // Teachers see all group chats that exist based on student data.
+      const allGens = new Set(allStudents.map(student => student.gen).filter(Boolean));
+      allGens.forEach(gen => {
         groups.push({
           id: `group-${gen}`,
           name: `${gen} Hub`,
@@ -51,14 +53,17 @@ export default function ChatPage() {
         });
       });
     } else if (role === 'student' && userData?.gen) {
+      // Students only see their own generation's group chat.
       groups.push({
         id: `group-${userData.gen}`,
         name: `${userData.gen} Hub`,
         dataAiHint: 'group students',
       });
     }
-    return groups;
-  }, [role, userData]);
+
+    // Sort groups alphabetically by name
+    return groups.sort((a, b) => a.name.localeCompare(b.name));
+  }, [role, userData, allStudents]);
 
   const handleSelectChat = (entity: ChatEntity) => {
     setSelectedChat(entity);
@@ -131,26 +136,32 @@ export default function ChatPage() {
               )}
             </TabsContent>
             <TabsContent value="groups" className="m-0">
-              <div className="space-y-1 p-2">
-                {groupChats.map(group => (
-                  <Button
-                    key={group.id}
-                    variant={selectedChat?.id === group.id ? 'secondary' : 'ghost'}
-                    className="h-auto w-full justify-start p-3"
-                    onClick={() => handleSelectChat(group)}
-                  >
-                    <Avatar className="mr-3 h-10 w-10">
-                      <AvatarFallback>G</AvatarFallback>
-                    </Avatar>
-                    <div className="text-left">
-                      <p className="font-semibold">{group.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {messages[group.id]?.slice(-1)[0]?.text || 'No messages yet'}
-                      </p>
-                    </div>
-                  </Button>
-                ))}
-              </div>
+              {loading ? (
+                <div className="flex justify-center items-center p-4">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+              ) : (
+                <div className="space-y-1 p-2">
+                  {groupChats.map(group => (
+                    <Button
+                      key={group.id}
+                      variant={selectedChat?.id === group.id ? 'secondary' : 'ghost'}
+                      className="h-auto w-full justify-start p-3"
+                      onClick={() => handleSelectChat(group)}
+                    >
+                      <Avatar className="mr-3 h-10 w-10">
+                        <AvatarFallback>G</AvatarFallback>
+                      </Avatar>
+                      <div className="text-left">
+                        <p className="font-semibold">{group.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {messages[group.id]?.slice(-1)[0]?.text || 'No messages yet'}
+                        </p>
+                      </div>
+                    </Button>
+                  ))}
+                </div>
+              )}
             </TabsContent>
           </div>
         </Tabs>
