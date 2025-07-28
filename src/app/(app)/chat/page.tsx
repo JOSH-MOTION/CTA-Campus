@@ -2,6 +2,7 @@
 'use client';
 
 import {useState, useEffect, useMemo} from 'react';
+import {useSearchParams} from 'next/navigation';
 import {Avatar, AvatarFallback, AvatarImage} from '@/components/ui/avatar';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
@@ -22,29 +23,47 @@ type Message = {sender: string; text: string; time: string};
 
 export default function ChatPage() {
   const {fetchAllUsers, userData, role} = useAuth();
-  const [allStudents, setAllStudents] = useState<UserData[]>([]);
+  const searchParams = useSearchParams();
+  const [allUsers, setAllUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [selectedChat, setSelectedChat] = useState<ChatEntity | null>(null);
   const [messages, setMessages] = useState<Record<string, Message[]>>(initialMessages);
 
+  const directMessageUserId = searchParams.get('dm');
+
   useEffect(() => {
     const loadUsers = async () => {
       setLoading(true);
       const users = await fetchAllUsers();
-      const students = users.filter(u => u.role === 'student');
-      setAllStudents(students);
+      setAllUsers(users);
+
+      // If a user ID is passed in the URL, select that user for a direct message.
+      if (directMessageUserId) {
+        const userToDm = users.find(u => u.uid === directMessageUserId);
+        if (userToDm) {
+          setSelectedChat({
+            id: userToDm.uid,
+            name: userToDm.displayName,
+            avatar: userToDm.photoURL,
+            dataAiHint: 'user portrait',
+          });
+        }
+      }
+
       setLoading(false);
     };
     loadUsers();
-  }, [fetchAllUsers]);
+  }, [fetchAllUsers, directMessageUserId]);
+  
+  const allStudents = useMemo(() => allUsers.filter(u => u.role === 'student'), [allUsers]);
 
   const groupChats = useMemo(() => {
     const groups: ChatEntity[] = [];
+    const allGens = new Set(allStudents.map(student => student.gen).filter(Boolean));
 
     if (role === 'teacher') {
       // Teachers see all group chats that exist based on student data.
-      const allGens = new Set(allStudents.map(student => student.gen).filter(Boolean));
       allGens.forEach(gen => {
         groups.push({
           id: `group-${gen}`,
@@ -113,7 +132,7 @@ export default function ChatPage() {
                 </div>
               ) : (
                 <div className="space-y-1 p-2">
-                  {allStudents.map(user => (
+                  {allUsers.filter(u => u.uid !== userData?.uid).map(user => (
                     <Button
                       key={user.uid}
                       variant={selectedChat?.id === user.uid ? 'secondary' : 'ghost'}

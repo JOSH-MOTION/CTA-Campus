@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/card';
 import {Avatar, AvatarFallback, AvatarImage} from '@/components/ui/avatar';
 import {Button} from '@/components/ui/button';
-import {Mail, Phone, Building, MessageSquareQuote, Loader2, ServerCrash, Bot, CalendarPlus} from 'lucide-react';
+import {Mail, Phone, Building, MessageSquareQuote, Loader2, ServerCrash, Bot, CalendarPlus, MessageSquare} from 'lucide-react';
 import {suggestContactMethod} from '@/ai/flows/suggested-contact-method';
 import {
   Dialog,
@@ -25,10 +25,12 @@ import {
 } from '@/components/ui/dialog';
 import {Alert, AlertDescription, AlertTitle} from '../ui/alert';
 import Link from 'next/link';
+import {useRouter} from 'next/navigation';
 import {useAuth} from '@/contexts/AuthContext';
 
 
 export interface Contact {
+  id: string;
   name: string;
   role: string;
   department: string;
@@ -47,10 +49,13 @@ interface ContactCardProps {
 
 export function ContactCard({contact}: ContactCardProps) {
   const {role} = useAuth();
+  const router = useRouter();
   const [suggestion, setSuggestion] = useState<{contactMethod: string; reason: string} | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  
+  const isFaculty = contact.role === 'Teacher' || contact.role === 'Administrator';
 
   const getSuggestion = async () => {
     setIsLoading(true);
@@ -77,6 +82,10 @@ export function ContactCard({contact}: ContactCardProps) {
       getSuggestion();
     }
   };
+  
+  const handleSendMessage = () => {
+      router.push(`/chat?dm=${contact.id}`);
+  }
 
   return (
     <Card className="flex flex-col shadow-sm transition-all hover:shadow-md">
@@ -88,6 +97,7 @@ export function ContactCard({contact}: ContactCardProps) {
         <div className="pt-4">
           <CardTitle>{contact.name}</CardTitle>
           <CardDescription>{contact.role}</CardDescription>
+           <CardDescription className="text-xs">{contact.department}</CardDescription>
         </div>
       </CardHeader>
       <CardContent className="flex-grow space-y-3 text-sm text-muted-foreground">
@@ -107,7 +117,7 @@ export function ContactCard({contact}: ContactCardProps) {
         </div>
       </CardContent>
       <CardFooter className="flex flex-col gap-2">
-         {role === 'student' && contact.name !== 'Library Front Desk' && (
+         {role === 'student' && isFaculty && (
            <Button className="w-full" asChild>
              <Link href="/book-session">
               <CalendarPlus className="mr-2 h-4 w-4" />
@@ -115,6 +125,10 @@ export function ContactCard({contact}: ContactCardProps) {
             </Link>
           </Button>
         )}
+         <Button className="w-full" variant="secondary" onClick={handleSendMessage}>
+            <MessageSquare className="mr-2 h-4 w-4" />
+            Send Message
+        </Button>
         <Dialog open={isDialogOpen} onOpenChange={handleOpenChange}>
           <DialogTrigger asChild>
             <Button className="w-full" variant="outline">
