@@ -21,7 +21,7 @@ export default function AdminSignupPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const {toast} = useToast();
-  const {user} = useAuth();
+  const {user, setRole} = useAuth();
 
   useEffect(() => {
     if (user) {
@@ -36,11 +36,8 @@ export default function AdminSignupPage() {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(userCredential.user, {displayName: fullName});
-      console.log('Admin Signup details:', {
-        uid: userCredential.user.uid,
-        role: 'admin',
-        fullName,
-      });
+      // In a real app, this would be a separate API call to set custom claims
+      setRole('admin');
       toast({title: 'Sign Up Successful', description: 'Your admin account has been created.'});
     } catch (error: any) {
       toast({

@@ -29,7 +29,7 @@ export default function TeacherSignupPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const {toast} = useToast();
-  const {user} = useAuth();
+  const {user, setRole} = useAuth();
 
   useEffect(() => {
     if (user) {
@@ -60,14 +60,8 @@ export default function TeacherSignupPage() {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(userCredential.user, {displayName: fullName});
-      console.log('Teacher Signup details:', {
-        uid: userCredential.user.uid,
-        role: 'teacher',
-        fullName,
-        gensTaught,
-        bio,
-        profilePicture: selectedFile ? selectedFile.name : 'none',
-      });
+      // In a real app, this would be a separate API call to set custom claims
+      setRole('teacher');
       toast({title: 'Sign Up Successful', description: 'Your teacher account has been created.'});
     } catch (error: any) {
       toast({
