@@ -15,7 +15,7 @@ import {Label} from '@/components/ui/label';
 import {cn} from '@/lib/utils';
 
 export default function RoadmapPage() {
-  const {roadmapData, completedTopics, toggleTopicCompletion} = useRoadmap();
+  const {roadmapData, completedWeeks, toggleWeekCompletion} = useRoadmap();
   const {role} = useAuth();
   const isTeacher = role === 'teacher';
 
@@ -42,47 +42,56 @@ export default function RoadmapPage() {
             <AccordionContent className="pt-2">
               {topic.weeks.length > 0 ? (
                 <div className="grid gap-4 md:grid-cols-2">
-                  {topic.weeks.map((week, weekIndex) => (
-                    <Card key={weekIndex}>
-                      <CardHeader>
-                        <CardTitle className="text-base">{week.title}</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ul className="space-y-3">
-                          {week.topics.map(item => {
-                            const isCompleted = completedTopics.has(item.id);
-                            return (
-                              <li key={item.id} className="flex items-start gap-3">
-                                {isTeacher ? (
-                                  <div className="flex items-center space-x-2 pt-1">
-                                    <Checkbox
-                                      id={item.id}
-                                      checked={isCompleted}
-                                      onCheckedChange={() => toggleTopicCompletion(item.id)}
-                                    />
-                                  </div>
-                                ) : isCompleted ? (
-                                  <CheckCircle className="mt-1 h-4 w-4 shrink-0 text-primary" />
-                                ) : (
-                                  <Circle className="mt-1 h-4 w-4 shrink-0 text-muted-foreground/50" />
-                                )}
-                                <Label
-                                  htmlFor={isTeacher ? item.id : undefined}
-                                  className={cn(
-                                    'text-sm text-muted-foreground',
-                                    isCompleted && 'line-through',
-                                    isTeacher ? 'cursor-pointer' : ''
-                                  )}
-                                >
-                                  {item.title}
+                  {topic.weeks.map(week => {
+                    const weekId = `${topic.title}-${week.title}`;
+                    const isCompleted = completedWeeks.has(weekId);
+                    return (
+                      <Card key={weekId}>
+                        <CardHeader>
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-base">{week.title}</CardTitle>
+                            {isTeacher ? (
+                              <div className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={weekId}
+                                  checked={isCompleted}
+                                  onCheckedChange={() => toggleWeekCompletion(weekId)}
+                                />
+                                <Label htmlFor={weekId} className="text-sm font-normal">
+                                  Mark as done
                                 </Label>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </CardContent>
-                    </Card>
-                  ))}
+                              </div>
+                            ) : isCompleted ? (
+                              <CheckCircle className="h-5 w-5 text-primary" />
+                            ) : null}
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <ul className="space-y-3">
+                            {week.topics.map(item => {
+                              return (
+                                <li key={item.id} className="flex items-start gap-3">
+                                  {isCompleted ? (
+                                    <CheckCircle className="mt-1 h-4 w-4 shrink-0 text-primary" />
+                                  ) : (
+                                    <Circle className="mt-1 h-4 w-4 shrink-0 text-muted-foreground/50" />
+                                  )}
+                                  <span
+                                    className={cn(
+                                      'text-sm text-muted-foreground',
+                                      isCompleted && 'line-through'
+                                    )}
+                                  >
+                                    {item.title}
+                                  </span>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="p-4 text-center text-muted-foreground">

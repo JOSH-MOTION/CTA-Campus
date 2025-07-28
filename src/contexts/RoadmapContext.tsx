@@ -22,13 +22,13 @@ export interface RoadmapSubject {
 }
 
 interface RoadmapContextType {
-  completedTopics: Set<string>;
-  toggleTopicCompletion: (topicId: string) => void;
+  completedWeeks: Set<string>;
+  toggleWeekCompletion: (weekId: string) => void;
   roadmapData: RoadmapSubject[];
 }
 
 const roadmapData: RoadmapSubject[] = [
-    {
+  {
     title: 'HTML',
     duration: '2 weeks',
     weeks: [
@@ -424,22 +424,22 @@ const roadmapData: RoadmapSubject[] = [
 const RoadmapContext = createContext<RoadmapContextType | undefined>(undefined);
 
 export const RoadmapProvider: FC<{children: ReactNode}> = ({children}) => {
-  const [completedTopics, setCompletedTopics] = useState<Set<string>>(new Set());
+  const [completedWeeks, setCompletedWeeks] = useState<Set<string>>(new Set());
 
-  const toggleTopicCompletion = (topicId: string) => {
-    setCompletedTopics(prev => {
+  const toggleWeekCompletion = (weekId: string) => {
+    setCompletedWeeks(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(topicId)) {
-        newSet.delete(topicId);
+      if (newSet.has(weekId)) {
+        newSet.delete(weekId);
       } else {
-        newSet.add(topicId);
+        newSet.add(weekId);
       }
       return newSet;
     });
   };
 
   return (
-    <RoadmapContext.Provider value={{roadmapData, completedTopics, toggleTopicCompletion}}>
+    <RoadmapContext.Provider value={{roadmapData, completedWeeks, toggleWeekCompletion}}>
       {children}
     </RoadmapContext.Provider>
   );
