@@ -28,6 +28,7 @@ import {
   CalendarClock,
   Award,
   TrendingUp,
+  History,
 } from 'lucide-react';
 import {SidebarMenu, SidebarMenuItem, SidebarMenuButton} from '@/components/ui/sidebar';
 import Link from 'next/link';
@@ -83,6 +84,7 @@ export const adminNavItems = [
   {href: '/roadmap', label: 'Roadmap', icon: Map},
   {href: '/directory', label: 'Directory', icon: Contact},
   {href: '/career', label: 'Career Module', icon: GraduationCap},
+  {href: '/temp-update', label: 'Temp Update', icon: History},
   {href: '/profile', label: 'Profile', icon: User},
 ];
 
