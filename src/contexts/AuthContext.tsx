@@ -1,7 +1,7 @@
 // src/contexts/AuthContext.tsx
 'use client';
 
-import {createContext, useContext, useState, ReactNode, useEffect} from 'react';
+import {createContext, useContext, useState, ReactNode, useEffect, useCallback} from 'react';
 import {auth, db} from '@/lib/firebase';
 import type {User} from 'firebase/auth';
 import {onAuthStateChanged}from 'firebase/auth';
@@ -104,12 +104,12 @@ export function AuthProvider({children}: {children: ReactNode}) {
     }
   };
 
-  const fetchAllUsers = async (): Promise<UserData[]> => {
+  const fetchAllUsers = useCallback(async (): Promise<UserData[]> => {
     const usersCollection = collection(db, 'users');
     const usersSnapshot = await getDocs(usersCollection);
     const usersList = usersSnapshot.docs.map(doc => doc.data() as UserData);
     return usersList;
-  };
+  }, []);
 
   return (
     <AuthContext.Provider value={{user, userData, role, loading, setRole: handleSetRole, fetchAllUsers}}>
