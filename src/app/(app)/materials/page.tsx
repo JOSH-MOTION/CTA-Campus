@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { PlusCircle, Youtube, FileText, Loader2 } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, getDocs, query, orderBy, Timestamp } from 'firebase/firestore';
+import { useAuth } from '@/contexts/AuthContext';
 
 
 const materialSchema = z.object({
@@ -39,6 +40,8 @@ interface Material extends MaterialFormValues {
 export default function MaterialsPage() {
   const { roadmapData } = useRoadmap();
   const { toast } = useToast();
+  const { role } = useAuth();
+  const isTeacher = role === 'teacher' || role === 'admin';
   const [materials, setMaterials] = useState<Material[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -111,7 +114,7 @@ export default function MaterialsPage() {
        toast({
         variant: 'destructive',
         title: 'Database Error',
-        description: 'Failed to save the material. Please try again.',
+        description: 'Failed to save the material. You might not have permission.',
       });
     } finally {
       setIsSubmitting(false);
@@ -132,123 +135,126 @@ export default function MaterialsPage() {
         <p className="text-muted-foreground">Add and manage learning resources for each topic.</p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Add New Material</CardTitle>
-          <CardDescription>Link a video or slide deck to a specific topic in the roadmap.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="title"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Title</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., Flexbox Explained" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                 <FormField
+      {isTeacher && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Add New Material</CardTitle>
+            <CardDescription>Link a video or slide deck to a specific topic in the roadmap.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
                   control={form.control}
-                  name="videoUrl"
+                  name="title"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Video URL (Optional)</FormLabel>
+                      <FormLabel>Title</FormLabel>
                       <FormControl>
-                        <Input placeholder="https://youtube.com/..." {...field} />
+                        <Input placeholder="e.g., Flexbox Explained" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                 <FormField
-                  control={form.control}
-                  name="slidesUrl"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Slides URL (Optional)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="https://slides.com/..." {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="videoUrl"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Video URL (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="https://youtube.com/..." {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="slidesUrl"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Slides URL (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="https://slides.com/..." {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
-               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <FormField
-                  control={form.control}
-                  name="subject"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Subject</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger><SelectValue placeholder="Select Subject" /></SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {roadmapData.map(s => <SelectItem key={s.title} value={s.title}>{s.title}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                  <FormField
+                    control={form.control}
+                    name="subject"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Subject</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger><SelectValue placeholder="Select Subject" /></SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {roadmapData.map(s => <SelectItem key={s.title} value={s.title}>{s.title}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="week"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Week</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={!selectedSubjectTitle}>
+                          <FormControl>
+                            <SelectTrigger><SelectValue placeholder="Select Week" /></SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {availableWeeks.map(w => <SelectItem key={w.title} value={w.title}>{w.title}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="topic"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Topic</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={!selectedWeekTitle}>
+                          <FormControl>
+                            <SelectTrigger><SelectValue placeholder="Select Topic" /></SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {availableTopics.map(t => <SelectItem key={t.id} value={t.title}>{t.title}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Adding...</>
+                  ) : (
+                    <><PlusCircle className="mr-2 h-4 w-4" /> Add Material</>
                   )}
-                />
-                 <FormField
-                  control={form.control}
-                  name="week"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Week</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} disabled={!selectedSubjectTitle}>
-                        <FormControl>
-                          <SelectTrigger><SelectValue placeholder="Select Week" /></SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {availableWeeks.map(w => <SelectItem key={w.title} value={w.title}>{w.title}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="topic"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Topic</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} disabled={!selectedWeekTitle}>
-                        <FormControl>
-                          <SelectTrigger><SelectValue placeholder="Select Topic" /></SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                           {availableTopics.map(t => <SelectItem key={t.id} value={t.title}>{t.title}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Adding...</>
-                ) : (
-                  <><PlusCircle className="mr-2 h-4 w-4" /> Add Material</>
-                )}
-              </Button>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+                </Button>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
+      )}
+
 
       <div className="space-y-4">
         <h2 className="text-2xl font-semibold tracking-tight">Uploaded Materials</h2>

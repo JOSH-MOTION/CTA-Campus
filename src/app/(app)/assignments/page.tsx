@@ -3,7 +3,7 @@
 
 import { useMemo } from 'react';
 import {Button} from '@/components/ui/button';
-import {PlusCircle, ListOrdered, ArrowRight, Clock} from 'lucide-react';
+import {PlusCircle, ListOrdered, ArrowRight, Clock, Loader2} from 'lucide-react';
 import {useAuth} from '@/contexts/AuthContext';
 import {useAssignments} from '@/contexts/AssignmentsContext';
 import {Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle} from '@/components/ui/card';
@@ -13,7 +13,7 @@ import {format} from 'date-fns';
 
 export default function AssignmentsPage() {
   const {role, userData} = useAuth();
-  const {assignments} = useAssignments();
+  const {assignments, loading} = useAssignments();
   const isTeacher = role === 'teacher' || role === 'admin';
 
   const filteredAssignments = useMemo(() => {
@@ -51,7 +51,11 @@ export default function AssignmentsPage() {
         )}
       </div>
 
-      {sortedAssignments.length > 0 ? (
+      {loading ? (
+        <div className="flex h-64 flex-col items-center justify-center rounded-lg border-2 border-dashed">
+            <Loader2 className="h-12 w-12 animate-spin text-muted-foreground" />
+        </div>
+      ) : sortedAssignments.length > 0 ? (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {sortedAssignments.map(assignment => (
             <Card key={assignment.id} className="flex flex-col">

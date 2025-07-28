@@ -3,6 +3,11 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Helper function to check if the user is an admin or teacher
+    function isPrivileged() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'teacher'];
+    }
+
     // Users collection rules
     match /users/{userId} {
       // Any authenticated user can get a single user's public data
@@ -20,12 +25,33 @@ service cloud.firestore {
     
     // Materials collection rules
     match /materials/{materialId} {
-      // Any authenticated user can read or create materials
-      allow read, create: if request.auth != null;
+      // Any authenticated user can read materials
+      allow read: if request.auth != null;
+      // Only privileged users (teachers/admins) can create, update, or delete materials
+      allow write: if request.auth != null && isPrivileged();
+    }
+
+    // Announcements collection rules
+    match /announcements/{announcementId} {
+       // Any authenticated user can read announcements
+      allow read: if request.auth != null;
+      // Only privileged users (teachers/admins) can create, update, or delete announcements
+      allow write: if request.auth != null && isPrivileged();
+    }
+
+    // Assignments collection rules
+    match /assignments/{assignmentId} {
+       // Any authenticated user can read assignments
+      allow read: if request.auth != null;
+      // Only privileged users (teachers/admins) can create, update, or delete assignments
+      allow write: if request.auth != null && isPrivileged();
     }
 
     // Chat collection rules
     match /chats/{chatId}/messages/{messageId} {
+      // Allow read and write for any authenticated user.
+      // More specific logic (isMemberOfDm, isMemberOfGroup) can be re-added
+      // once custom claims are implemented for more secure role checking.
       allow read, write: if request.auth != null;
     }
   }

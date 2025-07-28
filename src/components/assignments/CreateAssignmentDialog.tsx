@@ -22,7 +22,7 @@ import {useAssignments} from '@/contexts/AssignmentsContext';
 import {useToast} from '@/hooks/use-toast';
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover';
 import {cn} from '@/lib/utils';
-import {CalendarIcon, Clock} from 'lucide-react';
+import {CalendarIcon, Clock, Loader2} from 'lucide-react';
 import {format} from 'date-fns';
 import {Calendar} from '@/components/ui/calendar';
 import {useAuth, UserData} from '@/contexts/AuthContext';
@@ -62,19 +62,20 @@ const timeSlots = Array.from({ length: 24 * 2 }, (_, i) => {
 
 export function CreateAssignmentDialog({children}: CreateAssignmentDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const {addAssignment} = useAssignments();
   const {toast} = useToast();
   const {fetchAllUsers} = useAuth();
   const [allUsers, setAllUsers] = useState<UserData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingUsers, setLoadingUsers] = useState(true);
 
   useEffect(() => {
     if (isOpen) {
       const loadUsers = async () => {
-        setLoading(true);
+        setLoadingUsers(true);
         const users = await fetchAllUsers();
         setAllUsers(users);
-        setLoading(false);
+        setLoadingUsers(false);
       };
       loadUsers();
     }
@@ -107,7 +108,8 @@ export function CreateAssignmentDialog({children}: CreateAssignmentDialogProps) 
       name: "dueDates",
   });
 
-  const onSubmit = (data: AssignmentFormValues) => {
+  const onSubmit = async (data: AssignmentFormValues) => {
+    setIsSubmitting(true);
     const activeDueDates = data.dueDates
         .filter(d => d.enabled && d.date)
         .map(d => {
@@ -123,21 +125,32 @@ export function CreateAssignmentDialog({children}: CreateAssignmentDialogProps) 
             title: "Error",
             description: "Please set a valid date and time for at least one enabled day.",
         });
+        setIsSubmitting(false);
         return;
     }
 
-    addAssignment({
-      title: data.title,
-      description: data.description,
-      targetGen: data.targetGen,
-      dueDates: activeDueDates,
-    });
-    toast({
-      title: 'Assignment Created',
-      description: 'Your new assignment has been posted.',
-    });
-    form.reset();
-    setIsOpen(false);
+    try {
+        await addAssignment({
+          title: data.title,
+          description: data.description,
+          targetGen: data.targetGen,
+          dueDates: activeDueDates,
+        });
+        toast({
+          title: 'Assignment Created',
+          description: 'Your new assignment has been posted.',
+        });
+        form.reset();
+        setIsOpen(false);
+    } catch(error) {
+         toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Failed to create assignment. You may not have permission.",
+        });
+    } finally {
+        setIsSubmitting(false);
+    }
   };
 
   return (
@@ -170,7 +183,7 @@ export function CreateAssignmentDialog({children}: CreateAssignmentDialogProps) 
                 render={({field}) => (
                   <FormItem>
                     <FormLabel>Target Generation</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loading}>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loadingUsers}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select a generation" />
@@ -299,7 +312,10 @@ export function CreateAssignmentDialog({children}: CreateAssignmentDialogProps) 
               <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit">Create</Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Create
+              </Button>
             </DialogFooter>
           </form>
         </Form>

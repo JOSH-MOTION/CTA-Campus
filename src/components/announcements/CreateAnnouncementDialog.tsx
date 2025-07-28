@@ -22,6 +22,7 @@ import {useAnnouncements} from '@/contexts/AnnouncementsContext';
 import {useAuth, UserData} from '@/contexts/AuthContext';
 import {useToast} from '@/hooks/use-toast';
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select';
+import { Loader2 } from 'lucide-react';
 
 const announcementSchema = z.object({
   title: z.string().min(5, 'Title must be at least 5 characters long.'),
@@ -37,19 +38,20 @@ interface CreateAnnouncementDialogProps {
 
 export function CreateAnnouncementDialog({children}: CreateAnnouncementDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const {addAnnouncement} = useAnnouncements();
   const {toast} = useToast();
   const {user, fetchAllUsers} = useAuth();
   const [allUsers, setAllUsers] = useState<UserData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingUsers, setLoadingUsers] = useState(true);
 
   useEffect(() => {
     if (isOpen) {
       const loadUsers = async () => {
-        setLoading(true);
+        setLoadingUsers(true);
         const users = await fetchAllUsers();
         setAllUsers(users);
-        setLoading(false);
+        setLoadingUsers(false);
       };
       loadUsers();
     }
@@ -71,17 +73,28 @@ export function CreateAnnouncementDialog({children}: CreateAnnouncementDialogPro
     },
   });
 
-  const onSubmit = (data: AnnouncementFormValues) => {
-    addAnnouncement({
-      ...data,
-      author: user?.displayName || 'Teacher',
-    });
-    toast({
-      title: 'Announcement Created',
-      description: 'Your announcement has been posted.',
-    });
-    form.reset();
-    setIsOpen(false);
+  const onSubmit = async (data: AnnouncementFormValues) => {
+    setIsSubmitting(true);
+    try {
+      await addAnnouncement({
+        ...data,
+        author: user?.displayName || 'Teacher',
+      });
+      toast({
+        title: 'Announcement Created',
+        description: 'Your announcement has been posted.',
+      });
+      form.reset();
+      setIsOpen(false);
+    } catch (error) {
+       toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to create announcement. You may not have permission.',
+      });
+    } finally {
+        setIsSubmitting(false);
+    }
   };
 
   return (
@@ -115,7 +128,7 @@ export function CreateAnnouncementDialog({children}: CreateAnnouncementDialogPro
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Target Generation</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loading}>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loadingUsers}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select a generation" />
@@ -148,7 +161,10 @@ export function CreateAnnouncementDialog({children}: CreateAnnouncementDialogPro
               <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit">Create</Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Create
+              </Button>
             </DialogFooter>
           </form>
         </Form>

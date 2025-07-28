@@ -3,7 +3,7 @@
 
 import { useMemo } from 'react';
 import {Button} from '@/components/ui/button';
-import {PlusCircle, Rss} from 'lucide-react';
+import {PlusCircle, Rss, Loader2} from 'lucide-react';
 import {useAuth} from '@/contexts/AuthContext';
 import {useAnnouncements} from '@/contexts/AnnouncementsContext';
 import {Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle} from '@/components/ui/card';
@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 
 export default function AnnouncementsPage() {
   const {role, userData} = useAuth();
-  const {announcements} = useAnnouncements();
+  const {announcements, loading} = useAnnouncements();
   const isTeacher = role === 'teacher' || role === 'admin';
 
   const filteredAnnouncements = useMemo(() => {
@@ -45,7 +45,11 @@ export default function AnnouncementsPage() {
         )}
       </div>
 
-      {sortedAnnouncements.length > 0 ? (
+      {loading ? (
+         <div className="flex h-64 flex-col items-center justify-center rounded-lg border-2 border-dashed">
+            <Loader2 className="h-12 w-12 animate-spin text-muted-foreground" />
+         </div>
+      ) : sortedAnnouncements.length > 0 ? (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {sortedAnnouncements.map(announcement => (
             <Card key={announcement.id}>
