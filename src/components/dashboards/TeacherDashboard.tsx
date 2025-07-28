@@ -119,7 +119,7 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
                   <BarChart2 className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">92%</div>
+                  <div className="text-2xl font-bold">N/A</div>
                   <p className="text-xs text-muted-foreground">(Data not yet available)</p>
                 </CardContent>
               </Card>
@@ -129,7 +129,7 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
                   <BookOpen className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">8</div>
+                  <div className="text-2xl font-bold">N/A</div>
                   <p className="text-xs text-muted-foreground">(Data not yet available)</p>
                 </CardContent>
               </Card>
@@ -161,7 +161,7 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
             <CardDescription>New assignments waiting for your review across all generations.</CardDescription>
           </CardHeader>
           <CardContent>
-            <p>A list of recent submissions would go here. (Data not yet available)</p>
+            <p className="text-sm text-muted-foreground">A list of recent submissions would go here. (Feature not yet implemented)</p>
           </CardContent>
         </Card>
       </div>
