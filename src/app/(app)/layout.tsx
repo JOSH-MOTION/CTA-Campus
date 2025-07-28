@@ -12,7 +12,7 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import type {ReactNode} from 'react';
-import {AuthProvider, useAuth} from '@/contexts/AuthContext';
+import {useAuth} from '@/contexts/AuthContext';
 import {UserRoleSwitcher} from '@/components/UserRoleSwitcher';
 import {RoadmapProvider} from '@/contexts/RoadmapContext';
 import {AnnouncementsProvider} from '@/contexts/AnnouncementsContext';
@@ -84,14 +84,12 @@ function ProtectedLayout({children}: {children: ReactNode}) {
 
 export default function AppLayout({children}: {children: ReactNode}) {
   return (
-    <AuthProvider>
-      <RoadmapProvider>
-        <AnnouncementsProvider>
-          <AssignmentsProvider>
-            <ProtectedLayout>{children}</ProtectedLayout>
-          </AssignmentsProvider>
-        </AnnouncementsProvider>
-      </RoadmapProvider>
-    </AuthProvider>
+    <RoadmapProvider>
+      <AnnouncementsProvider>
+        <AssignmentsProvider>
+          <ProtectedLayout>{children}</ProtectedLayout>
+        </AssignmentsProvider>
+      </AnnouncementsProvider>
+    </RoadmapProvider>
   );
 }

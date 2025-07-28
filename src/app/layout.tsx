@@ -3,6 +3,7 @@ import './globals.css';
 import {cn} from '@/lib/utils';
 import {Toaster} from '@/components/ui/toaster';
 import {ThemeProvider} from '@/components/ThemeProvider';
+import {AuthProvider} from '@/contexts/AuthContext';
 
 export const metadata: Metadata = {
   title: 'CTA Portal',
@@ -26,7 +27,7 @@ export default function RootLayout({
       </head>
       <body className={cn('min-h-screen bg-background font-body antialiased')}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          {children}
+          <AuthProvider>{children}</AuthProvider>
           <Toaster />
         </ThemeProvider>
       </body>
