@@ -5,7 +5,6 @@ import {
   MessageSquare,
   Megaphone,
   ClipboardList,
-  PenSquare,
   Briefcase,
   BookCopy,
   Upload,
@@ -15,6 +14,9 @@ import {
   Mail,
   Map,
   GraduationCap,
+  ListOrdered,
+  BookMarked,
+  PencilRuler,
 } from 'lucide-react';
 import {SidebarMenu, SidebarMenuItem, SidebarMenuButton} from '@/components/ui/sidebar';
 import Link from 'next/link';
@@ -24,9 +26,9 @@ const navItems = [
   {href: '/', label: 'Dashboard', icon: LayoutDashboard},
   {href: '/chat', label: 'Chat', icon: MessageSquare},
   {href: '/announcements', label: 'Announcements', icon: Megaphone},
-  {href: '/assignments', label: 'Assignments', icon: ClipboardList},
-  {href: '/exercises', label: 'Exercises', icon: PenSquare},
-  {href: '/projects', label: 'Projects', icon: Briefcase},
+  {href: '/assignments', label: 'Assignments', icon: ListOrdered},
+  {href: '/exercises', label: 'Exercises', icon: PencilRuler},
+  {href: '/projects', label: 'Projects', icon: BookMarked},
   {href: '/materials', label: 'Class Materials', icon: BookCopy},
   {href: '/submissions', label: 'Submissions', icon: Upload},
   {href: '/students', label: 'Student Management', icon: Users},
