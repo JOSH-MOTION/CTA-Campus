@@ -12,6 +12,7 @@ import {auth, storage} from '@/lib/firebase';
 import {ref, uploadBytes, getDownloadURL} from 'firebase/storage';
 import {updateProfile} from 'firebase/auth';
 import {useToast} from '@/hooks/use-toast';
+import { Badge } from '@/components/ui/badge';
 
 export default function ProfilePage() {
   const {user, role, loading} = useAuth();
@@ -103,6 +104,7 @@ export default function ProfilePage() {
           <div className="text-center">
             <h2 className="text-2xl font-semibold">{user.displayName || 'User'}</h2>
             <p className="text-muted-foreground">{user.email}</p>
+            <Badge variant="secondary" className="mt-2 capitalize">{role}</Badge>
           </div>
           <Button onClick={handleSave} disabled={!selectedFile || isUploading}>
             {isUploading ? 'Saving...' : 'Save Changes'}
