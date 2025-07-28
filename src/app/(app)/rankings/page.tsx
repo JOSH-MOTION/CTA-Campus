@@ -8,15 +8,12 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Cell } from 'recharts';
+import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 
 interface StudentRank extends UserData {
   rank: number;
   totalPoints: number;
-  maxPoints: number;
-  progress: number;
 }
 
 // Mock function to generate points for students
@@ -31,7 +28,7 @@ const generateMockPoints = (studentId: string) => {
     return Math.abs(hash % 200) + 50; // Points between 50 and 250
 };
 
-const MAX_POINTS = 286; // Sum of all points from grading data
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
 export default function RankingsPage() {
   const { fetchAllUsers } = useAuth();
@@ -64,15 +61,10 @@ export default function RankingsPage() {
       return matchesSearch && matchesGen;
     });
 
-    const studentsWithPoints = filtered.map(student => {
-        const totalPoints = generateMockPoints(student.uid);
-        return {
-            ...student,
-            totalPoints,
-            maxPoints: MAX_POINTS,
-            progress: (totalPoints / MAX_POINTS) * 100
-        }
-    });
+    const studentsWithPoints = filtered.map(student => ({
+        ...student,
+        totalPoints: generateMockPoints(student.uid),
+    }));
 
     return studentsWithPoints
         .sort((a, b) => b.totalPoints - a.totalPoints)
@@ -82,16 +74,7 @@ export default function RankingsPage() {
         }));
   }, [allStudents, searchTerm, selectedGen]);
   
-  const topThree = rankedStudents.slice(0, 3);
-  const otherStudents = rankedStudents.slice(3);
-
-  const getTrophyColor = (rank: number) => {
-      if (rank === 1) return "text-yellow-500";
-      if (rank === 2) return "text-gray-400";
-      if (rank === 3) return "text-yellow-700";
-      return "text-muted-foreground";
-  }
-
+  const chartData = useMemo(() => rankedStudents.slice(0, 15).reverse(), [rankedStudents]);
 
   return (
     <div className="space-y-6">
@@ -126,79 +109,78 @@ export default function RankingsPage() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center items-center h-64">
+        <div className="flex justify-center items-center h-96">
           <Loader2 className="h-8 w-8 animate-spin" />
         </div>
       ) : (
-        <>
-            {/* Top 3 */}
-            <div className="grid gap-6 md:grid-cols-3">
-                {topThree.map((student, index) => (
-                    <Card key={student.uid} className={`border-2 ${index === 0 ? 'border-yellow-500' : index === 1 ? 'border-gray-400' : 'border-yellow-700'}`}>
-                        <CardHeader className="flex flex-row items-center gap-4">
-                            <Trophy className={`h-8 w-8 ${getTrophyColor(student.rank)}`} />
-                            <div>
-                                <CardTitle className="text-lg">{student.displayName}</CardTitle>
-                                <CardDescription>{student.gen}</CardDescription>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="text-center">
-                            <p className="text-4xl font-bold">{student.totalPoints}</p>
-                            <p className="text-sm text-muted-foreground">Total Points</p>
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
-
-            {/* Other students */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>Leaderboard</CardTitle>
-                    <CardDescription>Full list of student rankings.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead className="w-[80px]">Rank</TableHead>
-                                <TableHead>Student</TableHead>
-                                <TableHead className="hidden sm:table-cell">Generation</TableHead>
-                                <TableHead className="w-[150px] hidden md:table-cell">Progress</TableHead>
-                                <TableHead className="text-right">Total Points</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {otherStudents.map(student => (
-                                <TableRow key={student.uid}>
-                                    <TableCell>
-                                        <Badge variant="secondary" className="text-lg">{student.rank}</Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex items-center gap-3">
-                                            <Avatar className="h-9 w-9">
-                                                <AvatarImage src={student.photoURL} alt={student.displayName} />
-                                                <AvatarFallback>{student.displayName.charAt(0)}</AvatarFallback>
-                                            </Avatar>
-                                            <span className="font-medium">{student.displayName}</span>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="hidden sm:table-cell">{student.gen}</TableCell>
-                                    <TableCell className="hidden md:table-cell">
-                                        <Progress value={student.progress} className="h-2"/>
-                                    </TableCell>
-                                    <TableCell className="text-right font-bold">{student.totalPoints}</TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                     {rankedStudents.length === 0 && (
-                        <div className="text-center py-10 text-muted-foreground">
-                            No students found for the current filter.
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-        </>
+        <Card>
+            <CardHeader>
+                <CardTitle>Top 15 Performers</CardTitle>
+                <CardDescription>Bar chart showing the top students based on total points. Filter by generation or search by name.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                {chartData.length > 0 ? (
+                    <ChartContainer config={{}} className="w-full h-[500px]">
+                        <ResponsiveContainer>
+                            <BarChart
+                                data={chartData}
+                                layout="vertical"
+                                margin={{ left: 10, right: 10, top: 10, bottom: 10 }}
+                            >
+                                <XAxis type="number" hide />
+                                <YAxis
+                                    dataKey="displayName"
+                                    type="category"
+                                    tickLine={false}
+                                    axisLine={false}
+                                    tick={{ fontSize: 12 }}
+                                    width={120}
+                                />
+                                <Tooltip
+                                    cursor={{ fill: 'hsl(var(--muted))' }}
+                                    content={({ active, payload }) => {
+                                        if (active && payload && payload.length) {
+                                            return (
+                                                <div className="rounded-lg border bg-background p-2 shadow-sm">
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <div className="flex flex-col">
+                                                            <span className="text-[0.70rem] uppercase text-muted-foreground">
+                                                                Student
+                                                            </span>
+                                                            <span className="font-bold text-muted-foreground">
+                                                                {payload[0].payload.displayName}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex flex-col">
+                                                            <span className="text-[0.70rem] uppercase text-muted-foreground">
+                                                                Points
+                                                            </span>
+                                                            <span className="font-bold">
+                                                                {payload[0].value}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )
+                                        }
+                                        return null;
+                                    }}
+                                />
+                                <Bar dataKey="totalPoints" background={{ fill: 'hsl(var(--muted) / 0.5)' }} radius={4}>
+                                    {chartData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </ChartContainer>
+                ) : (
+                    <div className="flex h-48 items-center justify-center text-muted-foreground">
+                        No students found for the current filter.
+                    </div>
+                )}
+            </CardContent>
+        </Card>
       )}
     </div>
   );
