@@ -1,8 +1,8 @@
 // src/components/dashboards/PerformanceHub.tsx
 'use client';
 
-import {useState} from 'react';
-import {BarChart, PieChart, TrendingUp} from 'lucide-react';
+import {useState, useMemo} from 'react';
+import {BarChart, PieChart, TrendingUp, Award} from 'lucide-react';
 import {
   Bar,
   BarChart as RechartsBarChart,
@@ -78,6 +78,16 @@ const chartConfig = {
 
 export default function PerformanceHub() {
   const [chartType, setChartType] = useState<'bar' | 'pie'>('bar');
+  
+  const overallProgress = useMemo(() => {
+    const totalCurrent = gradingData.reduce((acc, item) => acc + item.current, 0);
+    const totalPossible = gradingData.reduce((acc, item) => acc + item.total, 0);
+    return {
+      current: totalCurrent,
+      total: totalPossible,
+      percentage: totalPossible > 0 ? (totalCurrent / totalPossible) * 100 : 0,
+    };
+  }, []);
 
   return (
     <Card>
@@ -106,57 +116,73 @@ export default function PerformanceHub() {
         </div>
         <CardDescription>Your academic points breakdown and progress.</CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-6 md:grid-cols-2">
-        <div className="space-y-4">
-          {gradingData.map(item => (
-            <div key={item.title} className="space-y-1">
-              <div className="flex justify-between text-sm">
-                <span className="font-medium">{item.title}</span>
-                <span className="text-muted-foreground">
-                  {item.current} / {item.total} pts
-                </span>
-              </div>
-              <Progress value={(item.current / item.total) * 100} />
+      <CardContent className="grid gap-6">
+        <Card>
+          <CardHeader className="flex-row items-center gap-4">
+            <Award className="h-8 w-8 text-primary" />
+            <div>
+              <CardTitle>Overall Progress</CardTitle>
+              <CardDescription>
+                You have earned {overallProgress.current} out of {overallProgress.total} possible points.
+              </CardDescription>
             </div>
-          ))}
-        </div>
-        <div className="min-h-[300px]">
-          <ChartContainer config={chartConfig} className="w-full h-full">
-            {chartType === 'bar' ? (
-              <RechartsBarChart
-                data={chartData}
-                layout="vertical"
-                margin={{left: 10, right: 10}}
-              >
-                <CartesianGrid horizontal={false} />
-                <YAxis
-                  dataKey="name"
-                  type="category"
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={10}
-                  className="text-xs"
-                  width={110}
-                />
-                <XAxis dataKey="value" type="number" hide />
-                <Tooltip cursor={{fill: 'hsl(var(--muted))'}} content={<ChartTooltipContent />} />
-                <Bar dataKey="value" radius={5}>
-                  {chartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Bar>
-              </RechartsBarChart>
-            ) : (
-              <RechartsPieChart>
-                <Tooltip content={<ChartTooltipContent nameKey="name" />} />
-                <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={120}>
-                  {chartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-              </RechartsPieChart>
-            )}
-          </ChartContainer>
+          </CardHeader>
+          <CardContent>
+            <Progress value={overallProgress.percentage} />
+          </CardContent>
+        </Card>
+        <div className="grid gap-6 md:grid-cols-2">
+            <div className="space-y-4">
+            {gradingData.map(item => (
+                <div key={item.title} className="space-y-1">
+                <div className="flex justify-between text-sm">
+                    <span className="font-medium">{item.title}</span>
+                    <span className="text-muted-foreground">
+                    {item.current} / {item.total} pts
+                    </span>
+                </div>
+                <Progress value={(item.current / item.total) * 100} />
+                </div>
+            ))}
+            </div>
+            <div className="min-h-[300px]">
+            <ChartContainer config={chartConfig} className="w-full h-full">
+                {chartType === 'bar' ? (
+                <RechartsBarChart
+                    data={chartData}
+                    layout="vertical"
+                    margin={{left: 10, right: 10}}
+                >
+                    <CartesianGrid horizontal={false} />
+                    <YAxis
+                    dataKey="name"
+                    type="category"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={10}
+                    className="text-xs"
+                    width={110}
+                    />
+                    <XAxis dataKey="value" type="number" hide />
+                    <Tooltip cursor={{fill: 'hsl(var(--muted))'}} content={<ChartTooltipContent />} />
+                    <Bar dataKey="value" radius={5}>
+                    {chartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                    </Bar>
+                </RechartsBarChart>
+                ) : (
+                <RechartsPieChart>
+                    <Tooltip content={<ChartTooltipContent nameKey="name" />} />
+                    <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={120}>
+                    {chartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                    </Pie>
+                </RechartsPieChart>
+                )}
+            </ChartContainer>
+            </div>
         </div>
       </CardContent>
     </Card>
