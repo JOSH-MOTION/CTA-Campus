@@ -33,15 +33,15 @@ import {
 } from '@/components/ui/chart';
 
 const gradingData = [
-  {title: 'Class Attendance', current: 35, total: 50, description: '1 point per attendance'},
-  {title: 'Class Assignments', current: 40, total: 50, description: '1 point per assignment'},
-  {title: 'Class Exercises', current: 25, total: 50, description: '1 point per exercise'},
-  {title: 'Weekly Projects', current: 38, total: 50, description: '1 point per project'},
-  {title: 'Monthly Projects', current: 7, total: 10, description: '1 point per project'},
-  {title: 'Soft Skills Training', current: 4, total: 6, description: '1 point per attendance'},
-  {title: 'Mini Demo Days', current: 5, total: 5, description: '5 points per demo'},
-  {title: '100 Days of Code', current: 25, total: 50, description: '0.5 points per day'},
-  {title: 'Code Review', current: 3, total: 5, description: '1 point per contribution'},
+  {title: 'Class Attendance', current: 0, total: 50, description: '1 point per attendance'},
+  {title: 'Class Assignments', current: 0, total: 50, description: '1 point per assignment'},
+  {title: 'Class Exercises', current: 0, total: 50, description: '1 point per exercise'},
+  {title: 'Weekly Projects', current: 0, total: 50, description: '1 point per project'},
+  {title: 'Monthly Projects', current: 0, total: 10, description: '1 point per project'},
+  {title: 'Soft Skills Training', current: 0, total: 6, description: '1 point per attendance'},
+  {title: 'Mini Demo Days', current: 0, total: 5, description: '5 points per demo'},
+  {title: '100 Days of Code', current: 0, total: 50, description: '0.5 points per day'},
+  {title: 'Code Review', current: 0, total: 5, description: '1 point per contribution'},
   {title: 'Final Project', current: 0, total: 10, description: 'Awarded upon completion'},
 ];
 
@@ -145,13 +145,13 @@ export default function PerformanceHub() {
                 </div>
             ))}
             </div>
-            <div className="min-h-[300px]">
+            <div className="min-h-[300px] w-full h-full">
             <ChartContainer config={chartConfig} className="w-full h-full">
                 {chartType === 'bar' ? (
                 <RechartsBarChart
                     data={chartData}
                     layout="vertical"
-                    margin={{left: 0, right: 10}}
+                    margin={{left: 0, right: 10, top: 10, bottom: 10}}
                 >
                     <CartesianGrid horizontal={false} />
                     <YAxis
@@ -160,7 +160,7 @@ export default function PerformanceHub() {
                     tickLine={false}
                     axisLine={false}
                     tickMargin={5}
-                    tick={{fontSize: 12, width: 100, whiteSpace: 'pre-wrap'}}
+                    tick={{fontSize: 10, width: 100, whiteSpace: 'pre-wrap'}}
                     className="text-xs"
                     width={100}
                     />
@@ -173,9 +173,9 @@ export default function PerformanceHub() {
                     </Bar>
                 </RechartsBarChart>
                 ) : (
-                <RechartsPieChart>
+                <RechartsPieChart margin={{left: 0, right: 0, top: 0, bottom: 0}}>
                     <Tooltip content={<ChartTooltipContent nameKey="name" />} />
-                    <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100}>
+                    <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80}>
                     {chartData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
