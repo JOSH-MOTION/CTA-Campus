@@ -28,6 +28,7 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(true);
 
   const [selectedChat, setSelectedChat] = useState<ChatEntity | null>(null);
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeTab, setActiveTab] = useState<'dms' | 'groups'>('dms');
   const [messageUnsubscribe, setMessageUnsubscribe] = useState<Unsubscribe | null>(null);
@@ -81,8 +82,8 @@ export default function ChatPage() {
         chatId = entity.id;
       }
       
-      const fullSelectedChat = {...entity, id: chatId};
-      setSelectedChat(fullSelectedChat);
+      setSelectedChat(entity);
+      setCurrentChatId(chatId);
       setUnreadCounts(prev => ({...prev, [chatId]: 0}));
 
       const unsubscribe = onMessages(chatId, newMessages => {
@@ -123,7 +124,7 @@ export default function ChatPage() {
       return onMessages(chatId, (newMessages) => {
         if(newMessages.length > 0) {
             const lastMessage = newMessages[newMessages.length - 1];
-            if (chatId !== selectedChat?.id && lastMessage.senderId !== currentUser.uid) {
+            if (chatId !== currentChatId && lastMessage.senderId !== currentUser.uid) {
                 setUnreadCounts(prev => ({...prev, [chatId]: (prev[chatId] || 0) + 1 }));
 
                 toast({
@@ -176,7 +177,7 @@ export default function ChatPage() {
 
 
   const handleSendMessage = async (text: string, replyTo?: Message) => {
-    if (!selectedChat || !text.trim() || !currentUser) return;
+    if (!currentChatId || !text.trim() || !currentUser) return;
 
     let messagePayload: any = {
         senderId: currentUser.uid,
@@ -192,7 +193,7 @@ export default function ChatPage() {
         };
     }
     
-    await sendMessage(selectedChat.id, messagePayload);
+    await sendMessage(currentChatId, messagePayload);
   };
   
   const handleTabChange = (value: string) => {
@@ -240,7 +241,7 @@ export default function ChatPage() {
                     return (
                         <Button
                         key={user.uid}
-                        variant={selectedChat?.id === chatId ? 'secondary' : 'ghost'}
+                        variant={selectedChat?.id === user.uid ? 'secondary' : 'ghost'}
                         className="h-auto w-full justify-start p-3 relative"
                         onClick={() => handleSelectChat({id: user.uid, name: user.displayName, type: 'dm', avatar: user.photoURL, dataAiHint: 'student portrait'})}
                         >
