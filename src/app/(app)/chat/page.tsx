@@ -1,7 +1,7 @@
 // src/app/(app)/chat/page.tsx
 'use client';
 
-import {useState, useEffect, useMemo} from 'react';
+import {useState, useEffect, useMemo, useCallback} from 'react';
 import {useSearchParams, useRouter} from 'next/navigation';
 import {Avatar, AvatarFallback, AvatarImage} from '@/components/ui/avatar';
 import {Button} from '@/components/ui/button';
@@ -10,28 +10,22 @@ import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs';
 import {Search, Send, User, Users, Loader2} from 'lucide-react';
 import {Chat} from '@/components/chat/Chat';
 import {useAuth, UserData} from '@/contexts/AuthContext';
-import {Badge} from '@/components/ui/badge';
-
-const initialMessages: Record<string, Message[]> = {
-  'group-Gen 30': [
-    {sender: 'Alice Johnson', text: 'Hello everyone! Just a reminder about the group project deadline on Friday.', time: '9:00 AM'},
-    {sender: 'Charlie Brown', text: 'Thanks for the reminder, Alice!', time: '9:05 AM'},
-  ],
-};
+import {Message, getChatId, sendMessage, onMessages} from '@/services/chat';
+import {Unsubscribe} from 'firebase/firestore';
 
 type ChatEntity = {id: string; name: string; avatar?: string; dataAiHint: string};
-type Message = {sender: string; text: string; time: string};
 
 export default function ChatPage() {
-  const {fetchAllUsers, userData, role} = useAuth();
+  const {user: currentUser, fetchAllUsers, userData, role} = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
   const [allUsers, setAllUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [selectedChat, setSelectedChat] = useState<ChatEntity | null>(null);
-  const [messages, setMessages] = useState<Record<string, Message[]>>(initialMessages);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [activeTab, setActiveTab] = useState<'dms' | 'groups'>('dms');
+  const [messageUnsubscribe, setMessageUnsubscribe] = useState<Unsubscribe | null>(null);
 
   const directMessageUserId = searchParams.get('dm');
   const groupChatId = searchParams.get('group');
@@ -52,8 +46,7 @@ export default function ChatPage() {
     const groups: ChatEntity[] = [];
     const allGens = new Set(allStudents.map(student => student.gen).filter(Boolean));
 
-    if (role === 'teacher') {
-      // Teachers see all group chats that exist based on student data.
+    if (role === 'teacher' || role === 'admin') {
       allGens.forEach(gen => {
         groups.push({
           id: `group-${gen}`,
@@ -62,7 +55,6 @@ export default function ChatPage() {
         });
       });
     } else if (role === 'student' && userData?.gen) {
-      // Students only see their own generation's group chat.
       groups.push({
         id: `group-${userData.gen}`,
         name: `${userData.gen} Hub`,
@@ -70,26 +62,51 @@ export default function ChatPage() {
       });
     }
 
-    // Sort groups alphabetically by name
     return groups.sort((a, b) => a.name.localeCompare(b.name));
   }, [role, userData, allStudents]);
 
-  useEffect(() => {
-    if (loading) return;
+  const handleSelectChat = useCallback(
+    (entity: ChatEntity) => {
+      if (messageUnsubscribe) {
+        messageUnsubscribe();
+      }
 
-    // If a group ID is passed in the URL, select that group.
+      let chatId = entity.id;
+      if (!entity.id.startsWith('group-') && currentUser) {
+        chatId = getChatId(currentUser.uid, entity.id);
+      }
+      
+      setSelectedChat({...entity, id: chatId});
+
+      const unsubscribe = onMessages(chatId, newMessages => {
+        setMessages(newMessages);
+      });
+      setMessageUnsubscribe(() => unsubscribe);
+      
+      if (entity.id.startsWith('group-')) {
+        setActiveTab('groups');
+        router.push(`/chat?group=${entity.id.replace('group-', '')}`, {scroll: false});
+      } else {
+        setActiveTab('dms');
+        router.push(`/chat?dm=${entity.id}`, {scroll: false});
+      }
+    },
+    [currentUser, router, messageUnsubscribe]
+  );
+  
+  useEffect(() => {
+    if (loading || !currentUser) return;
+
     if (groupChatId) {
       const groupToSelect = groupChats.find(g => g.id === `group-${groupChatId}`);
       if (groupToSelect) {
-        setSelectedChat(groupToSelect);
+        handleSelectChat(groupToSelect);
         setActiveTab('groups');
       }
-    }
-    // If a user ID is passed in the URL, select that user for a direct message.
-    else if (directMessageUserId) {
+    } else if (directMessageUserId) {
       const userToDm = allUsers.find(u => u.uid === directMessageUserId);
       if (userToDm) {
-        setSelectedChat({
+        handleSelectChat({
           id: userToDm.uid,
           name: userToDm.displayName,
           avatar: userToDm.photoURL,
@@ -98,32 +115,33 @@ export default function ChatPage() {
         setActiveTab('dms');
       }
     }
-  }, [loading, allUsers, groupChats, directMessageUserId, groupChatId]);
-
-  const handleSelectChat = (entity: ChatEntity) => {
-    setSelectedChat(entity);
-    if (entity.id.startsWith('group-')) {
-      setActiveTab('groups');
-      router.push(`/chat?group=${entity.id.replace('group-', '')}`, {scroll: false});
-    } else {
-      setActiveTab('dms');
-      router.push(`/chat?dm=${entity.id}`, {scroll: false});
+    
+    return () => {
+        if(messageUnsubscribe) {
+            messageUnsubscribe();
+        }
     }
-  };
+  }, [loading, allUsers, groupChats, directMessageUserId, groupChatId, handleSelectChat, currentUser, messageUnsubscribe]);
 
-  const handleSendMessage = (text: string) => {
-    if (!selectedChat || !text.trim()) return;
 
-    const newMessage: Message = {sender: 'You', text, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})};
-
-    setMessages(prev => {
-      const existingMessages = prev[selectedChat.id] || [];
-      return {
-        ...prev,
-        [selectedChat.id]: [...existingMessages, newMessage],
-      };
+  const handleSendMessage = async (text: string) => {
+    if (!selectedChat || !text.trim() || !currentUser) return;
+    
+    await sendMessage(selectedChat.id, {
+        senderId: currentUser.uid,
+        senderName: currentUser.displayName || 'User',
+        text: text.trim(),
     });
   };
+  
+  const handleTabChange = (value: string) => {
+      const newTab = value as 'dms' | 'groups';
+      setActiveTab(newTab);
+      // Optional: clear selection when changing tabs
+      // setSelectedChat(null);
+      // if (messageUnsubscribe) messageUnsubscribe();
+  }
+
 
   return (
     <div className="grid h-[calc(100vh-8rem)] grid-cols-1 md:grid-cols-3 xl:grid-cols-4">
@@ -140,7 +158,7 @@ export default function ChatPage() {
         </div>
         <Tabs
           value={activeTab}
-          onValueChange={value => setActiveTab(value as 'dms' | 'groups')}
+          onValueChange={handleTabChange}
           className="flex flex-1 flex-col overflow-hidden"
         >
           <TabsList className="mx-4 grid w-auto grid-cols-2">
@@ -162,7 +180,7 @@ export default function ChatPage() {
                   {allUsers.filter(u => u.uid !== userData?.uid).map(user => (
                     <Button
                       key={user.uid}
-                      variant={selectedChat?.id === user.uid ? 'secondary' : 'ghost'}
+                      variant={selectedChat?.id === getChatId(currentUser!.uid, user.uid) ? 'secondary' : 'ghost'}
                       className="h-auto w-full justify-start p-3"
                       onClick={() => handleSelectChat({id: user.uid, name: user.displayName, avatar: user.photoURL, dataAiHint: 'student portrait'})}
                     >
@@ -198,9 +216,6 @@ export default function ChatPage() {
                       </Avatar>
                       <div className="text-left">
                         <p className="font-semibold">{group.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {messages[group.id]?.slice(-1)[0]?.text || 'No messages yet'}
-                        </p>
                       </div>
                     </Button>
                   ))}
@@ -215,8 +230,9 @@ export default function ChatPage() {
         {selectedChat ? (
           <Chat
             entity={selectedChat}
-            messages={messages[selectedChat.id] || []}
+            messages={messages}
             onSendMessage={handleSendMessage}
+            currentUser={currentUser}
           />
         ) : (
           <div className="flex h-full items-center justify-center bg-background">

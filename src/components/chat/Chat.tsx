@@ -8,17 +8,20 @@ import {Input} from '@/components/ui/input';
 import {ScrollArea} from '@/components/ui/scroll-area';
 import {Send} from 'lucide-react';
 import {cn} from '@/lib/utils';
+import type {Message} from '@/services/chat';
+import type {User} from 'firebase/auth';
+import {format} from 'date-fns';
 
 type ChatEntity = {id: string; name: string; avatar?: string; dataAiHint: string};
-type Message = {sender: string; text: string; time: string};
 
 interface ChatProps {
   entity: ChatEntity;
   messages: Message[];
   onSendMessage: (text: string) => void;
+  currentUser: User | null;
 }
 
-export function Chat({entity, messages, onSendMessage}: ChatProps) {
+export function Chat({entity, messages, onSendMessage, currentUser}: ChatProps) {
   const [text, setText] = useState('');
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
@@ -26,6 +29,7 @@ export function Chat({entity, messages, onSendMessage}: ChatProps) {
     if (scrollAreaRef.current) {
       scrollAreaRef.current.scrollTo({
         top: scrollAreaRef.current.scrollHeight,
+        behavior: 'smooth',
       });
     }
   }, [messages]);
@@ -48,31 +52,33 @@ export function Chat({entity, messages, onSendMessage}: ChatProps) {
 
       <ScrollArea className="flex-1 bg-background/50" ref={scrollAreaRef}>
         <div className="space-y-6 p-4">
-          {messages.map((msg, index) => (
+          {messages.map(msg => (
             <div
-              key={index}
-              className={cn('flex items-end gap-3', msg.sender === 'You' ? 'justify-end' : 'justify-start')}
+              key={msg.id}
+              className={cn('flex items-end gap-3', msg.senderId === currentUser?.uid ? 'justify-end' : 'justify-start')}
             >
-              {msg.sender !== 'You' && (
+              {msg.senderId !== currentUser?.uid && (
                 <Avatar className="h-8 w-8">
-                  <AvatarFallback>{msg.sender.charAt(0)}</AvatarFallback>
+                  <AvatarFallback>{msg.senderName.charAt(0)}</AvatarFallback>
                 </Avatar>
               )}
               <div
                 className={cn(
                   'max-w-[70%] rounded-lg p-3 text-sm shadow-sm',
-                  msg.sender === 'You'
+                  msg.senderId === currentUser?.uid
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-card'
                 )}
               >
-                <p className="font-semibold">{msg.sender}</p>
+                <p className="font-semibold">{msg.senderName}</p>
                 <p>{msg.text}</p>
-                <p className="mt-1 text-xs opacity-70">{msg.time}</p>
+                <p className="mt-1 text-xs opacity-70">
+                   {msg.timestamp ? format(msg.timestamp.toDate(), 'p') : '...'}
+                </p>
               </div>
-               {msg.sender === 'You' && (
+               {msg.senderId === currentUser?.uid && (
                 <Avatar className="h-8 w-8">
-                  <AvatarFallback>Y</AvatarFallback>
+                  <AvatarFallback>{currentUser?.displayName?.charAt(0) || 'U'}</AvatarFallback>
                 </Avatar>
               )}
             </div>
@@ -88,7 +94,7 @@ export function Chat({entity, messages, onSendMessage}: ChatProps) {
             placeholder="Type your message..."
             className="pr-14"
           />
-          <Button type="submit" size="icon" className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2">
+          <Button type="submit" size="icon" className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2" disabled={!text.trim()}>
             <Send className="h-4 w-4" />
           </Button>
         </form>
