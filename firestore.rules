@@ -1,31 +1,39 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Allow reading of all user profiles (for display names, roles, etc.).
-    // Allow users to update only their own document.
+    // Users can read public data of other users, but can only write to their own document.
     match /users/{userId} {
-      allow read;
-      allow write: if request.auth.uid == userId;
+      allow read: if request.auth != null;
+      allow update: if request.auth.uid == userId;
+      // Allow creation during sign-up.
+      allow create: if request.auth != null;
     }
 
-    // Allow read/write access to chat messages only if the user is authenticated
-    // and a member of that specific chat.
+    // Chat messages and collections
     match /chats/{chatId}/messages/{messageId} {
-      allow read, write: if request.auth != null && (
-        // For DMs (e.g., "uid1-uid2"), allow if the user's ID is in the chat ID.
-        (chatId.split('-').length() == 2 && request.auth.uid in chatId.split('-')) ||
-        // For group chats (e.g., "group-Gen 30"), allow if the user's generation
-        // matches the one in the chat ID. This requires reading the user's own document.
-        (chatId.startsWith('group-') && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.gen == chatId.replace('group-', ''))
+      // Allow read/write if the user is part of the DM conversation.
+      // DM chatIds are formatted as "uid1-uid2".
+      allow read, write: if request.auth.uid in chatId.split('-');
+
+      // OR, allow read/write if it's a group chat and the user belongs to that generation.
+      // Group chatIds are "group-GenName"
+      allow read, write: if chatId.startsWith('group-') && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'student' &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.gen == chatId.split('-')[1]
+      );
+       // OR, allow if the user is a teacher/admin for that gen group chat
+      allow read, write: if chatId.startsWith('group-') && (
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher' &&
+         chatId.split('-')[1] in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.gensTaught.split(',')) ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
       );
     }
     
-    // Allow read access on materials for any authenticated user.
-    // Write access should be restricted (e.g., to teachers/admins), but for now we will allow any authenticated user to write.
+    // Allow authenticated users to create new materials
     match /materials/{materialId} {
       allow read, create: if request.auth != null;
     }
+
   }
 }
