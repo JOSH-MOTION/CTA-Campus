@@ -3,11 +3,6 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if the user is an admin or teacher
-    function isPrivileged() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'teacher'];
-    }
-
     // Users collection rules
     match /users/{userId} {
       // Any authenticated user can get a single user's public data
@@ -25,34 +20,50 @@ service cloud.firestore {
     
     // Materials collection rules
     match /materials/{materialId} {
+      // Teachers and admins can create materials
+      allow create: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['teacher', 'admin'];
+      
       // Any authenticated user can read materials
       allow read: if request.auth != null;
-      // Only privileged users (teachers/admins) can create, update, or delete materials
-      allow write: if request.auth != null && isPrivileged();
     }
 
-    // Announcements collection rules
-    match /announcements/{announcementId} {
-       // Any authenticated user can read announcements
-      allow read: if request.auth != null;
-      // Only privileged users (teachers/admins) can create, update, or delete announcements
-      allow write: if request.auth != null && isPrivileged();
-    }
-
-    // Assignments collection rules
-    match /assignments/{assignmentId} {
-       // Any authenticated user can read assignments
-      allow read: if request.auth != null;
-      // Only privileged users (teachers/admins) can create, update, or delete assignments
-      allow write: if request.auth != null && isPrivileged();
+    // Announcements, Assignments, Exercises, Projects
+    match /{collection}/{docId} where collection in ['announcements', 'assignments', 'exercises', 'projects'] {
+       allow read: if request.auth != null;
+       allow create: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['teacher', 'admin'];
+       allow update, delete: if request.auth != null && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' || request.auth.uid == resource.data.authorId);
     }
 
     // Chat collection rules
     match /chats/{chatId}/messages/{messageId} {
-      // Allow read and write for any authenticated user.
-      // More specific logic (isMemberOfDm, isMemberOfGroup) can be re-added
-      // once custom claims are implemented for more secure role checking.
-      allow read, write: if request.auth != null;
+      // Allow read if the user is part of the chat.
+      allow read: if request.auth != null && (isMemberOfDm(chatId) || isMemberOfGroup(chatId));
+
+      // Allow create if the user is part of the chat.
+      allow create: if request.auth != null && (isMemberOfDm(chatId) || isMemberOfGroup(chatId));
+      
+      // Allow update and delete ONLY if the user is the original sender of the message.
+      allow update, delete: if request.auth != null && resource.data.senderId == request.auth.uid;
     }
+  }
+
+  // Helper function to check if a user is in a DM chat
+  function isMemberOfDm(chatId) {
+    return request.auth.uid in chatId.split('-');
+  }
+
+  // Helper function to check if a user belongs to a group chat.
+  function isMemberOfGroup(chatId) {
+    // This check is simplified. A robust implementation would use custom claims in the auth token.
+    // For now, we assume if it's a group chat, the user's client-side logic has already determined access.
+    // The create/read rules above will gate access.
+    let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+
+    // Admins and teachers can access any group chat
+    if (userDoc.role in ['admin', 'teacher']) {
+      return true;
+    }
+    // Students can only access their own generation's group chat
+    return userDoc.role == 'student' && chatId == 'group-' + userDoc.gen;
   }
 }

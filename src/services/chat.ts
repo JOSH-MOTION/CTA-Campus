@@ -8,10 +8,11 @@ import {
     orderBy,
     Timestamp,
     DocumentData,
-    WithFieldValue,
+    doc,
+    updateDoc,
+    deleteDoc,
   } from 'firebase/firestore';
   import { db } from '@/lib/firebase';
-  import { v4 as uuidv4 } from 'uuid';
   
   export interface Message {
     id: string;
@@ -25,6 +26,7 @@ import {
         senderName: string;
     };
     isPinned?: boolean;
+    edited?: boolean;
   }
   
   export type NewMessage = Omit<Message, 'id' | 'timestamp'>;
@@ -53,7 +55,7 @@ import {
       });
     } catch (error) {
       console.error('Error sending message:', error);
-      // Optionally, re-throw or handle the error in the UI
+      throw error;
     }
   };
   
@@ -80,15 +82,49 @@ import {
                 timestamp: data.timestamp as Timestamp,
                 replyTo: data.replyTo,
                 isPinned: data.isPinned,
+                edited: data.edited,
             }
         });
         callback(messages);
       },
       error => {
         console.error('Error listening to messages:', error);
-        // Optionally, handle the error in the UI
       }
     );
   
     return unsubscribe;
+  };
+  
+  /**
+   * Updates a message in a chat.
+   * @param chatId - The ID of the chat.
+   * @param messageId - The ID of the message to update.
+   * @param newText - The new text for the message.
+   */
+  export const updateMessage = async (chatId: string, messageId: string, newText: string) => {
+      try {
+          const messageRef = doc(db, 'chats', chatId, 'messages', messageId);
+          await updateDoc(messageRef, {
+              text: newText,
+              edited: true,
+          });
+      } catch (error) {
+          console.error("Error updating message: ", error);
+          throw error;
+      }
+  };
+  
+  /**
+   * Deletes a message from a chat.
+   * @param chatId - The ID of the chat.
+   * @param messageId - The ID of the message to delete.
+   */
+  export const deleteMessage = async (chatId: string, messageId: string) => {
+      try {
+          const messageRef = doc(db, 'chats', chatId, 'messages', messageId);
+          await deleteDoc(messageRef);
+      } catch (error) {
+          console.error("Error deleting message: ", error);
+          throw error;
+      }
   };
