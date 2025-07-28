@@ -1,6 +1,7 @@
 // src/app/(app)/assignments/page.tsx
 'use client';
 
+import { useMemo } from 'react';
 import {Button} from '@/components/ui/button';
 import {PlusCircle, ListOrdered, ArrowRight} from 'lucide-react';
 import {useAuth} from '@/contexts/AuthContext';
@@ -11,11 +12,21 @@ import {Badge} from '@/components/ui/badge';
 import {format} from 'date-fns';
 
 export default function AssignmentsPage() {
-  const {role} = useAuth();
+  const {role, userData} = useAuth();
   const {assignments} = useAssignments();
-  const isTeacher = role === 'teacher';
+  const isTeacher = role === 'teacher' || role === 'admin';
 
-  const sortedAssignments = [...assignments].sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
+  const filteredAssignments = useMemo(() => {
+    if (isTeacher) {
+      return assignments;
+    }
+    return assignments.filter(
+      assign => assign.targetGen === 'All' || assign.targetGen === userData?.gen
+    );
+  }, [assignments, isTeacher, userData?.gen]);
+
+
+  const sortedAssignments = [...filteredAssignments].sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
 
   return (
     <div className="space-y-6">
@@ -41,7 +52,10 @@ export default function AssignmentsPage() {
           {sortedAssignments.map(assignment => (
             <Card key={assignment.id} className="flex flex-col">
               <CardHeader>
-                <CardTitle>{assignment.title}</CardTitle>
+                <div className="flex justify-between items-start">
+                  <CardTitle>{assignment.title}</CardTitle>
+                  {isTeacher && <Badge variant={assignment.targetGen === 'All' ? 'default' : 'secondary'}>{assignment.targetGen}</Badge>}
+                </div>
                 <CardDescription>{assignment.description}</CardDescription>
               </CardHeader>
               <CardContent className="flex-grow">

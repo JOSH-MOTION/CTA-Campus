@@ -1,7 +1,7 @@
 // src/components/assignments/CreateAssignmentDialog.tsx
 'use client';
 
-import {useState, type ReactNode} from 'react';
+import {useState, type ReactNode, useEffect, useMemo} from 'react';
 import {
   Dialog,
   DialogContent,
@@ -25,6 +25,8 @@ import {cn} from '@/lib/utils';
 import {CalendarIcon} from 'lucide-react';
 import {format} from 'date-fns';
 import {Calendar} from '@/components/ui/calendar';
+import {useAuth, UserData} from '@/contexts/AuthContext';
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select';
 
 const assignmentSchema = z.object({
   title: z.string().min(5, 'Title must be at least 5 characters long.'),
@@ -32,6 +34,7 @@ const assignmentSchema = z.object({
   dueDate: z.date({
     required_error: 'A due date is required.',
   }),
+  targetGen: z.string().nonempty('Please select a target generation.'),
 });
 
 type AssignmentFormValues = z.infer<typeof assignmentSchema>;
@@ -44,12 +47,35 @@ export function CreateAssignmentDialog({children}: CreateAssignmentDialogProps) 
   const [isOpen, setIsOpen] = useState(false);
   const {addAssignment} = useAssignments();
   const {toast} = useToast();
+  const {fetchAllUsers} = useAuth();
+  const [allUsers, setAllUsers] = useState<UserData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (isOpen) {
+      const loadUsers = async () => {
+        setLoading(true);
+        const users = await fetchAllUsers();
+        setAllUsers(users);
+        setLoading(false);
+      };
+      loadUsers();
+    }
+  }, [isOpen, fetchAllUsers]);
+
+  const availableGens = useMemo(() => {
+    const studentGens = allUsers
+      .filter(u => u.role === 'student' && u.gen)
+      .map(u => u.gen!);
+    return ['All', ...[...new Set(studentGens)].sort()];
+  }, [allUsers]);
 
   const form = useForm<AssignmentFormValues>({
     resolver: zodResolver(assignmentSchema),
     defaultValues: {
       title: '',
       description: '',
+      targetGen: 'All',
     },
   });
 
@@ -99,41 +125,67 @@ export function CreateAssignmentDialog({children}: CreateAssignmentDialogProps) 
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="dueDate"
-              render={({field}) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Due Date</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="dueDate"
+                render={({field}) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Due Date</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant={'outline'}
+                            className={cn(
+                              'w-full pl-3 text-left font-normal',
+                              !field.value && 'text-muted-foreground'
+                            )}
+                          >
+                            {field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          disabled={date => date < new Date()}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="targetGen"
+                render={({field}) => (
+                  <FormItem>
+                    <FormLabel>Target Generation</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loading}>
                       <FormControl>
-                        <Button
-                          variant={'outline'}
-                          className={cn(
-                            'w-[240px] pl-3 text-left font-normal',
-                            !field.value && 'text-muted-foreground'
-                          )}
-                        >
-                          {field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a generation" />
+                        </SelectTrigger>
                       </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value}
-                        onSelect={field.onChange}
-                        disabled={date => date < new Date()}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                      <SelectContent>
+                        {availableGens.map(gen => (
+                          <SelectItem key={gen} value={gen}>
+                            {gen}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>
                 Cancel

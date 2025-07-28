@@ -1,6 +1,7 @@
 // src/app/(app)/announcements/page.tsx
 'use client';
 
+import { useMemo } from 'react';
 import {Button} from '@/components/ui/button';
 import {PlusCircle, Rss} from 'lucide-react';
 import {useAuth} from '@/contexts/AuthContext';
@@ -8,13 +9,24 @@ import {useAnnouncements} from '@/contexts/AnnouncementsContext';
 import {Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle} from '@/components/ui/card';
 import {CreateAnnouncementDialog} from '@/components/announcements/CreateAnnouncementDialog';
 import {Avatar, AvatarFallback} from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 
 export default function AnnouncementsPage() {
-  const {role} = useAuth();
+  const {role, userData} = useAuth();
   const {announcements} = useAnnouncements();
-  const isTeacher = role === 'teacher';
+  const isTeacher = role === 'teacher' || role === 'admin';
 
-  const sortedAnnouncements = [...announcements].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const filteredAnnouncements = useMemo(() => {
+    if (isTeacher) {
+      return announcements;
+    }
+    return announcements.filter(
+      ann => ann.targetGen === 'All' || ann.targetGen === userData?.gen
+    );
+  }, [announcements, isTeacher, userData?.gen]);
+
+
+  const sortedAnnouncements = [...filteredAnnouncements].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   return (
     <div className="space-y-6">
@@ -38,7 +50,10 @@ export default function AnnouncementsPage() {
           {sortedAnnouncements.map(announcement => (
             <Card key={announcement.id}>
               <CardHeader>
-                <CardTitle>{announcement.title}</CardTitle>
+                 <div className="flex justify-between items-start">
+                  <CardTitle>{announcement.title}</CardTitle>
+                  {isTeacher && <Badge variant={announcement.targetGen === 'All' ? 'default' : 'secondary'}>{announcement.targetGen}</Badge>}
+                </div>
                 <CardDescription>{announcement.content}</CardDescription>
               </CardHeader>
               <CardFooter className="flex items-center gap-2 text-sm text-muted-foreground">

@@ -1,7 +1,7 @@
 // src/components/announcements/CreateAnnouncementDialog.tsx
 'use client';
 
-import {useState, type ReactNode} from 'react';
+import {useState, type ReactNode, useEffect, useMemo} from 'react';
 import {
   Dialog,
   DialogContent,
@@ -14,17 +14,19 @@ import {
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Textarea} from '@/components/ui/textarea';
-import {useForm, Controller} from 'react-hook-form';
+import {useForm} from 'react-hook-form';
 import {zodResolver} from '@hookform/resolvers/zod';
 import {z} from 'zod';
 import {Form, FormControl, FormField, FormItem, FormLabel, FormMessage} from '@/components/ui/form';
 import {useAnnouncements} from '@/contexts/AnnouncementsContext';
-import {useAuth} from '@/contexts/AuthContext';
+import {useAuth, UserData} from '@/contexts/AuthContext';
 import {useToast} from '@/hooks/use-toast';
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select';
 
 const announcementSchema = z.object({
   title: z.string().min(5, 'Title must be at least 5 characters long.'),
   content: z.string().min(10, 'Content must be at least 10 characters long.'),
+  targetGen: z.string().nonempty('Please select a target generation.'),
 });
 
 type AnnouncementFormValues = z.infer<typeof announcementSchema>;
@@ -37,19 +39,42 @@ export function CreateAnnouncementDialog({children}: CreateAnnouncementDialogPro
   const [isOpen, setIsOpen] = useState(false);
   const {addAnnouncement} = useAnnouncements();
   const {toast} = useToast();
+  const {user, fetchAllUsers} = useAuth();
+  const [allUsers, setAllUsers] = useState<UserData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (isOpen) {
+      const loadUsers = async () => {
+        setLoading(true);
+        const users = await fetchAllUsers();
+        setAllUsers(users);
+        setLoading(false);
+      };
+      loadUsers();
+    }
+  }, [isOpen, fetchAllUsers]);
+
+  const availableGens = useMemo(() => {
+    const studentGens = allUsers
+      .filter(u => u.role === 'student' && u.gen)
+      .map(u => u.gen!);
+    return ['All', ...[...new Set(studentGens)].sort()];
+  }, [allUsers]);
 
   const form = useForm<AnnouncementFormValues>({
     resolver: zodResolver(announcementSchema),
     defaultValues: {
       title: '',
       content: '',
+      targetGen: 'All',
     },
   });
 
   const onSubmit = (data: AnnouncementFormValues) => {
     addAnnouncement({
       ...data,
-      author: 'Teacher', // In a real app, this would come from the authenticated user
+      author: user?.displayName || 'Teacher',
     });
     toast({
       title: 'Announcement Created',
@@ -84,6 +109,28 @@ export function CreateAnnouncementDialog({children}: CreateAnnouncementDialogPro
                 </FormItem>
               )}
             />
+             <FormField
+                control={form.control}
+                name="targetGen"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Target Generation</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loading}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a generation" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {availableGens.map(gen => (
+                          <SelectItem key={gen} value={gen}>{gen}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             <FormField
               control={form.control}
               name="content"

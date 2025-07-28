@@ -8,11 +8,12 @@ export interface Assignment {
   title: string;
   description: string;
   dueDate: string;
+  targetGen: string; // e.g., "Gen 30" or "All"
 }
 
 interface AssignmentsContextType {
   assignments: Assignment[];
-  addAssignment: (assignment: Omit<Assignment, 'id'>) => void;
+  addAssignment: (assignment: Omit<Assignment, 'id' | 'dueDate'> & {dueDate: Date}) => void;
 }
 
 const initialAssignments: Assignment[] = [
@@ -21,12 +22,14 @@ const initialAssignments: Assignment[] = [
     title: 'Final Year Project Proposal',
     description: 'Submit a 2-page proposal for your final year project. Include problem statement, objectives, and proposed methodology.',
     dueDate: new Date(new Date().setDate(new Date().getDate() + 14)).toISOString(),
+    targetGen: 'All',
   },
   {
     id: '2',
     title: 'JavaScript Algorithm Challenge',
     description: 'Complete the five algorithm challenges on the provided platform. Submit the link to your profile.',
     dueDate: new Date(new Date().setDate(new Date().getDate() + 7)).toISOString(),
+    targetGen: 'All',
   },
 ];
 

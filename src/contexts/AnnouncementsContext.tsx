@@ -9,6 +9,7 @@ export interface Announcement {
   content: string;
   author: string;
   date: string;
+  targetGen: string; // e.g., "Gen 30" or "All"
 }
 
 interface AnnouncementsContextType {
@@ -24,6 +25,7 @@ const initialAnnouncements: Announcement[] = [
       'We are excited to welcome all new and returning students to the start of a new academic year. Please be sure to check the updated timetable.',
     author: 'Admin',
     date: '2023-09-01T10:00:00Z',
+    targetGen: 'All',
   },
   {
     id: '2',
@@ -31,6 +33,7 @@ const initialAnnouncements: Announcement[] = [
     content: 'The university library will have extended hours during the exam period, from 8 AM to 2 AM daily.',
     author: 'Library Services',
     date: '2023-11-20T14:30:00Z',
+    targetGen: 'All',
   },
 ];
 
