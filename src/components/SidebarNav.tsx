@@ -1,15 +1,40 @@
 'use client';
 
-import {LayoutDashboard, Calendar, FolderKanban, Contact} from 'lucide-react';
+import {
+  LayoutDashboard,
+  MessageSquare,
+  Megaphone,
+  ClipboardList,
+  PenSquare,
+  Briefcase,
+  BookCopy,
+  Upload,
+  Users,
+  UserCheck,
+  CalendarCheck,
+  Mail,
+  Map,
+  GraduationCap,
+} from 'lucide-react';
 import {SidebarMenu, SidebarMenuItem, SidebarMenuButton} from '@/components/ui/sidebar';
 import Link from 'next/link';
 import {usePathname} from 'next/navigation';
 
 const navItems = [
   {href: '/', label: 'Dashboard', icon: LayoutDashboard},
-  {href: '/timetable', label: 'Timetable', icon: Calendar},
-  {href: '/resources', label: 'Resources', icon: FolderKanban},
-  {href: '/directory', label: 'Directory', icon: Contact},
+  {href: '/chat', label: 'Chat', icon: MessageSquare},
+  {href: '/announcements', label: 'Announcements', icon: Megaphone},
+  {href: '/assignments', label: 'Assignments', icon: ClipboardList},
+  {href: '/exercises', label: 'Exercises', icon: PenSquare},
+  {href: '/projects', label: 'Projects', icon: Briefcase},
+  {href: '/materials', label: 'Class Materials', icon: BookCopy},
+  {href: '/submissions', label: 'Submissions', icon: Upload},
+  {href: '/students', label: 'Student Management', icon: Users},
+  {href: '/attendance', label: 'Attendance', icon: UserCheck},
+  {href: '/bookings', label: 'Manage Bookings', icon: CalendarCheck},
+  {href: '/dms', label: 'DMs', icon: Mail},
+  {href: '/roadmap', label: 'Roadmap', icon: Map},
+  {href: '/career', label: 'Career Module', icon: GraduationCap},
 ];
 
 export function SidebarNav() {
@@ -18,7 +43,9 @@ export function SidebarNav() {
   return (
     <SidebarMenu className="mt-8">
       {navItems.map(item => {
-        const isActive = (pathname === '/' && item.href === '/') || (item.href !== '/' && pathname.startsWith(item.href));
+        const isActive =
+          (pathname === '/' && item.href === '/') ||
+          (item.href !== '/' && pathname.startsWith(item.href));
         return (
           <SidebarMenuItem key={item.label}>
             <Link href={item.href} passHref legacyBehavior>

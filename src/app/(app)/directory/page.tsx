@@ -58,7 +58,7 @@ export default function DirectoryPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-3xl font-bold tracking-tight">Contact Directory</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Directory</h1>
         <p className="text-muted-foreground">Find contact information for faculty and departments.</p>
       </div>
 

@@ -37,7 +37,7 @@ export default function TimetablePage() {
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-3xl font-bold tracking-tight">Weekly Timetable</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Timetable</h1>
         <p className="text-muted-foreground">Your class schedule for the week.</p>
       </div>
 
