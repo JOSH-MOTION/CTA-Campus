@@ -30,7 +30,7 @@ export default function AppLayout({children}: {children: ReactNode}) {
               <path d="M12 22c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8Z"></path>
               <path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z"></path>
             </svg>
-            <h1 className="text-xl font-semibold">Campus Compass</h1>
+            <h1 className="text-xl font-semibold">CTA Portal</h1>
           </div>
           <SidebarNav />
         </SidebarContent>
