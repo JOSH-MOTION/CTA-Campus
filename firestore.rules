@@ -1,32 +1,53 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Users can only read/update their own profile.
-    // Allow reading of other user profiles for directory/chat info, but not full data.
+
+    // Users collection rules
     match /users/{userId} {
-      allow read: if request.auth != null;
+      // Any authenticated user can get a single user's public data
+      allow get: if request.auth != null;
+
+      // Users can update their own document
       allow update: if request.auth.uid == userId;
-      // Allow user creation for sign up
-      allow create: if true; 
-    }
+      
+      // Any authenticated user can list users (for directory, chat, etc.)
+      allow list: if request.auth != null;
 
-    // Chat messages can only be read or written by participants of the chat.
-    // The chat ID for DMs is a composite of two sorted user IDs.
-    // The chat ID for group chats is `group-${gen}`.
-    match /chats/{chatId}/messages/{messageId} {
-       allow read, write: if request.auth != null && 
-                          (
-                            (chatId.split('-').length == 2 && request.auth.uid in chatId.split('-')) ||
-                            (chatId.split('-').length > 1 && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.gen == chatId.split('-')[1])
-                          );
+      // Anyone can create a user during sign-up
+      allow create: if true;
     }
-
-    // Rules for class materials
+    
+    // Materials collection rules
     match /materials/{materialId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['teacher', 'admin'];
+      // Any authenticated user can read or create materials
+      allow read, create: if request.auth != null;
     }
 
+    // Chat collection rules
+    match /chats/{chatId}/messages/{messageId} {
+      // Allow read and write if the user is part of the chat.
+      // A chat member is either in a DM (their UID is in the chatId)
+      // or they are part of the group chat.
+      allow read, write: if request.auth != null && (
+        isMemberOfDm(chatId) || isMemberOfGroup(chatId)
+      );
+    }
+  }
+
+  // Helper function to check if a user is in a DM chat
+  function isMemberOfDm(chatId) {
+    return request.auth.uid in chatId.split('-');
+  }
+
+  // Helper function to check if a user belongs to a group chat.
+  function isMemberOfGroup(chatId) {
+    let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    // Admins and teachers can access any group chat
+    if (userDoc.role in ['admin', 'teacher']) {
+      return true;
+    }
+    // Students can only access their own generation's group chat
+    return userDoc.role == 'student' && chatId == 'group-' + userDoc.gen;
   }
 }
