@@ -12,18 +12,21 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useRoadmap } from '@/contexts/RoadmapContext';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Link as LinkIcon, Youtube, FileText, Loader2 } from 'lucide-react';
+import { PlusCircle, Youtube, FileText, Loader2 } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, getDocs, query, orderBy, Timestamp } from 'firebase/firestore';
 
 
 const materialSchema = z.object({
   title: z.string().min(3, 'Title is too short.'),
-  url: z.string().url('Please enter a valid URL.'),
-  type: z.enum(['video', 'slides'], { required_error: 'Please select a material type.' }),
+  videoUrl: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
+  slidesUrl: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
   subject: z.string().nonempty('Please select a subject.'),
   week: z.string().nonempty('Please select a week.'),
   topic: z.string().nonempty('Please select a topic.'),
+}).refine(data => data.videoUrl || data.slidesUrl, {
+    message: "Please provide at least one link for a video or slides.",
+    path: ["videoUrl"], // You can associate the error with one of the fields
 });
 
 type MaterialFormValues = z.infer<typeof materialSchema>;
@@ -68,7 +71,8 @@ export default function MaterialsPage() {
     resolver: zodResolver(materialSchema),
     defaultValues: {
       title: '',
-      url: '',
+      videoUrl: '',
+      slidesUrl: '',
     },
   });
 
@@ -117,7 +121,7 @@ export default function MaterialsPage() {
   const getTopicById = (subjectTitle: string, weekTitle: string, topicId: string) => {
     const subject = roadmapData.find(s => s.title === subjectTitle);
     const week = subject?.weeks.find(w => w.title === weekTitle);
-    const topic = week?.topics.find(t => t.id === topicId || t.title === topicId); // a bit of a hack to support old and new
+    const topic = week?.topics.find(t => t.id === topicId || t.title === topicId);
     return topic?.title || 'Unknown Topic';
   }
 
@@ -136,15 +140,28 @@ export default function MaterialsPage() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Title</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Flexbox Explained" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <FormField
+                 <FormField
                   control={form.control}
-                  name="title"
+                  name="videoUrl"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Title</FormLabel>
+                      <FormLabel>Video URL (Optional)</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., Flexbox Explained" {...field} />
+                        <Input placeholder="https://youtube.com/..." {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -152,12 +169,12 @@ export default function MaterialsPage() {
                 />
                  <FormField
                   control={form.control}
-                  name="url"
+                  name="slidesUrl"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>URL</FormLabel>
+                      <FormLabel>Slides URL (Optional)</FormLabel>
                       <FormControl>
-                        <Input placeholder="https://..." {...field} />
+                        <Input placeholder="https://slides.com/..." {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -165,7 +182,7 @@ export default function MaterialsPage() {
                 />
               </div>
 
-               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <FormField
                   control={form.control}
                   name="subject"
@@ -220,25 +237,6 @@ export default function MaterialsPage() {
                     </FormItem>
                   )}
                 />
-                 <FormField
-                  control={form.control}
-                  name="type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Type</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger><SelectValue placeholder="Select Type" /></SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="video">Video</SelectItem>
-                          <SelectItem value="slides">Slides</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               </div>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? (
@@ -265,23 +263,28 @@ export default function MaterialsPage() {
             {materials.map(material => (
               <Card key={material.id}>
                 <CardHeader>
-                  <div className="flex items-start justify-between gap-4">
-                      {material.type === 'video' ? <Youtube className="h-8 w-8 text-red-500" /> : <FileText className="h-8 w-8 text-blue-500" />}
-                      <div className="flex-1 text-right">
-                          <CardTitle>{material.title}</CardTitle>
-                          <CardDescription>
-                              {material.subject} - {getTopicById(material.subject, material.week, material.topic)}
-                          </CardDescription>
-                      </div>
-                  </div>
+                  <CardTitle>{material.title}</CardTitle>
+                  <CardDescription>
+                      {material.subject} - {getTopicById(material.subject, material.week, material.topic)}
+                  </CardDescription>
                 </CardHeader>
-                <CardFooter>
-                  <Button variant="outline" className="w-full" asChild>
-                      <a href={material.url} target="_blank" rel="noopener noreferrer">
-                          <LinkIcon className="mr-2 h-4 w-4" />
-                          View Material
-                      </a>
-                  </Button>
+                <CardFooter className="flex flex-col gap-2 items-stretch">
+                   {material.videoUrl && (
+                     <Button variant="outline" asChild>
+                         <a href={material.videoUrl} target="_blank" rel="noopener noreferrer">
+                             <Youtube className="mr-2 h-4 w-4 text-red-500" />
+                             View Video
+                         </a>
+                     </Button>
+                   )}
+                   {material.slidesUrl && (
+                     <Button variant="outline" asChild>
+                         <a href={material.slidesUrl} target="_blank" rel="noopener noreferrer">
+                             <FileText className="mr-2 h-4 w-4 text-blue-500" />
+                             View Slides
+                         </a>
+                     </Button>
+                   )}
                 </CardFooter>
               </Card>
             ))}
