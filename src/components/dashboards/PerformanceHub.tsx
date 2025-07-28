@@ -151,7 +151,7 @@ export default function PerformanceHub() {
                 <RechartsBarChart
                     data={chartData}
                     layout="vertical"
-                    margin={{left: 10, right: 10}}
+                    margin={{left: 0, right: 10}}
                 >
                     <CartesianGrid horizontal={false} />
                     <YAxis
@@ -159,9 +159,10 @@ export default function PerformanceHub() {
                     type="category"
                     tickLine={false}
                     axisLine={false}
-                    tickMargin={10}
+                    tickMargin={5}
+                    tick={{fontSize: 12, width: 100, whiteSpace: 'pre-wrap'}}
                     className="text-xs"
-                    width={110}
+                    width={100}
                     />
                     <XAxis dataKey="value" type="number" hide />
                     <Tooltip cursor={{fill: 'hsl(var(--muted))'}} content={<ChartTooltipContent />} />
@@ -174,7 +175,7 @@ export default function PerformanceHub() {
                 ) : (
                 <RechartsPieChart>
                     <Tooltip content={<ChartTooltipContent nameKey="name" />} />
-                    <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={120}>
+                    <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100}>
                     {chartData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
