@@ -31,31 +31,18 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Record<string, Message[]>>(initialMessages);
 
   const directMessageUserId = searchParams.get('dm');
+  const groupChatId = searchParams.get('group');
 
   useEffect(() => {
     const loadUsers = async () => {
       setLoading(true);
       const users = await fetchAllUsers();
       setAllUsers(users);
-
-      // If a user ID is passed in the URL, select that user for a direct message.
-      if (directMessageUserId) {
-        const userToDm = users.find(u => u.uid === directMessageUserId);
-        if (userToDm) {
-          setSelectedChat({
-            id: userToDm.uid,
-            name: userToDm.displayName,
-            avatar: userToDm.photoURL,
-            dataAiHint: 'user portrait',
-          });
-        }
-      }
-
       setLoading(false);
     };
     loadUsers();
-  }, [fetchAllUsers, directMessageUserId]);
-  
+  }, [fetchAllUsers]);
+
   const allStudents = useMemo(() => allUsers.filter(u => u.role === 'student'), [allUsers]);
 
   const groupChats = useMemo(() => {
@@ -83,6 +70,30 @@ export default function ChatPage() {
     // Sort groups alphabetically by name
     return groups.sort((a, b) => a.name.localeCompare(b.name));
   }, [role, userData, allStudents]);
+  
+  useEffect(() => {
+    if (loading) return;
+    
+    // If a group ID is passed in the URL, select that group.
+    if (groupChatId) {
+      const groupToSelect = groupChats.find(g => g.id === `group-${groupChatId}`);
+      if (groupToSelect) {
+        setSelectedChat(groupToSelect);
+      }
+    }
+    // If a user ID is passed in the URL, select that user for a direct message.
+    else if (directMessageUserId) {
+      const userToDm = allUsers.find(u => u.uid === directMessageUserId);
+      if (userToDm) {
+        setSelectedChat({
+          id: userToDm.uid,
+          name: userToDm.displayName,
+          avatar: userToDm.photoURL,
+          dataAiHint: 'user portrait',
+        });
+      }
+    }
+  }, [loading, allUsers, groupChats, directMessageUserId, groupChatId]);
 
   const handleSelectChat = (entity: ChatEntity) => {
     setSelectedChat(entity);
@@ -102,6 +113,13 @@ export default function ChatPage() {
     });
   };
 
+  const activeTab = useMemo(() => {
+    if (selectedChat?.id.startsWith('group-')) {
+      return 'groups';
+    }
+    return 'dms';
+  }, [selectedChat]);
+
   return (
     <div className="grid h-[calc(100vh-8rem)] grid-cols-1 md:grid-cols-3 xl:grid-cols-4">
       <div className="flex flex-col border-r bg-card md:col-span-1 xl:col-span-1">
@@ -115,7 +133,7 @@ export default function ChatPage() {
             <Input placeholder="Search" className="pl-9" />
           </div>
         </div>
-        <Tabs defaultValue="dms" className="flex flex-1 flex-col overflow-hidden">
+        <Tabs value={activeTab} className="flex flex-1 flex-col overflow-hidden">
           <TabsList className="mx-4 grid w-auto grid-cols-2">
             <TabsTrigger value="dms">
               <User className="mr-2" /> DMs

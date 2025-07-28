@@ -19,7 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
+import {Button} from '@/components/ui/button';
+import {useRouter} from 'next/navigation';
 
 interface TeacherDashboardProps {
   user: User | null;
@@ -30,6 +31,7 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
   const [selectedGen, setSelectedGen] = useState<string>('');
   const [allUsers, setAllUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     async function loadUsers() {
@@ -43,9 +45,7 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
 
   const availableGens = useMemo(() => {
     const taughtGens = userData?.gensTaught?.split(',').map(g => g.trim()).filter(Boolean) || [];
-    const studentGens = allUsers
-        .filter(u => u.role === 'student' && u.gen)
-        .map(u => u.gen!);
+    const studentGens = allUsers.filter(u => u.role === 'student' && u.gen).map(u => u.gen!);
     const allGens = [...new Set([...taughtGens, ...studentGens])];
     return allGens.sort();
   }, [userData?.gensTaught, allUsers]);
@@ -60,6 +60,12 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
       setSelectedGen(availableGens[0]);
     }
   }, [availableGens, selectedGen]);
+  
+  const handleOpenChat = () => {
+    if (selectedGen) {
+      router.push(`/chat?group=${selectedGen}`);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -89,9 +95,7 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
 
       <Card>
         <CardHeader>
-          <CardTitle>
-            {selectedGen ? `${selectedGen} Overview` : 'Dashboard'}
-          </CardTitle>
+          <CardTitle>{selectedGen ? `${selectedGen} Overview` : 'Dashboard'}</CardTitle>
           <CardDescription>
             {selectedGen ? `Key metrics for ${selectedGen}.` : 'Select a generation to view details.'}
           </CardDescription>
@@ -106,9 +110,7 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{loading ? '...' : studentsInSelectedGen.length}</div>
-                  <p className="text-xs text-muted-foreground">
-                    Total students enrolled
-                  </p>
+                  <p className="text-xs text-muted-foreground">Total students enrolled</p>
                 </CardContent>
               </Card>
               <Card>
@@ -118,55 +120,45 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">92%</div>
-                   <p className="text-xs text-muted-foreground">
-                    (Data not yet available)
-                  </p>
+                  <p className="text-xs text-muted-foreground">(Data not yet available)</p>
                 </CardContent>
               </Card>
-               <Card>
+              <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Pending Submissions</CardTitle>
                   <BookOpen className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">8</div>
-                   <p className="text-xs text-muted-foreground">
-                    (Data not yet available)
-                  </p>
+                  <p className="text-xs text-muted-foreground">(Data not yet available)</p>
                 </CardContent>
               </Card>
               <Card className="flex flex-col items-center justify-center bg-secondary/50">
                 <CardHeader className="items-center pb-2">
-                   <CardTitle className="text-base font-medium">
-                      Group Chat
-                  </CardTitle>
+                  <CardTitle className="text-base font-medium">Group Chat</CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-col items-center">
-                    <Group className="h-8 w-8 text-muted-foreground mb-2"/>
-                    <Button>
-                      <MessageSquare className="mr-2 h-4 w-4" />
-                      Open {selectedGen} Chat
-                    </Button>
+                  <Group className="h-8 w-8 text-muted-foreground mb-2" />
+                  <Button onClick={handleOpenChat}>
+                    <MessageSquare className="mr-2 h-4 w-4" />
+                    Open {selectedGen} Chat
+                  </Button>
                 </CardContent>
               </Card>
             </div>
           ) : (
-             <div className="flex h-48 items-center justify-center rounded-lg border-2 border-dashed">
-                <p className="text-muted-foreground">
-                  {loading ? 'Loading...' : 'No student generations found.'}
-                </p>
-             </div>
+            <div className="flex h-48 items-center justify-center rounded-lg border-2 border-dashed">
+              <p className="text-muted-foreground">{loading ? 'Loading...' : 'No student generations found.'}</p>
+            </div>
           )}
         </CardContent>
       </Card>
-      
+
       <div className="grid grid-cols-1 gap-6">
         <Card>
           <CardHeader>
             <CardTitle>Recent Submissions</CardTitle>
-            <CardDescription>
-              New assignments waiting for your review across all generations.
-            </CardDescription>
+            <CardDescription>New assignments waiting for your review across all generations.</CardDescription>
           </CardHeader>
           <CardContent>
             <p>A list of recent submissions would go here. (Data not yet available)</p>

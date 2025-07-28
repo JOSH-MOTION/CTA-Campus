@@ -116,7 +116,7 @@ export default function BookSessionPage() {
                             mode="single"
                             selected={field.value}
                             onSelect={field.onChange}
-                            disabled={(date) => date < new Date() || date.getDay() === 0 || date.getDay() === 6}
+                            disabled={(date) => date < new Date() || date.getDay() === 0}
                             initialFocus
                           />
                         </PopoverContent>
