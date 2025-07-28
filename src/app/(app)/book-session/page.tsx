@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -14,14 +14,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { CalendarIcon, Clock } from 'lucide-react';
+import { CalendarIcon, Clock, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
-
-const staff = [
-  { id: '1', name: 'Dr. Evelyn Reed' },
-  { id: '2', name: 'John Carter' },
-  { id: '3', name: 'Dr. Alan Grant' },
-];
+import { useAuth, UserData } from '@/contexts/AuthContext';
 
 const availableTimeSlots = [
   '09:00 AM', '10:00 AM', '11:00 AM', '02:00 PM', '03:00 PM', '04:00 PM'
@@ -38,15 +33,31 @@ type BookingFormValues = z.infer<typeof bookingSchema>;
 
 export default function BookSessionPage() {
   const { toast } = useToast();
+  const { fetchAllUsers } = useAuth();
+  const [staff, setStaff] = useState<UserData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadStaff = async () => {
+      setLoading(true);
+      const allUsers = await fetchAllUsers();
+      const staffUsers = allUsers.filter(u => u.role === 'teacher' || u.role === 'admin');
+      setStaff(staffUsers);
+      setLoading(false);
+    };
+    loadStaff();
+  }, [fetchAllUsers]);
+  
   const form = useForm<BookingFormValues>({
     resolver: zodResolver(bookingSchema),
   });
 
   const onSubmit = (data: BookingFormValues) => {
     console.log(data);
+    const selectedStaff = staff.find(s => s.uid === data.staffId);
     toast({
       title: 'Booking Confirmed!',
-      description: `Your session with ${staff.find(s => s.id === data.staffId)?.name} on ${format(data.date, 'PPP')} at ${data.time} is booked.`,
+      description: `Your session with ${selectedStaff?.displayName} on ${format(data.date, 'PPP')} at ${data.time} is booked.`,
     });
     form.reset();
   };
@@ -72,15 +83,16 @@ export default function BookSessionPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Staff Member</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loading}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select a staff member" />
+                           {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                          <SelectValue placeholder={loading ? "Loading staff..." : "Select a staff member"} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         {staff.map(member => (
-                          <SelectItem key={member.id} value={member.id}>{member.name}</SelectItem>
+                          <SelectItem key={member.uid} value={member.uid}>{member.displayName}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
