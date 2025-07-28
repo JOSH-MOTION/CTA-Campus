@@ -70,6 +70,7 @@ export const teacherNavItems = [
   {href: '/roadmap', label: 'Roadmap', icon: Map},
   {href: '/directory', label: 'Directory', icon: Contact},
   {href: '/availability', label: 'Manage Availability', icon: CalendarClock},
+  {href: '/temp-update', label: 'Temp Update', icon: History},
   {href: '/profile', label: 'Profile', icon: User},
 ];
 
