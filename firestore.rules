@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -31,16 +32,31 @@ service cloud.firestore {
       allow write: if request.auth.uid == userId;
     }
 
-    // Rules for content collections (announcements, assignments, etc.)
-    match /{collection}/{docId}
-    where collection in ['announcements', 'assignments', 'exercises', 'projects'] {
-      // Anyone authenticated can read the documents
+    // Rules for announcements collection
+    match /announcements/{docId} {
       allow read: if isAuthenticated();
-      
-      // Only teachers or admins can create documents
       allow create: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
+      allow update, delete: if isAuthenticated() && (resource.data.authorId == request.auth.uid || isAdmin(request.auth.uid));
+    }
 
-      // Only the author or an admin can update or delete
+    // Rules for assignments collection
+    match /assignments/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
+      allow update, delete: if isAuthenticated() && (resource.data.authorId == request.auth.uid || isAdmin(request.auth.uid));
+    }
+
+    // Rules for exercises collection
+    match /exercises/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
+      allow update, delete: if isAuthenticated() && (resource.data.authorId == request.auth.uid || isAdmin(request.auth.uid));
+    }
+
+    // Rules for projects collection
+    match /projects/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
       allow update, delete: if isAuthenticated() && (resource.data.authorId == request.auth.uid || isAdmin(request.auth.uid));
     }
     
