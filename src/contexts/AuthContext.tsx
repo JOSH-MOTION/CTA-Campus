@@ -1,9 +1,10 @@
 'use client';
 
 import {createContext, useContext, useState, ReactNode, useEffect} from 'react';
-import {auth} from '@/lib/firebase';
+import {auth, db} from '@/lib/firebase';
 import type {User} from 'firebase/auth';
 import {onAuthStateChanged} from 'firebase/auth';
+import {doc, getDoc} from 'firebase/firestore';
 
 export type UserRole = 'student' | 'teacher' | 'admin';
 
@@ -22,16 +23,27 @@ export function AuthProvider({children}: {children: ReactNode}) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, user => {
-      setUser(user);
-      // In a real app, you would fetch the user's role from your database.
-      // We'll use localStorage for this simulation.
-      const storedRole = localStorage.getItem('userRole') as UserRole;
-      if (user && storedRole && ['student', 'teacher', 'admin'].includes(storedRole)) {
-        setRole(storedRole);
-      } else if (user) {
-        // default to student if no role is stored
-        setRole('student');
+    const unsubscribe = onAuthStateChanged(auth, async user => {
+      if (user) {
+        setUser(user);
+        const docRef = doc(db, 'users', user.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const userData = docSnap.data();
+          if (userData.role) {
+            setRole(userData.role);
+            localStorage.setItem('userRole', userData.role);
+          }
+        } else {
+          // If no user doc, check localStorage (for just-signed-up users)
+          const storedRole = localStorage.getItem('userRole') as UserRole;
+          if (storedRole && ['student', 'teacher', 'admin'].includes(storedRole)) {
+            setRole(storedRole);
+          }
+        }
+      } else {
+        setUser(null);
+        localStorage.removeItem('userRole');
       }
       setLoading(false);
     });
@@ -42,6 +54,10 @@ export function AuthProvider({children}: {children: ReactNode}) {
   const handleSetRole = (newRole: UserRole) => {
     setRole(newRole);
     localStorage.setItem('userRole', newRole);
+    if (user) {
+      const docRef = doc(db, 'users', user.uid);
+      setDoc(docRef, {role: newRole}, {merge: true});
+    }
   };
 
   return (

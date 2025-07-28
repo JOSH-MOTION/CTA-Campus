@@ -4,7 +4,8 @@
 import {useState, useEffect} from 'react';
 import {useRouter} from 'next/navigation';
 import {createUserWithEmailAndPassword, updateProfile} from 'firebase/auth';
-import {auth} from '@/lib/firebase';
+import {auth, db} from '@/lib/firebase';
+import {doc, setDoc} from 'firebase/firestore';
 import {Button} from '@/components/ui/button';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
 import {Input} from '@/components/ui/input';
@@ -34,15 +35,22 @@ export default function AdminSignupPage() {
     setLoading(true);
 
     try {
-      // Set role in localStorage before creating user
       localStorage.setItem('userRole', 'admin');
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      await updateProfile(userCredential.user, {displayName: fullName});
-      // In a real app, this would be a separate API call to set custom claims
+      const {user} = userCredential;
+      
+      await updateProfile(user, {displayName: fullName});
+      
+      await setDoc(doc(db, 'users', user.uid), {
+        uid: user.uid,
+        email: user.email,
+        displayName: fullName,
+        role: 'admin',
+      });
+      
       setRole('admin');
       toast({title: 'Sign Up Successful', description: 'Your admin account has been created.'});
     } catch (error: any) {
-      // If signup fails, remove the stored role
       localStorage.removeItem('userRole');
       toast({
         variant: 'destructive',

@@ -4,7 +4,8 @@
 import {useState, useEffect, useRef} from 'react';
 import {useRouter} from 'next/navigation';
 import {createUserWithEmailAndPassword, updateProfile} from 'firebase/auth';
-import {auth} from '@/lib/firebase';
+import {auth, db} from '@/lib/firebase';
+import {doc, setDoc} from 'firebase/firestore';
 import {Button} from '@/components/ui/button';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
 import {Input} from '@/components/ui/input';
@@ -63,17 +64,27 @@ export default function StudentSignupPage() {
     setLoading(true);
 
     try {
-      // Set role in localStorage before creating user
       localStorage.setItem('userRole', 'student');
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      // In a real app, you would save the extra details and photoURL to a Firestore database
-      // associated with the user's UID and set a custom claim for the role.
-      await updateProfile(userCredential.user, {displayName: fullName});
+      const {user} = userCredential;
+
+      await updateProfile(user, {displayName: fullName});
+      
+      await setDoc(doc(db, 'users', user.uid), {
+        uid: user.uid,
+        email: user.email,
+        displayName: fullName,
+        role: 'student',
+        gen,
+        schoolId,
+        lessonDay,
+        lessonType,
+        bio,
+      });
+
       setRole('student');
       toast({title: 'Sign Up Successful', description: 'Your account has been created.'});
-      // The onAuthStateChanged listener in AuthContext will handle redirection
     } catch (error: any) {
-      // If signup fails, remove the stored role
       localStorage.removeItem('userRole');
       toast({
         variant: 'destructive',
