@@ -147,7 +147,7 @@ export function Chat({entity, messages, onSendMessage, currentUser}: ChatProps) 
                     : 'bg-card'
                 )}
               >
-                <div className={cn("absolute top-1/2 -translate-y-1/2 flex bg-card border rounded-md shadow-sm opacity-0 group-hover:opacity-100 transition-opacity",  msg.senderId === currentUser?.uid ? '-left-28' : '-right-28')}>
+                <div className={cn("absolute top-1/2 -translate-y-1/2 flex bg-background border rounded-md shadow-sm opacity-0 group-hover:opacity-100 transition-opacity",  msg.senderId === currentUser?.uid ? '-left-28' : '-right-28')}>
                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReplyTo(msg)}>
                        <Reply className="h-4 w-4" />
                    </Button>
@@ -159,7 +159,7 @@ export function Chat({entity, messages, onSendMessage, currentUser}: ChatProps) 
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditClick(msg)}>
                             <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeletingMessage(msg)}>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 hover:text-destructive" onClick={() => setDeletingMessage(msg)}>
                             <Trash2 className="h-4 w-4" />
                         </Button>
                        </>
