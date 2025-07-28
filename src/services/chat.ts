@@ -19,6 +19,12 @@ import {
     senderId: string;
     senderName: string;
     timestamp: Timestamp;
+    replyTo?: {
+        messageId: string;
+        text: string;
+        senderName: string;
+    };
+    isPinned?: boolean;
   }
   
   export type NewMessage = Omit<Message, 'id' | 'timestamp'>;
@@ -72,6 +78,8 @@ import {
                 senderId: data.senderId,
                 senderName: data.senderName,
                 timestamp: data.timestamp as Timestamp,
+                replyTo: data.replyTo,
+                isPinned: data.isPinned,
             }
         });
         callback(messages);
@@ -84,4 +92,3 @@ import {
   
     return unsubscribe;
   };
-  

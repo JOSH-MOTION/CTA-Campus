@@ -6,7 +6,7 @@ import {Avatar, AvatarFallback, AvatarImage} from '@/components/ui/avatar';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {ScrollArea} from '@/components/ui/scroll-area';
-import {Send} from 'lucide-react';
+import {Send, Reply, Pin, X} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import type {Message} from '@/services/chat';
 import type {User} from 'firebase/auth';
@@ -17,12 +17,13 @@ type ChatEntity = {id: string; name: string; avatar?: string; dataAiHint: string
 interface ChatProps {
   entity: ChatEntity;
   messages: Message[];
-  onSendMessage: (text: string) => void;
+  onSendMessage: (text: string, replyTo?: Message) => void;
   currentUser: User | null;
 }
 
 export function Chat({entity, messages, onSendMessage, currentUser}: ChatProps) {
   const [text, setText] = useState('');
+  const [replyTo, setReplyTo] = useState<Message | undefined>(undefined);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -36,9 +37,14 @@ export function Chat({entity, messages, onSendMessage, currentUser}: ChatProps) 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSendMessage(text);
+    onSendMessage(text, replyTo);
     setText('');
+    setReplyTo(undefined);
   };
+  
+  const handleReplyTo = (message: Message) => {
+    setReplyTo(message);
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -55,7 +61,7 @@ export function Chat({entity, messages, onSendMessage, currentUser}: ChatProps) 
           {messages.map(msg => (
             <div
               key={msg.id}
-              className={cn('flex items-end gap-3', msg.senderId === currentUser?.uid ? 'justify-end' : 'justify-start')}
+              className={cn('flex items-end gap-3 group', msg.senderId === currentUser?.uid ? 'justify-end' : 'justify-start')}
             >
               {msg.senderId !== currentUser?.uid && (
                 <Avatar className="h-8 w-8">
@@ -64,12 +70,27 @@ export function Chat({entity, messages, onSendMessage, currentUser}: ChatProps) 
               )}
               <div
                 className={cn(
-                  'max-w-[70%] rounded-lg p-3 text-sm shadow-sm',
+                  'max-w-[70%] rounded-lg p-3 text-sm shadow-sm relative',
                   msg.senderId === currentUser?.uid
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-card'
                 )}
               >
+                <div className="absolute top-1/2 -translate-y-1/2 flex bg-card border rounded-md shadow-sm -left-16 opacity-0 group-hover:opacity-100 transition-opacity">
+                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReplyTo(msg)}>
+                       <Reply className="h-4 w-4" />
+                   </Button>
+                   <Button variant="ghost" size="icon" className="h-7 w-7">
+                       <Pin className="h-4 w-4" />
+                   </Button>
+                </div>
+
+                {msg.replyTo && (
+                    <div className="mb-2 rounded-md bg-black/10 p-2">
+                        <p className="font-bold text-xs">{msg.replyTo.senderName}</p>
+                        <p className="text-xs truncate">{msg.replyTo.text}</p>
+                    </div>
+                )}
                 <p className="font-semibold">{msg.senderName}</p>
                 <p>{msg.text}</p>
                 <p className="mt-1 text-xs opacity-70">
@@ -87,6 +108,15 @@ export function Chat({entity, messages, onSendMessage, currentUser}: ChatProps) 
       </ScrollArea>
 
       <footer className="border-t bg-card p-4">
+        {replyTo && (
+            <div className="mb-2 p-2 rounded-md bg-muted text-sm relative">
+                <p className="text-muted-foreground text-xs">Replying to <span className="font-semibold">{replyTo.senderName}</span></p>
+                <p className="truncate">{replyTo.text}</p>
+                <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6" onClick={() => setReplyTo(undefined)}>
+                    <X className="h-4 w-4"/>
+                </Button>
+            </div>
+        )}
         <form onSubmit={handleSubmit} className="relative">
           <Input
             value={text}

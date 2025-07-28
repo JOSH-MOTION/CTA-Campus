@@ -124,14 +124,24 @@ export default function ChatPage() {
   }, [loading, allUsers, groupChats, directMessageUserId, groupChatId, handleSelectChat, currentUser, messageUnsubscribe]);
 
 
-  const handleSendMessage = async (text: string) => {
+  const handleSendMessage = async (text: string, replyTo?: Message) => {
     if (!selectedChat || !text.trim() || !currentUser) return;
-    
-    await sendMessage(selectedChat.id, {
+
+    let messagePayload: any = {
         senderId: currentUser.uid,
         senderName: currentUser.displayName || 'User',
         text: text.trim(),
-    });
+    };
+
+    if (replyTo) {
+        messagePayload.replyTo = {
+            messageId: replyTo.id,
+            text: replyTo.text,
+            senderName: replyTo.senderName,
+        };
+    }
+    
+    await sendMessage(selectedChat.id, messagePayload);
   };
   
   const handleTabChange = (value: string) => {
