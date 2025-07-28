@@ -7,15 +7,16 @@ import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
 import {useAuth} from '@/contexts/AuthContext';
-import {Camera, LogOut} from 'lucide-react';
+import {Camera, LogOut, Briefcase, GraduationCap, Calendar, Monitor, Users, BookUser} from 'lucide-react';
 import {auth, storage} from '@/lib/firebase';
 import {ref, uploadBytes, getDownloadURL} from 'firebase/storage';
 import {updateProfile} from 'firebase/auth';
 import {useToast} from '@/hooks/use-toast';
-import { Badge } from '@/components/ui/badge';
+import {Badge} from '@/components/ui/badge';
+import {Separator} from '@/components/ui/separator';
 
 export default function ProfilePage() {
-  const {user, role, loading} = useAuth();
+  const {user, userData, role, loading} = useAuth();
   const {toast} = useToast();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(user?.photoURL || null);
@@ -64,7 +65,7 @@ export default function ProfilePage() {
     await auth.signOut();
   };
 
-  if (loading || !user) return <p>Loading...</p>;
+  if (loading || !user || !userData) return <p>Loading...</p>;
 
   const getRoleBasedDescription = () => {
     switch (role) {
@@ -76,6 +77,18 @@ export default function ProfilePage() {
         return 'System-wide administrative profile.';
     }
   };
+  
+  const InfoItem = ({ icon: Icon, label, value }: { icon: React.ElementType, label: string, value?: string }) => (
+    value ? (
+      <div className="flex items-center gap-3">
+        <Icon className="h-5 w-5 text-muted-foreground" />
+        <div>
+          <p className="text-sm text-muted-foreground">{label}</p>
+          <p className="font-medium capitalize">{value}</p>
+        </div>
+      </div>
+    ) : null
+  );
 
   return (
     <div className="container mx-auto max-w-2xl space-y-6 py-8">
@@ -107,8 +120,42 @@ export default function ProfilePage() {
             <Badge variant="secondary" className="mt-2 capitalize">{role}</Badge>
           </div>
           <Button onClick={handleSave} disabled={!selectedFile || isUploading}>
-            {isUploading ? 'Saving...' : 'Save Changes'}
+            {isUploading ? 'Saving...' : 'Save Picture'}
           </Button>
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>Details</CardTitle>
+          <CardDescription>
+            This information is managed by the administration and is read-only.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {userData.bio && (
+            <>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Bio</p>
+                <p className="font-medium italic">"{userData.bio}"</p>
+              </div>
+              <Separator />
+            </>
+          )}
+
+          <div className="grid grid-cols-1 gap-y-4 sm:grid-cols-2">
+            {role === 'student' && (
+              <>
+                <InfoItem icon={GraduationCap} label="Generation" value={userData.gen} />
+                <InfoItem icon={BookUser} label="School ID" value={userData.schoolId} />
+                <InfoItem icon={Calendar} label="Lesson Day" value={userData.lessonDay} />
+                <InfoItem icon={Monitor} label="Lesson Type" value={userData.lessonType} />
+              </>
+            )}
+             {role === 'teacher' && (
+              <InfoItem icon={Users} label="Generations Taught" value={userData.gensTaught} />
+            )}
+          </div>
         </CardContent>
       </Card>
 
