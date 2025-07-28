@@ -1,7 +1,7 @@
 // src/app/(app)/exercises/page.tsx
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, PencilRuler, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,11 +10,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { CreateExerciseDialog } from '@/components/exercises/CreateExerciseDialog';
 import { Badge } from '@/components/ui/badge';
 import { ExerciseActions } from '@/components/exercises/ExerciseActions';
+import { awardPoint } from '@/services/points';
+import { useToast } from '@/hooks/use-toast';
 
 export default function ExercisesPage() {
-  const { role, userData } = useAuth();
+  const { role, userData, user } = useAuth();
   const { exercises, loading } = useExercises();
   const isTeacherOrAdmin = role === 'teacher' || role === 'admin';
+  const { toast } = useToast();
+  const [submittingId, setSubmittingId] = useState<string | null>(null);
 
   const filteredExercises = useMemo(() => {
     if (isTeacherOrAdmin) return exercises;
@@ -27,6 +31,27 @@ export default function ExercisesPage() {
   }, [exercises, isTeacherOrAdmin, role, userData?.gen]);
   
   const sortedExercises = [...filteredExercises].sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+
+  const handleStartExercise = async (exerciseId: string) => {
+    if (!user) return;
+    setSubmittingId(exerciseId);
+    try {
+      await awardPoint(user.uid, 1, 'Class Exercise', `exercise-${exerciseId}`);
+      toast({
+        title: 'Exercise Submitted',
+        description: 'You have been awarded 1 point!',
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.message === 'duplicate' ? 'You have already received points for this exercise.' : 'Could not submit exercise.',
+      });
+    } finally {
+      setSubmittingId(null);
+    }
+  };
+
 
   return (
     <div className="space-y-6">
@@ -67,7 +92,8 @@ export default function ExercisesPage() {
               </CardHeader>
               <CardContent className="flex-grow"></CardContent>
               <CardFooter>
-                 <Button className="w-full">
+                 <Button className="w-full" onClick={() => handleStartExercise(exercise.id)} disabled={isTeacherOrAdmin || submittingId === exercise.id}>
+                    {submittingId === exercise.id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Start Exercise
                   </Button>
               </CardFooter>

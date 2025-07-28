@@ -10,44 +10,37 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Cell } from 'recharts';
 import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
+import { getPointsForAllStudents } from '@/services/points';
 
 interface StudentRank extends UserData {
   rank: number;
   totalPoints: number;
 }
 
-// Mock function to generate points for students
-const generateMockPoints = (studentId: string) => {
-    // Simple hash to get a consistent "random" number
-    let hash = 0;
-    for (let i = 0; i < studentId.length; i++) {
-        const char = studentId.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convert to 32bit integer
-    }
-    return Math.abs(hash % 200) + 50; // Points between 50 and 250
-};
-
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
 export default function RankingsPage() {
   const { fetchAllUsers } = useAuth();
-  const [allUsers, setAllUsers] = useState<UserData[]>([]);
+  const [allStudents, setAllStudents] = useState<UserData[]>([]);
+  const [studentPoints, setStudentPoints] = useState<{[key: string]: number}>({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGen, setSelectedGen] = useState('all');
 
   useEffect(() => {
-    const loadUsers = async () => {
+    const loadData = async () => {
       setLoading(true);
       const users = await fetchAllUsers();
-      setAllUsers(users);
+      const students = users.filter(u => u.role === 'student');
+      setAllStudents(students);
+      
+      const points = await getPointsForAllStudents(students.map(s => s.uid));
+      setStudentPoints(points);
+
       setLoading(false);
     };
-    loadUsers();
+    loadData();
   }, [fetchAllUsers]);
-
-  const allStudents = useMemo(() => allUsers.filter(u => u.role === 'student'), [allUsers]);
 
   const availableGens = useMemo(() => {
     const gens = new Set(allStudents.map(student => student.gen).filter(Boolean));
@@ -63,7 +56,7 @@ export default function RankingsPage() {
 
     const studentsWithPoints = filtered.map(student => ({
         ...student,
-        totalPoints: generateMockPoints(student.uid),
+        totalPoints: studentPoints[student.uid] || 0,
     }));
 
     return studentsWithPoints
@@ -72,7 +65,7 @@ export default function RankingsPage() {
             ...student,
             rank: index + 1,
         }));
-  }, [allStudents, searchTerm, selectedGen]);
+  }, [allStudents, studentPoints, searchTerm, selectedGen]);
   
   const chartData = useMemo(() => rankedStudents.slice(0, 15).reverse(), [rankedStudents]);
 

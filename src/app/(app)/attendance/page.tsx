@@ -1,4 +1,4 @@
-
+// src/app/(app)/attendance/page.tsx
 'use client';
 
 import { useForm } from 'react-hook-form';
@@ -10,9 +10,11 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, Loader2 } from 'lucide-react';
 import { useRoadmap } from '@/contexts/RoadmapContext';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { awardPoint } from '@/services/points';
 
 const attendanceSchema = z.object({
   classId: z.string().nonempty('Please select a class.'),
@@ -26,6 +28,8 @@ type AttendanceFormValues = z.infer<typeof attendanceSchema>;
 export default function AttendancePage() {
   const { toast } = useToast();
   const { roadmapData } = useRoadmap();
+  const { user } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const classSessions = useMemo(() => {
     return roadmapData.flatMap(subject =>
@@ -47,20 +51,33 @@ export default function AttendancePage() {
     },
   });
 
-  const onSubmit = (data: AttendanceFormValues) => {
-    console.log(data);
-    toast({
-      title: 'Attendance Marked!',
-      description: 'You have been awarded 1 point for submitting your feedback.',
-    });
-    form.reset();
+  const onSubmit = async (data: AttendanceFormValues) => {
+    if (!user) return;
+    setIsSubmitting(true);
+    try {
+      const attendanceDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      await awardPoint(user.uid, 1, 'Class Attendance', `attendance-${data.classId}-${attendanceDate}`);
+      toast({
+        title: 'Attendance Marked!',
+        description: 'You have been awarded 1 point for submitting your feedback.',
+      });
+      form.reset();
+    } catch(error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.message === 'duplicate' ? 'You have already marked attendance for this session today.' : 'Could not submit attendance.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="space-y-6">
       <div className="space-y-1">
         <h1 className="text-3xl font-bold tracking-tight">Daily Attendance & Feedback</h1>
-        <p className="text-muted-foreground">Submit this form to mark your attendance and get a point.</p>
+        <p className="text-muted-foreground">Submit this form to mark your attendance and get 1 point.</p>
       </div>
       <Card>
         <CardHeader>
@@ -139,8 +156,9 @@ export default function AttendancePage() {
                 )}
               />
 
-              <Button type="submit">
-                <CheckCircle className="mr-2" />
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <CheckCircle className="mr-2 h-4 w-4" />
                 Submit Attendance
               </Button>
             </form>

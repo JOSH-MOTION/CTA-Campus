@@ -1,3 +1,4 @@
+// src/app/(app)/100-days-of-code/page.tsx
 'use client';
 
 import {useState} from 'react';
@@ -6,19 +7,39 @@ import {Calendar} from '@/components/ui/calendar';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
 import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
-import {Link} from 'lucide-react';
+import {Link, Loader2} from 'lucide-react';
+import {useAuth} from '@/contexts/AuthContext';
+import {useToast} from '@/hooks/use-toast';
+import {awardPoint} from '@/services/points';
 
 export default function OneHundredDaysOfCodePage() {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [link, setLink] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const {user} = useAuth();
+  const {toast} = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Here you would typically handle the submission,
-    // e.g., save the link to a database with the selected date.
-    console.log({date, link});
-    alert(`Link submitted for ${date?.toLocaleDateString()}:\n${link}`);
-    setLink('');
+    if (!user || !date) return;
+    setIsSubmitting(true);
+    
+    try {
+      await awardPoint(user.uid, 0.5, '100 Days of Code Submission', `submission-${date.toISOString().split('T')[0]}`);
+      toast({
+        title: 'Progress Submitted!',
+        description: 'You earned 0.5 points for your daily post.',
+      });
+      setLink('');
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.message === 'duplicate' ? 'You have already submitted for this date.' : 'Could not submit your progress.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -26,7 +47,7 @@ export default function OneHundredDaysOfCodePage() {
       <div className="space-y-1">
         <h1 className="text-3xl font-bold tracking-tight">100 Days of Code</h1>
         <p className="text-muted-foreground">
-          Select a day on the calendar and post the link to your daily progress.
+          Select a day on the calendar and post the link to your daily progress to earn 0.5 points.
         </p>
       </div>
 
@@ -55,7 +76,8 @@ export default function OneHundredDaysOfCodePage() {
                   />
                 </div>
               </div>
-              <Button type="submit" className="w-full" disabled={!link}>
+              <Button type="submit" className="w-full" disabled={!link || isSubmitting}>
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Post Link
               </Button>
             </form>

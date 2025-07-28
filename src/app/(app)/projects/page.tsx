@@ -1,7 +1,7 @@
 // src/app/(app)/projects/page.tsx
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, BookMarked, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,11 +10,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { CreateProjectDialog } from '@/components/projects/CreateProjectDialog';
 import { Badge } from '@/components/ui/badge';
 import { ProjectActions } from '@/components/projects/ProjectActions';
+import { awardPoint } from '@/services/points';
+import { useToast } from '@/hooks/use-toast';
 
 export default function ProjectsPage() {
-  const { role, userData } = useAuth();
+  const { role, userData, user } = useAuth();
   const { projects, loading } = useProjects();
   const isTeacherOrAdmin = role === 'teacher' || role === 'admin';
+  const { toast } = useToast();
+  const [submittingId, setSubmittingId] = useState<string | null>(null);
 
   const filteredProjects = useMemo(() => {
     if (isTeacherOrAdmin) return projects;
@@ -27,6 +31,29 @@ export default function ProjectsPage() {
   }, [projects, isTeacherOrAdmin, role, userData?.gen]);
   
   const sortedProjects = [...filteredProjects].sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+
+  const handleViewProject = async (projectId: string) => {
+    if (!user) return;
+    setSubmittingId(projectId);
+    try {
+      // For now, we assume viewing the details means they get the point.
+      // A real implementation would have a submission system.
+      // This is a placeholder for 'Weekly Projects'
+      await awardPoint(user.uid, 1, 'Weekly Project', `project-${projectId}`);
+      toast({
+        title: 'Project Submitted',
+        description: 'You have been awarded 1 point!',
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.message === 'duplicate' ? 'You have already received points for this project.' : 'Could not submit project.',
+      });
+    } finally {
+      setSubmittingId(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -67,7 +94,8 @@ export default function ProjectsPage() {
               </CardHeader>
               <CardContent className="flex-grow"></CardContent>
               <CardFooter>
-                 <Button className="w-full">
+                 <Button className="w-full" onClick={() => handleViewProject(project.id)} disabled={isTeacherOrAdmin || submittingId === project.id}>
+                    {submittingId === project.id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     View Project Details
                   </Button>
               </CardFooter>

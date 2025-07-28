@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -30,49 +29,62 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       // A user can only create or update their own profile
       allow write: if request.auth.uid == userId;
+
+      // Rules for the points subcollection
+      match /points/{pointId} {
+        // A user can only read their own points
+        allow read: if isAuthenticated() && request.auth.uid == userId;
+        // Only the user themselves (client-side) can add points.
+        // In a production app, this would be locked down to a backend service role.
+        allow create: if isAuthenticated() && request.auth.uid == userId;
+        // Points are immutable once awarded
+        allow update, delete: if false;
+      }
     }
 
-    // Rules for announcements collection
-    match /announcements/{docId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
-      allow update, delete: if isAuthenticated() && (resource.data.authorId == request.auth.uid || isAdmin(request.auth.uid));
+    // Generic rules for content collections
+    function canWriteContent() {
+      return isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
     }
 
-    // Rules for assignments collection
-    match /assignments/{docId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
-      allow update, delete: if isAuthenticated() && (resource.data.authorId == request.auth.uid || isAdmin(request.auth.uid));
+    function isAuthorOrAdmin() {
+       return isAuthenticated() && (resource.data.authorId == request.auth.uid || isAdmin(request.auth.uid));
     }
 
-    // Rules for exercises collection
-    match /exercises/{docId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
-      allow update, delete: if isAuthenticated() && (resource.data.authorId == request.auth.uid || isAdmin(request.auth.uid));
+    match /announcements/{announcementId} {
+        allow read: if isAuthenticated();
+        allow create: if canWriteContent();
+        allow update, delete: if isAuthorOrAdmin();
+    }
+    
+    match /assignments/{assignmentId} {
+        allow read: if isAuthenticated();
+        allow create: if canWriteContent();
+        allow update, delete: if isAuthorOrAdmin();
     }
 
-    // Rules for projects collection
-    match /projects/{docId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
-      allow update, delete: if isAuthenticated() && (resource.data.authorId == request.auth.uid || isAdmin(request.auth.uid));
+    match /exercises/{exerciseId} {
+        allow read: if isAuthenticated();
+        allow create: if canWriteContent();
+        allow update, delete: if isAuthorOrAdmin();
+    }
+
+    match /projects/{projectId} {
+        allow read: if isAuthenticated();
+        allow create: if canWriteContent();
+        allow update, delete: if isAuthorOrAdmin();
     }
     
     // Rules for the 'materials' collection
     match /materials/{materialId} {
-        // Anyone can read
         allow read: if isAuthenticated();
-        // Only teachers or admins can create
-        allow create: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
-        // No one can update or delete from the client
+        allow create: if canWriteContent();
         allow update, delete: if false;
     }
 
     // Rules for the 'chats' collection
     match /chats/{chatId}/messages/{messageId} {
-        // Allow read/write if the user is part of the chat.
+        // Allow read/create if the user is part of the chat.
         // For DMs, the chatId is 'uid1-uid2'. For groups, it's 'group-genName'.
         allow read, create: if isAuthenticated() && 
                             (request.auth.uid in chatId.split('-') || 
