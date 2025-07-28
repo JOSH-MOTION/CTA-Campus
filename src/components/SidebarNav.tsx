@@ -36,6 +36,7 @@ const studentNavItems = [
   {href: '/submissions', label: 'Submissions', icon: Upload},
   {href: '/timetable', label: 'Timetable', icon: CalendarCheck},
   {href: '/directory', label: 'Directory', icon: Users},
+  {href: '/roadmap', label: 'Roadmap', icon: Map},
 ];
 
 const teacherNavItems = [
