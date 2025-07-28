@@ -63,6 +63,8 @@ export default function StudentSignupPage() {
     setLoading(true);
 
     try {
+      // Set role in localStorage before creating user
+      localStorage.setItem('userRole', 'student');
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       // In a real app, you would save the extra details and photoURL to a Firestore database
       // associated with the user's UID and set a custom claim for the role.
@@ -71,6 +73,8 @@ export default function StudentSignupPage() {
       toast({title: 'Sign Up Successful', description: 'Your account has been created.'});
       // The onAuthStateChanged listener in AuthContext will handle redirection
     } catch (error: any) {
+      // If signup fails, remove the stored role
+      localStorage.removeItem('userRole');
       toast({
         variant: 'destructive',
         title: 'Authentication Error',

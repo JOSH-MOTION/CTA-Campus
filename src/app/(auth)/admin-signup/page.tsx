@@ -34,12 +34,16 @@ export default function AdminSignupPage() {
     setLoading(true);
 
     try {
+      // Set role in localStorage before creating user
+      localStorage.setItem('userRole', 'admin');
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(userCredential.user, {displayName: fullName});
       // In a real app, this would be a separate API call to set custom claims
       setRole('admin');
       toast({title: 'Sign Up Successful', description: 'Your admin account has been created.'});
     } catch (error: any) {
+      // If signup fails, remove the stored role
+      localStorage.removeItem('userRole');
       toast({
         variant: 'destructive',
         title: 'Authentication Error',

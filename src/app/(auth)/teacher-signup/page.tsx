@@ -58,12 +58,17 @@ export default function TeacherSignupPage() {
     setLoading(true);
 
     try {
+      // Set role in localStorage before creating user
+      localStorage.setItem('userRole', 'teacher');
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(userCredential.user, {displayName: fullName});
       // In a real app, this would be a separate API call to set custom claims
-      setRole('teacher');
+      setRole('teacher'); // This updates the context state
       toast({title: 'Sign Up Successful', description: 'Your teacher account has been created.'});
+      // The onAuthStateChanged listener will now pick up the correct role and redirect
     } catch (error: any) {
+      // If signup fails, remove the stored role
+      localStorage.removeItem('userRole');
       toast({
         variant: 'destructive',
         title: 'Authentication Error',
