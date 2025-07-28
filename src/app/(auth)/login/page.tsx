@@ -1,7 +1,7 @@
 // src/app/(auth)/login/page.tsx
 'use client';
 
-import {useState, useEffect} from 'react';
+import {useState, useEffect, useRef} from 'react';
 import {useRouter} from 'next/navigation';
 import {signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile} from 'firebase/auth';
 import {auth} from '@/lib/firebase';
@@ -11,10 +11,11 @@ import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
 import {useToast} from '@/hooks/use-toast';
 import {useAuth} from '@/contexts/AuthContext';
-import {Compass} from 'lucide-react';
+import {Camera, Compass} from 'lucide-react';
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select';
 import {Textarea} from '@/components/ui/textarea';
 import {RadioGroup, RadioGroupItem} from '@/components/ui/radio-group';
+import {Avatar, AvatarImage, AvatarFallback} from '@/components/ui/avatar';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -25,6 +26,9 @@ export default function LoginPage() {
   const [lessonDay, setLessonDay] = useState('');
   const [lessonType, setLessonType] = useState('online');
   const [bio, setBio] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -38,6 +42,22 @@ export default function LoginPage() {
     }
   }, [user, router]);
 
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviewUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
   const handleAuthAction = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -48,7 +68,7 @@ export default function LoginPage() {
         toast({title: 'Login Successful', description: 'Welcome back!'});
       } else {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        // In a real app, you would save the extra details to a Firestore database
+        // In a real app, you would save the extra details and photoURL to a Firestore database
         // associated with the user's UID.
         await updateProfile(userCredential.user, {displayName: fullName});
         console.log('Signup details:', {
@@ -59,6 +79,7 @@ export default function LoginPage() {
           lessonDay,
           lessonType,
           bio,
+          profilePicture: selectedFile ? selectedFile.name : 'none',
         });
         toast({title: 'Sign Up Successful', description: 'Your account has been created.'});
       }
@@ -93,6 +114,29 @@ export default function LoginPage() {
           <form onSubmit={handleAuthAction} className="space-y-4">
             {!isLogin && (
               <>
+                <div className="flex flex-col items-center gap-4">
+                  <div className="relative">
+                    <Avatar className="h-24 w-24 border-2 border-primary/20">
+                      <AvatarImage src={previewUrl ?? undefined} alt="Profile picture preview" />
+                      <AvatarFallback className="text-4xl">{fullName ? fullName.charAt(0).toUpperCase() : 'U'}</AvatarFallback>
+                    </Avatar>
+                    <Button
+                      type="button"
+                      size="icon"
+                      className="absolute bottom-0 right-0 rounded-full"
+                      onClick={handleUploadClick}
+                    >
+                      <Camera className="h-4 w-4" />
+                    </Button>
+                    <Input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileChange}
+                      className="hidden"
+                      accept="image/*"
+                    />
+                  </div>
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="fullName">Full Name</Label>
                   <Input
