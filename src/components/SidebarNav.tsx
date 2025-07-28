@@ -55,6 +55,7 @@ export const studentNavItems = [
 export const teacherNavItems = [
   {href: '/', label: 'Dashboard', icon: LayoutDashboard},
   {href: '/chat', label: 'Campus Connect', icon: MessageSquare},
+  {href: '/students', label: 'Student Management', icon: Users},
   {href: '/announcements', label: 'Announcements', icon: Megaphone},
   {href: '/assignments', label: 'Assignments', icon: ListOrdered},
   {href: '/exercises', label: 'Exercises', icon: PencilRuler},
@@ -71,6 +72,7 @@ export const teacherNavItems = [
 export const adminNavItems = [
   {href: '/', label: 'Dashboard', icon: LayoutDashboard},
   {href: '/users', label: 'User Management', icon: UserCog},
+  {href: '/students', label: 'Student Management', icon: Users},
   {href: '/announcements', label: 'Manage Announcements', icon: Megaphone},
   {href: '/bookings', label: 'Manage Bookings', icon: CalendarCheck},
   {href: '/availability', label: 'Manage Availability', icon: CalendarClock},
