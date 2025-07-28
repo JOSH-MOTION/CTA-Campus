@@ -54,10 +54,19 @@ export function AuthProvider({children}: {children: ReactNode}) {
             localStorage.setItem('userRole', fetchedData.role);
           }
         } else {
-          // If no user doc, check localStorage (for just-signed-up users)
+          // This case handles a just-signed-up user where the doc might not be available immediately.
+          // We optimistically use localStorage and assume the doc will be created.
           const storedRole = localStorage.getItem('userRole') as UserRole;
           if (storedRole && ['student', 'teacher', 'admin'].includes(storedRole)) {
             setRole(storedRole);
+            // We can also try to fetch the document again after a short delay
+            setTimeout(async () => {
+              const delayedSnap = await getDoc(docRef);
+              if (delayedSnap.exists()) {
+                 const fetchedData = delayedSnap.data() as UserData;
+                 setUserData(fetchedData);
+              }
+            }, 1000);
           }
         }
       } else {
@@ -71,16 +80,21 @@ export function AuthProvider({children}: {children: ReactNode}) {
     return () => unsubscribe();
   }, []);
 
-  const handleSetRole = (newRole: UserRole) => {
+  const handleSetRole = async (newRole: UserRole) => {
     setRole(newRole);
     localStorage.setItem('userRole', newRole);
     if (user) {
       const docRef = doc(db, 'users', user.uid);
-      setDoc(docRef, {role: newRole}, {merge: true}).then(() => {
-        if (userData) {
-          setUserData({...userData, role: newRole});
+      try {
+        await setDoc(docRef, { role: newRole }, { merge: true });
+        // After successfully setting the role in the DB, update the local userData state
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setUserData(docSnap.data() as UserData);
         }
-      });
+      } catch (error) {
+        console.error("Failed to update role in Firestore:", error);
+      }
     }
   };
 
