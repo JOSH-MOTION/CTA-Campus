@@ -26,6 +26,7 @@ import {
   BookOpen,
   Contact,
   CalendarClock,
+  Award,
 } from 'lucide-react';
 import {SidebarMenu, SidebarMenuItem, SidebarMenuButton} from '@/components/ui/sidebar';
 import Link from 'next/link';
@@ -40,6 +41,7 @@ export const studentNavItems = [
   {href: '/projects', label: 'Projects', icon: BookMarked},
   {href: '/exercises', label: 'Exercises', icon: PencilRuler},
   {href: '/attendance', label: 'Attendance', icon: UserCheck},
+  {href: '/grading', label: 'Grading', icon: Award},
   {href: '/100-days-of-code', label: '100 Days of Code', icon: Code},
   {href: '/roadmap', label: 'Roadmap', icon: Map},
   {href: '/materials', label: 'Class Materials', icon: BookCopy},
