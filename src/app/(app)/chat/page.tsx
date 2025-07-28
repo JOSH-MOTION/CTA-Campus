@@ -84,6 +84,7 @@ export default function ChatPage() {
       
       setSelectedChat(entity);
       setCurrentChatId(chatId);
+      setMessages([]); // Clear previous messages
       setUnreadCounts(prev => ({...prev, [chatId]: 0}));
 
       const unsubscribe = onMessages(chatId, newMessages => {
@@ -173,7 +174,7 @@ export default function ChatPage() {
         allChatListeners.forEach(unsubscribe => unsubscribe());
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, currentUser, getEntityForToast]);
+  }, [loading, currentUser, getEntityForToast, handleSelectChat]);
 
 
   const handleSendMessage = async (text: string, replyTo?: Message) => {

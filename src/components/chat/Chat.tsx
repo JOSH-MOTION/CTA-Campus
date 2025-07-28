@@ -8,7 +8,7 @@ import {Input} from '@/components/ui/input';
 import {ScrollArea} from '@/components/ui/scroll-area';
 import {Send, Reply, Pin, X} from 'lucide-react';
 import {cn} from '@/lib/utils';
-import type {Message} from '@/services/chat';
+import type {Message, NewMessage} from '@/services/chat';
 import type {User} from 'firebase/auth';
 import {format} from 'date-fns';
 
@@ -37,6 +37,7 @@ export function Chat({entity, messages, onSendMessage, currentUser}: ChatProps) 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!text.trim()) return;
     onSendMessage(text, replyTo);
     setText('');
     setReplyTo(undefined);
