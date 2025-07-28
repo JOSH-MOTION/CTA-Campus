@@ -30,7 +30,7 @@ import Link from 'next/link';
 import {usePathname} from 'next/navigation';
 import {useAuth} from '@/contexts/AuthContext';
 
-const studentNavItems = [
+export const studentNavItems = [
   {href: '/', label: 'Dashboard', icon: LayoutDashboard},
   {href: '/chat', label: 'Campus Connect', icon: MessageSquare},
   {href: '/announcements', label: 'Announcements', icon: Megaphone},
@@ -45,9 +45,10 @@ const studentNavItems = [
   {href: '/directory', label: 'Directory', icon: Contact},
   {href: '/book-session', label: 'Book a Session', icon: CalendarPlus},
   {href: '/work-ready', label: 'Work Ready', icon: Rocket},
+  {href: '/profile', label: 'Profile', icon: User},
 ];
 
-const teacherNavItems = [
+export const teacherNavItems = [
   {href: '/', label: 'Dashboard', icon: LayoutDashboard},
   {href: '/chat', label: 'Campus Connect', icon: MessageSquare},
   {href: '/announcements', label: 'Announcements', icon: Megaphone},
@@ -62,7 +63,7 @@ const teacherNavItems = [
   {href: '/profile', label: 'Profile', icon: User},
 ];
 
-const adminNavItems = [
+export const adminNavItems = [
   {href: '/', label: 'Dashboard', icon: LayoutDashboard},
   {href: '/users', label: 'User Management', icon: UserCog},
   {href: '/announcements', label: 'Manage Announcements', icon: Megaphone},
@@ -70,6 +71,7 @@ const adminNavItems = [
   {href: '/roadmap', label: 'Roadmap', icon: Map},
   {href: '/directory', label: 'Directory', icon: Contact},
   {href: '/career', label: 'Career Module', icon: GraduationCap},
+  {href: '/profile', label: 'Profile', icon: User},
 ];
 
 export function SidebarNav() {

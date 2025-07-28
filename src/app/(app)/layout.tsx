@@ -13,24 +13,54 @@ import {
 } from '@/components/ui/sidebar';
 import type {ReactNode} from 'react';
 import {useAuth} from '@/contexts/AuthContext';
-import {UserRoleSwitcher} from '@/components/UserRoleSwitcher';
 import {RoadmapProvider} from '@/contexts/RoadmapContext';
 import {AnnouncementsProvider} from '@/contexts/AnnouncementsContext';
 import {AssignmentsProvider} from '@/contexts/AssignmentsContext';
-import {useRouter} from 'next/navigation';
+import {useRouter, usePathname} from 'next/navigation';
 import {useEffect} from 'react';
 import {auth} from '@/lib/firebase';
 import {onAuthStateChanged} from 'firebase/auth';
+import {adminNavItems, studentNavItems, teacherNavItems} from '@/components/SidebarNav';
+import {Button} from '@/components/ui/button';
+import {Bell, User} from 'lucide-react';
+import Link from 'next/link';
 
 function ProtectedLayout({children}: {children: ReactNode}) {
-  const {user, loading} = useAuth();
+  const {user, role, loading} = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (!loading && !user) {
       router.push('/login');
+      return;
     }
-  }, [user, loading, router]);
+
+    if (!loading && user) {
+      let allowedPaths: string[] = [];
+      switch (role) {
+        case 'student':
+          allowedPaths = studentNavItems.map(item => item.href);
+          break;
+        case 'teacher':
+          allowedPaths = teacherNavItems.map(item => item.href);
+          break;
+        case 'admin':
+          allowedPaths = adminNavItems.map(item => item.href);
+          break;
+      }
+      // Allow access to profile page for all roles
+      if (!allowedPaths.includes('/profile')) {
+        allowedPaths.push('/profile');
+      }
+      
+      const isAllowed = allowedPaths.some(path => pathname === path || (path !== '/' && pathname.startsWith(path)));
+
+      if (!isAllowed) {
+        router.push('/');
+      }
+    }
+  }, [user, role, loading, router, pathname]);
 
   if (loading || !user) {
     return (
@@ -70,9 +100,18 @@ function ProtectedLayout({children}: {children: ReactNode}) {
       <SidebarInset className="flex flex-col">
         <header className="sticky top-0 z-10 flex h-16 items-center justify-between gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:px-6">
           <SidebarTrigger className="md:hidden" />
-          <div className="ml-auto flex items-center gap-4">
+          <div className="ml-auto flex items-center gap-2">
             <ThemeToggle />
-            <UserRoleSwitcher />
+            <Button variant="ghost" size="icon">
+              <Bell className="h-5 w-5" />
+              <span className="sr-only">Notifications</span>
+            </Button>
+            <Button variant="ghost" size="icon" asChild>
+              <Link href="/profile">
+                <User className="h-5 w-5" />
+                <span className="sr-only">Profile</span>
+              </Link>
+            </Button>
             <AIAssistant />
           </div>
         </header>
