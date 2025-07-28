@@ -31,6 +31,7 @@ export default function ChatPage() {
 
   const [selectedChat, setSelectedChat] = useState<ChatEntity | null>(null);
   const [messages, setMessages] = useState<Record<string, Message[]>>(initialMessages);
+  const [activeTab, setActiveTab] = useState<'dms' | 'groups'>('dms');
 
   const directMessageUserId = searchParams.get('dm');
   const groupChatId = searchParams.get('group');
@@ -81,6 +82,7 @@ export default function ChatPage() {
       const groupToSelect = groupChats.find(g => g.id === `group-${groupChatId}`);
       if (groupToSelect) {
         setSelectedChat(groupToSelect);
+        setActiveTab('groups');
       }
     }
     // If a user ID is passed in the URL, select that user for a direct message.
@@ -93,6 +95,7 @@ export default function ChatPage() {
           avatar: userToDm.photoURL,
           dataAiHint: 'user portrait',
         });
+        setActiveTab('dms');
       }
     }
   }, [loading, allUsers, groupChats, directMessageUserId, groupChatId]);
@@ -100,8 +103,10 @@ export default function ChatPage() {
   const handleSelectChat = (entity: ChatEntity) => {
     setSelectedChat(entity);
     if (entity.id.startsWith('group-')) {
+      setActiveTab('groups');
       router.push(`/chat?group=${entity.id.replace('group-', '')}`, {scroll: false});
     } else {
+      setActiveTab('dms');
       router.push(`/chat?dm=${entity.id}`, {scroll: false});
     }
   };
@@ -120,13 +125,6 @@ export default function ChatPage() {
     });
   };
 
-  const activeTab = useMemo(() => {
-    if (selectedChat?.id.startsWith('group-')) {
-      return 'groups';
-    }
-    return 'dms';
-  }, [selectedChat]);
-
   return (
     <div className="grid h-[calc(100vh-8rem)] grid-cols-1 md:grid-cols-3 xl:grid-cols-4">
       <div className="flex flex-col border-r bg-card md:col-span-1 xl:col-span-1">
@@ -140,7 +138,11 @@ export default function ChatPage() {
             <Input placeholder="Search" className="pl-9" />
           </div>
         </div>
-        <Tabs defaultValue={activeTab} value={activeTab} className="flex flex-1 flex-col overflow-hidden">
+        <Tabs
+          value={activeTab}
+          onValueChange={value => setActiveTab(value as 'dms' | 'groups')}
+          className="flex flex-1 flex-col overflow-hidden"
+        >
           <TabsList className="mx-4 grid w-auto grid-cols-2">
             <TabsTrigger value="dms">
               <User className="mr-2" /> DMs
