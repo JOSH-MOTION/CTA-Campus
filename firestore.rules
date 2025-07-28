@@ -30,68 +30,57 @@ service cloud.firestore {
       // A user can only create or update their own profile
       allow write: if request.auth.uid == userId;
 
-      // Rules for the points subcollection
+      // Rule for the 'points' subcollection when accessed directly
       match /points/{pointId} {
-        // A user can only read their own points
-        allow read: if isAuthenticated() && request.auth.uid == userId;
-        // Only the user themselves (client-side) can add points.
-        // In a production app, this would be locked down to a backend service role.
-        allow create: if isAuthenticated() && request.auth.uid == userId;
-        // Points are immutable once awarded
-        allow update, delete: if false;
+         allow read, write: if isAuthenticated() && (request.auth.uid == userId || isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
       }
     }
-
-    // Generic rules for content collections
-    function canWriteContent() {
-      return isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
+    
+    // This rule is required for the collectionGroup query in getPointsForAllStudents
+    match /{path=**}/points/{pointId} {
+      allow read: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
     }
 
-    function isAuthorOrAdmin() {
-       return isAuthenticated() && (resource.data.authorId == request.auth.uid || isAdmin(request.auth.uid));
+    match /announcements/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
+      allow update, delete: if isAuthenticated() && (resource.data.authorId == request.auth.uid || isAdmin(request.auth.uid));
     }
 
-    match /announcements/{announcementId} {
-        allow read: if isAuthenticated();
-        allow create: if canWriteContent();
-        allow update, delete: if isAuthorOrAdmin();
+    match /assignments/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
+      allow update, delete: if isAuthenticated() && (resource.data.authorId == request.auth.uid || isAdmin(request.auth.uid));
     }
     
-    match /assignments/{assignmentId} {
-        allow read: if isAuthenticated();
-        allow create: if canWriteContent();
-        allow update, delete: if isAuthorOrAdmin();
+    match /exercises/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
+      allow update, delete: if isAuthenticated() && (resource.data.authorId == request.auth.uid || isAdmin(request.auth.uid));
     }
-
-    match /exercises/{exerciseId} {
-        allow read: if isAuthenticated();
-        allow create: if canWriteContent();
-        allow update, delete: if isAuthorOrAdmin();
-    }
-
-    match /projects/{projectId} {
-        allow read: if isAuthenticated();
-        allow create: if canWriteContent();
-        allow update, delete: if isAuthorOrAdmin();
+    
+    match /projects/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
+      allow update, delete: if isAuthenticated() && (resource.data.authorId == request.auth.uid || isAdmin(request.auth.uid));
     }
     
     // Rules for the 'materials' collection
     match /materials/{materialId} {
         allow read: if isAuthenticated();
-        allow create: if canWriteContent();
-        allow update, delete: if false;
+        allow create: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
+        allow update, delete: if false; // Disallow client-side updates/deletes
     }
 
     // Rules for the 'chats' collection
     match /chats/{chatId}/messages/{messageId} {
-        // Allow read/create if the user is part of the chat.
-        // For DMs, the chatId is 'uid1-uid2'. For groups, it's 'group-genName'.
+        // Allow read/create if the user's ID is in the DM chat ID, or if it's a group chat.
         allow read, create: if isAuthenticated() && 
                             (request.auth.uid in chatId.split('-') || 
                              (chatId.startsWith('group-') && getUserRole(request.auth.uid) != null));
                              
         // Allow update/delete only if the user is the sender of the message.
-        allow update, delete: if isAuthenticated() && resource.data.senderId == request.auth.uid;
+        allow update, delete: if isAuthenticated() && request.auth.uid == get(/databases/$(database)/documents/chats/$(chatId)/messages/$(messageId)).data.senderId;
     }
   }
 }
