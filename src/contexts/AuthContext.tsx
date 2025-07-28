@@ -1,7 +1,7 @@
 // src/contexts/AuthContext.tsx
 'use client';
 
-import {createContext, useContext, useState, ReactNode, useEffect, useCallback} from 'react';
+import {createContext, useContext, useState, ReactNode, useEffect, useCallback, FC} from 'react';
 import {auth, db} from '@/lib/firebase';
 import type {User} from 'firebase/auth';
 import {onAuthStateChanged}from 'firebase/auth';
@@ -28,57 +28,54 @@ export interface UserData {
 interface AuthContextType {
   user: User | null;
   userData: UserData | null;
-  role: UserRole;
+  setUserData: React.Dispatch<React.SetStateAction<UserData | null>> | null;
+  role: UserRole | null;
   loading: boolean;
   setRole: (role: UserRole) => void;
   fetchAllUsers: () => Promise<UserData[]>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType>({
+    user: null,
+    userData: null,
+    setUserData: null,
+    role: null,
+    loading: true,
+    setRole: () => {},
+    fetchAllUsers: async () => [],
+});
 
-export function AuthProvider({children}: {children: ReactNode}) {
+export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
   const [user, setUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
-  const [role, setRole] = useState<UserRole>('student');
+  const [role, setRole] = useState<UserRole | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async user => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setLoading(true);
       if (user) {
         setUser(user);
         const docRef = doc(db, 'users', user.uid);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-          const fetchedData = docSnap.data() as UserData;
-          setUserData(fetchedData);
-          if (fetchedData.role) {
-            setRole(fetchedData.role);
-            localStorage.setItem('userRole', fetchedData.role);
-          }
+          const data = docSnap.data() as UserData;
+          setUserData(data);
+          setRole(data.role);
+          localStorage.setItem('userRole', data.role);
         } else {
-          // This case handles a just-signed-up user where the doc might not be available immediately.
-          // We optimistically use localStorage and assume the doc will be created.
-          const storedRole = localStorage.getItem('userRole') as UserRole;
-          if (storedRole && ['student', 'teacher', 'admin'].includes(storedRole)) {
-            setRole(storedRole);
-            // We can also try to fetch the document again after a short delay
-            setTimeout(async () => {
-              const delayedSnap = await getDoc(docRef);
-              if (delayedSnap.exists()) {
-                 const fetchedData = delayedSnap.data() as UserData;
-                 setUserData(fetchedData);
-              }
-            }, 2000); // Increased delay to ensure Firestore has time to write
-          }
+            // Case for newly signed up user where doc might not be available
+             const storedRole = localStorage.getItem('userRole') as UserRole;
+             if(storedRole) setRole(storedRole);
         }
       } else {
         setUser(null);
         setUserData(null);
+        setRole(null);
         localStorage.removeItem('userRole');
       }
       setLoading(false);
     });
-
     return () => unsubscribe();
   }, []);
 
@@ -88,12 +85,7 @@ export function AuthProvider({children}: {children: ReactNode}) {
     if (user) {
       const docRef = doc(db, 'users', user.uid);
       try {
-        // When setting a role, we'll optimistically create/merge the role in the user's document.
-        // This is especially useful during the sign-up flow.
         await setDoc(docRef, { role: newRole }, { merge: true });
-        
-        // After successfully setting the role, let's fetch the full document
-        // to update our local state completely.
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           setUserData(docSnap.data() as UserData);
@@ -103,7 +95,7 @@ export function AuthProvider({children}: {children: ReactNode}) {
       }
     }
   };
-
+  
   const fetchAllUsers = useCallback(async (): Promise<UserData[]> => {
     const usersCollection = collection(db, 'users');
     const usersSnapshot = await getDocs(usersCollection);
@@ -112,13 +104,13 @@ export function AuthProvider({children}: {children: ReactNode}) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{user, userData, role, loading, setRole: handleSetRole, fetchAllUsers}}>
+    <AuthContext.Provider value={{user, userData, setUserData, role, loading, setRole: handleSetRole, fetchAllUsers}}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-export function useAuth() {
+export function useAuth(): AuthContextType {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
