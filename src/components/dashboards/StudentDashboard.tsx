@@ -15,10 +15,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {Badge} from '@/components/ui/badge';
-import {FileText, BookOpen, ArrowRight} from 'lucide-react';
+import {FileText, BookOpen, ArrowRight, TrendingUp, CheckCircle, AlertCircle} from 'lucide-react';
 import Link from 'next/link';
 import {Button} from '@/components/ui/button';
 import type {User} from 'firebase/auth';
+import {Progress} from '@/components/ui/progress';
 
 const upcomingClasses = [
   {time: '09:00 AM', course: 'CS101: Intro to Computer Science', room: 'Hall A', type: 'Lecture'},
@@ -43,6 +44,42 @@ export default function StudentDashboard({user}: StudentDashboardProps) {
         <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user?.displayName || 'Student'}!</h1>
         <p className="text-muted-foreground">Here's your overview for today.</p>
       </div>
+
+      <div className="grid grid-cols-1 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-6 w-6" />
+              Performance Overview
+            </CardTitle>
+            <CardDescription>Your academic progress at a glance.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-6 md:grid-cols-3">
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="font-medium">Overall Progress</span>
+                <span className="text-muted-foreground">45%</span>
+              </div>
+              <Progress value={45} />
+            </div>
+            <div className="flex items-center justify-center gap-4 rounded-md bg-secondary/50 p-4">
+              <CheckCircle className="h-6 w-6 text-green-500" />
+              <div>
+                <p className="text-2xl font-bold">12</p>
+                <p className="text-sm text-muted-foreground">Assignments Done</p>
+              </div>
+            </div>
+            <div className="flex items-center justify-center gap-4 rounded-md bg-secondary/50 p-4">
+              <AlertCircle className="h-6 w-6 text-yellow-500" />
+              <div>
+                <p className="text-2xl font-bold">3</p>
+                <p className="text-sm text-muted-foreground">Upcoming Deadlines</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
