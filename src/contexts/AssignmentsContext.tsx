@@ -3,17 +3,22 @@
 
 import {createContext, useContext, useState, ReactNode, FC} from 'react';
 
+export interface AssignmentDueDate {
+  day: string; // e.g., "Monday"
+  dateTime: string; // ISO string
+}
+
 export interface Assignment {
   id: string;
   title: string;
   description: string;
-  dueDate: string;
+  dueDates: AssignmentDueDate[];
   targetGen: string; // e.g., "Gen 30" or "All"
 }
 
 interface AssignmentsContextType {
   assignments: Assignment[];
-  addAssignment: (assignment: Omit<Assignment, 'id' | 'dueDate'> & {dueDate: Date}) => void;
+  addAssignment: (assignment: Omit<Assignment, 'id'>) => void;
 }
 
 const initialAssignments: Assignment[] = [
@@ -21,14 +26,14 @@ const initialAssignments: Assignment[] = [
     id: '1',
     title: 'Final Year Project Proposal',
     description: 'Submit a 2-page proposal for your final year project. Include problem statement, objectives, and proposed methodology.',
-    dueDate: new Date(new Date().setDate(new Date().getDate() + 14)).toISOString(),
+    dueDates: [{ day: 'Friday', dateTime: new Date(new Date().setDate(new Date().getDate() + 14)).toISOString() }],
     targetGen: 'All',
   },
   {
     id: '2',
     title: 'JavaScript Algorithm Challenge',
     description: 'Complete the five algorithm challenges on the provided platform. Submit the link to your profile.',
-    dueDate: new Date(new Date().setDate(new Date().getDate() + 7)).toISOString(),
+    dueDates: [{ day: 'Wednesday', dateTime: new Date(new Date().setDate(new Date().getDate() + 7)).toISOString() }],
     targetGen: 'All',
   },
 ];
@@ -38,11 +43,10 @@ const AssignmentsContext = createContext<AssignmentsContextType | undefined>(und
 export const AssignmentsProvider: FC<{children: ReactNode}> = ({children}) => {
   const [assignments, setAssignments] = useState<Assignment[]>(initialAssignments);
 
-  const addAssignment = (assignment: Omit<Assignment, 'id' | 'dueDate'> & {dueDate: Date}) => {
+  const addAssignment = (assignment: Omit<Assignment, 'id'>) => {
     const newAssignment: Assignment = {
       ...assignment,
       id: (assignments.length + 1).toString(),
-      dueDate: assignment.dueDate.toISOString(),
     };
     setAssignments(prev => [newAssignment, ...prev]);
   };

@@ -3,7 +3,7 @@
 
 import { useMemo } from 'react';
 import {Button} from '@/components/ui/button';
-import {PlusCircle, ListOrdered, ArrowRight} from 'lucide-react';
+import {PlusCircle, ListOrdered, ArrowRight, Clock} from 'lucide-react';
 import {useAuth} from '@/contexts/AuthContext';
 import {useAssignments} from '@/contexts/AssignmentsContext';
 import {Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle} from '@/components/ui/card';
@@ -26,7 +26,11 @@ export default function AssignmentsPage() {
   }, [assignments, isTeacher, userData?.gen]);
 
 
-  const sortedAssignments = [...filteredAssignments].sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
+  const sortedAssignments = [...filteredAssignments].sort((a, b) => {
+      const aLatestDate = Math.max(...a.dueDates.map(d => new Date(d.dateTime).getTime()));
+      const bLatestDate = Math.max(...b.dueDates.map(d => new Date(d.dateTime).getTime()));
+      return bLatestDate - aLatestDate;
+  });
 
   return (
     <div className="space-y-6">
@@ -58,8 +62,16 @@ export default function AssignmentsPage() {
                 </div>
                 <CardDescription>{assignment.description}</CardDescription>
               </CardHeader>
-              <CardContent className="flex-grow">
-                <Badge variant="secondary">Due: {format(new Date(assignment.dueDate), 'PPP')}</Badge>
+              <CardContent className="flex-grow space-y-2">
+                  <p className="text-sm font-semibold">Due Dates:</p>
+                   <div className="flex flex-wrap gap-2">
+                    {assignment.dueDates.map(dueDate => (
+                        <Badge key={dueDate.day} variant="secondary" className="flex items-center gap-1.5">
+                            <Clock className="h-3 w-3" />
+                            <span>{dueDate.day}: {format(new Date(dueDate.dateTime), 'PP p')}</span>
+                        </Badge>
+                    ))}
+                    </div>
               </CardContent>
               <CardFooter>
                 {isTeacher ? (
