@@ -9,17 +9,78 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, PlusCircle } from 'lucide-react';
+import { Award, CheckCircle, Code, Edit, Film, GitBranch, Handshake, Loader2, PlusCircle, Presentation, Projector, Star } from 'lucide-react';
 import { useAuth, UserData } from '@/contexts/AuthContext';
 import { awardPoint } from '@/services/points';
+import { v4 as uuidv4 } from 'uuid';
+
+const gradingData = [
+    { 
+        title: "Class Attendance", 
+        points: 1, 
+        description: "1 point per weekly class attendance",
+        icon: CheckCircle,
+    },
+    { 
+        title: "Class Assignments", 
+        points: 1, 
+        description: "1 point per assignment",
+        icon: Edit,
+    },
+    { 
+        title: "Class Exercises", 
+        points: 1, 
+        description: "1 point per exercise",
+        icon: Edit,
+    },
+    { 
+        title: "Weekly Projects", 
+        points: 1, 
+        description: "1 point per project completion",
+        icon: Projector
+    },
+    { 
+        title: "Monthly Personal Projects", 
+        points: 1, 
+        description: "1 point per project",
+        icon: Projector
+    },
+    { 
+        title: "Soft Skills & Product Training", 
+        points: 1, 
+        description: "1 point per attendance",
+        icon: Handshake
+    },
+    { 
+        title: "Mini Demo Days", 
+        points: 5, 
+        description: "5 points per demo",
+        icon: Presentation
+    },
+    { 
+        title: "100 Days of Code", 
+        points: 0.5, 
+        description: "0.5 points per day",
+        icon: Code
+    },
+    { 
+        title: "Code Review", 
+        points: 1, 
+        description: "1 point per contribution",
+        icon: GitBranch
+    },
+    { 
+        title: "Final Project Completion", 
+        points: 10, 
+        description: "Awarded upon completion",
+        icon: Award
+    },
+];
 
 const tempUpdateSchema = z.object({
   studentId: z.string().nonempty('Please select a student.'),
-  points: z.coerce.number().min(0.1, 'Points must be greater than 0.'),
-  reason: z.string().min(5, 'Please provide a reason (min. 5 characters).'),
-  activityId: z.string().min(5, 'Please provide a unique ID (min. 5 characters).'),
+  activityIndex: z.string().nonempty('Please select an activity.'),
 });
 
 type TempUpdateFormValues = z.infer<typeof tempUpdateSchema>;
@@ -49,11 +110,20 @@ export default function TempUpdatePage() {
   const onSubmit = async (data: TempUpdateFormValues) => {
     setIsSubmitting(true);
     try {
-      await awardPoint(data.studentId, data.points, data.reason, data.activityId);
+      const activity = gradingData[parseInt(data.activityIndex)];
+      if (!activity) {
+        throw new Error("Invalid activity selected.");
+      }
+
+      // Generate a unique ID for this manual entry to ensure idempotency
+      const activityId = `manual-${activity.title.toLowerCase().replace(/\s+/g, '-')}-${uuidv4()}`;
+      
+      await awardPoint(data.studentId, activity.points, activity.title, activityId);
+      
       const selectedStudent = students.find(s => s.uid === data.studentId);
       toast({
         title: 'Points Awarded!',
-        description: `${data.points} points awarded to ${selectedStudent?.displayName} for "${data.reason}".`,
+        description: `${activity.points} points awarded to ${selectedStudent?.displayName} for "${activity.title}".`,
       });
       form.reset();
     } catch (error: any) {
@@ -77,7 +147,7 @@ export default function TempUpdatePage() {
       <Card className="max-w-2xl mx-auto">
         <CardHeader>
           <CardTitle>Award Points</CardTitle>
-          <CardDescription>Select a student and enter the details of the point award.</CardDescription>
+          <CardDescription>Select a student and the activity for which to award points.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -106,44 +176,26 @@ export default function TempUpdatePage() {
                 )}
               />
 
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                 <FormField
-                  control={form.control}
-                  name="points"
-                  render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Points</FormLabel>
-                        <FormControl>
-                            <Input type="number" step="0.5" placeholder="e.g., 10" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                 <FormField
-                  control={form.control}
-                  name="activityId"
-                  render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Unique Activity ID</FormLabel>
-                        <FormControl>
-                            <Input placeholder="e.g., legacy-assignment-1" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
               <FormField
                 control={form.control}
-                name="reason"
+                name="activityIndex"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Reason for Award</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., Credit for Q4 2023 projects" {...field} />
-                    </FormControl>
+                    <FormLabel>Activity</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select an activity to award points for" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {gradingData.map((activity, index) => (
+                          <SelectItem key={activity.title} value={index.toString()}>
+                            {activity.title} ({activity.points} points)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
