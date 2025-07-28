@@ -4,7 +4,7 @@
 import {createContext, useContext, useState, ReactNode, FC, useEffect, useCallback} from 'react';
 import { useNotifications } from './NotificationsContext';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, Timestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
 
 export interface Announcement {
@@ -12,13 +12,18 @@ export interface Announcement {
   title: string;
   content: string;
   author: string;
+  authorId: string;
   date: string;
   targetGen: string; // e.g., "Gen 30" or "All"
 }
 
+export type AnnouncementData = Omit<Announcement, 'id' | 'date'>;
+
 interface AnnouncementsContextType {
   announcements: Announcement[];
-  addAnnouncement: (announcement: Omit<Announcement, 'id' | 'date'>) => Promise<void>;
+  addAnnouncement: (announcement: AnnouncementData) => Promise<void>;
+  updateAnnouncement: (id: string, updates: Partial<AnnouncementData>) => Promise<void>;
+  deleteAnnouncement: (id: string) => Promise<void>;
   loading: boolean;
 }
 
@@ -60,7 +65,7 @@ export const AnnouncementsProvider: FC<{children: ReactNode}> = ({children}) => 
     return () => unsubscribe();
   }, [user]);
 
-  const addAnnouncement = useCallback(async (announcement: Omit<Announcement, 'id' | 'date'>) => {
+  const addAnnouncement = useCallback(async (announcement: AnnouncementData) => {
     if (!user) throw new Error("User not authenticated");
 
     const newAnnouncementData = {
@@ -77,8 +82,20 @@ export const AnnouncementsProvider: FC<{children: ReactNode}> = ({children}) => 
     });
   }, [user, addNotification]);
 
+  const updateAnnouncement = useCallback(async (id: string, updates: Partial<AnnouncementData>) => {
+    if (!user) throw new Error("User not authenticated");
+    const announcementDoc = doc(db, 'announcements', id);
+    await updateDoc(announcementDoc, updates);
+  }, [user]);
+
+  const deleteAnnouncement = useCallback(async (id: string) => {
+    if (!user) throw new Error("User not authenticated");
+    const announcementDoc = doc(db, 'announcements', id);
+    await deleteDoc(announcementDoc);
+  }, [user]);
+
   return (
-    <AnnouncementsContext.Provider value={{announcements, addAnnouncement, loading}}>
+    <AnnouncementsContext.Provider value={{announcements, addAnnouncement, updateAnnouncement, deleteAnnouncement, loading}}>
       {children}
     </AnnouncementsContext.Provider>
   );

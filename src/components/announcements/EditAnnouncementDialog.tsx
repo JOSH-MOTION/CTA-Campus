@@ -1,4 +1,4 @@
-// src/components/announcements/CreateAnnouncementDialog.tsx
+// src/components/announcements/EditAnnouncementDialog.tsx
 'use client';
 
 import {useState, type ReactNode, useEffect, useMemo} from 'react';
@@ -9,7 +9,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
@@ -18,7 +17,7 @@ import {useForm} from 'react-hook-form';
 import {zodResolver} from '@hookform/resolvers/zod';
 import {z} from 'zod';
 import {Form, FormControl, FormField, FormItem, FormLabel, FormMessage} from '@/components/ui/form';
-import {useAnnouncements} from '@/contexts/AnnouncementsContext';
+import {Announcement, useAnnouncements} from '@/contexts/AnnouncementsContext';
 import {useAuth, UserData} from '@/contexts/AuthContext';
 import {useToast} from '@/hooks/use-toast';
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select';
@@ -32,16 +31,17 @@ const announcementSchema = z.object({
 
 type AnnouncementFormValues = z.infer<typeof announcementSchema>;
 
-interface CreateAnnouncementDialogProps {
-  children: ReactNode;
+interface EditAnnouncementDialogProps {
+  announcement: Announcement;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
-export function CreateAnnouncementDialog({children}: CreateAnnouncementDialogProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export function EditAnnouncementDialog({ announcement, isOpen, onOpenChange }: EditAnnouncementDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const {addAnnouncement} = useAnnouncements();
+  const {updateAnnouncement} = useAnnouncements();
   const {toast} = useToast();
-  const {user, fetchAllUsers} = useAuth();
+  const {fetchAllUsers} = useAuth();
   const [allUsers, setAllUsers] = useState<UserData[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
 
@@ -66,33 +66,34 @@ export function CreateAnnouncementDialog({children}: CreateAnnouncementDialogPro
 
   const form = useForm<AnnouncementFormValues>({
     resolver: zodResolver(announcementSchema),
-    defaultValues: {
-      title: '',
-      content: '',
-      targetGen: 'All',
+    values: {
+      title: announcement.title,
+      content: announcement.content,
+      targetGen: announcement.targetGen,
     },
   });
 
   const onSubmit = async (data: AnnouncementFormValues) => {
-    if (!user) return;
     setIsSubmitting(true);
     try {
-      await addAnnouncement({
-        ...data,
-        author: user?.displayName || 'User',
-        authorId: user.uid,
+      await updateAnnouncement(announcement.id, {
+        title: data.title,
+        content: data.content,
+        targetGen: data.targetGen,
+        author: announcement.author,
+        authorId: announcement.authorId,
       });
       toast({
-        title: 'Announcement Created',
-        description: 'Your announcement has been posted.',
+        title: 'Announcement Updated',
+        description: 'Your announcement has been successfully updated.',
       });
       form.reset();
-      setIsOpen(false);
+      onOpenChange(false);
     } catch (error) {
        toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Failed to create announcement. You may not have permission.',
+        description: 'Failed to update announcement. You may not have permission.',
       });
     } finally {
         setIsSubmitting(false);
@@ -100,13 +101,12 @@ export function CreateAnnouncementDialog({children}: CreateAnnouncementDialogPro
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Create a New Announcement</DialogTitle>
+          <DialogTitle>Edit Announcement</DialogTitle>
           <DialogDescription>
-            This announcement will be visible to all students and staff.
+            Make changes to your existing announcement.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -160,12 +160,12 @@ export function CreateAnnouncementDialog({children}: CreateAnnouncementDialogPro
               )}
             />
             <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>
+              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Create
+                Save Changes
               </Button>
             </DialogFooter>
           </form>

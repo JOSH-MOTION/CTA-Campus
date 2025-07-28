@@ -10,20 +10,21 @@ import {Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle} f
 import {CreateAssignmentDialog} from '@/components/assignments/CreateAssignmentDialog';
 import {Badge} from '@/components/ui/badge';
 import {format} from 'date-fns';
+import { AssignmentActions } from '@/components/assignments/AssignmentActions';
 
 export default function AssignmentsPage() {
   const {role, userData} = useAuth();
   const {assignments, loading} = useAssignments();
-  const isTeacher = role === 'teacher' || role === 'admin';
+  const isTeacherOrAdmin = role === 'teacher' || role === 'admin';
 
   const filteredAssignments = useMemo(() => {
-    if (isTeacher) {
+    if (isTeacherOrAdmin) {
       return assignments;
     }
     return assignments.filter(
       assign => assign.targetGen === 'All' || assign.targetGen === userData?.gen
     );
-  }, [assignments, isTeacher, userData?.gen]);
+  }, [assignments, isTeacherOrAdmin, userData?.gen]);
 
 
   const sortedAssignments = [...filteredAssignments].sort((a, b) => {
@@ -38,10 +39,10 @@ export default function AssignmentsPage() {
         <div className="space-y-1">
           <h1 className="text-3xl font-bold tracking-tight">Assignments</h1>
           <p className="text-muted-foreground">
-            {isTeacher ? 'Create and manage assignments.' : 'View and submit your assignments.'}
+            {isTeacherOrAdmin ? 'Create and manage assignments.' : 'View and submit your assignments.'}
           </p>
         </div>
-        {isTeacher && (
+        {isTeacherOrAdmin && (
           <CreateAssignmentDialog>
             <Button>
               <PlusCircle className="mr-2 h-4 w-4" />
@@ -61,10 +62,13 @@ export default function AssignmentsPage() {
             <Card key={assignment.id} className="flex flex-col">
               <CardHeader>
                 <div className="flex justify-between items-start">
-                  <CardTitle>{assignment.title}</CardTitle>
-                  {isTeacher && <Badge variant={assignment.targetGen === 'All' ? 'default' : 'secondary'}>{assignment.targetGen}</Badge>}
+                  <div className="flex-1 pr-2">
+                    <CardTitle>{assignment.title}</CardTitle>
+                     {isTeacherOrAdmin && <Badge variant={assignment.targetGen === 'All' ? 'default' : 'secondary'} className="mt-1">{assignment.targetGen}</Badge>}
+                  </div>
+                  <AssignmentActions assignment={assignment} />
                 </div>
-                <CardDescription>{assignment.description}</CardDescription>
+                <CardDescription className="pt-2">{assignment.description}</CardDescription>
               </CardHeader>
               <CardContent className="flex-grow space-y-2">
                   <p className="text-sm font-semibold">Due Dates:</p>
@@ -78,7 +82,7 @@ export default function AssignmentsPage() {
                     </div>
               </CardContent>
               <CardFooter>
-                {isTeacher ? (
+                {isTeacherOrAdmin ? (
                   <Button variant="outline" className="w-full">
                     View Submissions
                   </Button>
@@ -96,7 +100,7 @@ export default function AssignmentsPage() {
           <ListOrdered className="h-12 w-12 text-muted-foreground" />
           <h2 className="mt-4 text-xl font-semibold">No assignments yet</h2>
           <p className="mt-1 text-muted-foreground">
-            {isTeacher ? 'Create the first assignment to get started.' : 'Check back later for assignments.'}
+            {isTeacherOrAdmin ? 'Create the first assignment to get started.' : 'Check back later for assignments.'}
           </p>
         </div>
       )}

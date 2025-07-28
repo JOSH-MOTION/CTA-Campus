@@ -4,7 +4,7 @@
 import {createContext, useContext, useState, ReactNode, FC, useEffect, useCallback} from 'react';
 import { useNotifications } from './NotificationsContext';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, Timestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
 
 
@@ -19,12 +19,17 @@ export interface Assignment {
   description: string;
   dueDates: AssignmentDueDate[];
   targetGen: string; // e.g., "Gen 30" or "All"
+  authorId: string;
   createdAt: Timestamp;
 }
 
+export type AssignmentData = Omit<Assignment, 'id' | 'createdAt'>;
+
 interface AssignmentsContextType {
   assignments: Assignment[];
-  addAssignment: (assignment: Omit<Assignment, 'id' | 'createdAt'>) => Promise<void>;
+  addAssignment: (assignment: AssignmentData) => Promise<void>;
+  updateAssignment: (id: string, updates: Partial<AssignmentData>) => Promise<void>;
+  deleteAssignment: (id: string) => Promise<void>;
   loading: boolean;
 }
 
@@ -65,7 +70,7 @@ export const AssignmentsProvider: FC<{children: ReactNode}> = ({children}) => {
   }, [user]);
 
 
-  const addAssignment = useCallback(async (assignment: Omit<Assignment, 'id' | 'createdAt'>) => {
+  const addAssignment = useCallback(async (assignment: AssignmentData) => {
     if(!user) throw new Error("User not authenticated");
     
     const newAssignmentData = {
@@ -82,8 +87,20 @@ export const AssignmentsProvider: FC<{children: ReactNode}> = ({children}) => {
     });
   }, [user, addNotification]);
 
+  const updateAssignment = useCallback(async (id: string, updates: Partial<AssignmentData>) => {
+    if (!user) throw new Error("User not authenticated");
+    const assignmentDoc = doc(db, 'assignments', id);
+    await updateDoc(assignmentDoc, updates);
+  }, [user]);
+
+  const deleteAssignment = useCallback(async (id: string) => {
+    if (!user) throw new Error("User not authenticated");
+    const assignmentDoc = doc(db, 'assignments', id);
+    await deleteDoc(assignmentDoc);
+  }, [user]);
+
   return (
-    <AssignmentsContext.Provider value={{assignments, addAssignment, loading}}>
+    <AssignmentsContext.Provider value={{assignments, addAssignment, updateAssignment, deleteAssignment, loading}}>
       {children}
     </AssignmentsContext.Provider>
   );

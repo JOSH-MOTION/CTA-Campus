@@ -1,4 +1,4 @@
-// src/components/assignments/CreateAssignmentDialog.tsx
+// src/components/assignments/EditAssignmentDialog.tsx
 'use client';
 
 import {useState, type ReactNode, useEffect, useMemo} from 'react';
@@ -9,7 +9,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
@@ -18,12 +17,12 @@ import {useForm, useFieldArray} from 'react-hook-form';
 import {zodResolver} from '@hookform/resolvers/zod';
 import {z} from 'zod';
 import {Form, FormControl, FormField, FormItem, FormLabel, FormMessage} from '@/components/ui/form';
-import {useAssignments} from '@/contexts/AssignmentsContext';
+import {Assignment, useAssignments} from '@/contexts/AssignmentsContext';
 import {useToast} from '@/hooks/use-toast';
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover';
 import {cn} from '@/lib/utils';
 import {CalendarIcon, Clock, Loader2} from 'lucide-react';
-import {format} from 'date-fns';
+import {format, parseISO} from 'date-fns';
 import {Calendar} from '@/components/ui/calendar';
 import {useAuth, UserData} from '@/contexts/AuthContext';
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select';
@@ -48,8 +47,10 @@ const assignmentSchema = z.object({
 
 type AssignmentFormValues = z.infer<typeof assignmentSchema>;
 
-interface CreateAssignmentDialogProps {
-  children: ReactNode;
+interface EditAssignmentDialogProps {
+  assignment: Assignment;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
 const timeSlots = Array.from({ length: 24 * 2 }, (_, i) => {
@@ -60,12 +61,11 @@ const timeSlots = Array.from({ length: 24 * 2 }, (_, i) => {
 });
 
 
-export function CreateAssignmentDialog({children}: CreateAssignmentDialogProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export function EditAssignmentDialog({ assignment, isOpen, onOpenChange }: EditAssignmentDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const {addAssignment} = useAssignments();
+  const {updateAssignment} = useAssignments();
   const {toast} = useToast();
-  const {user, fetchAllUsers} = useAuth();
+  const {fetchAllUsers} = useAuth();
   const [allUsers, setAllUsers] = useState<UserData[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
 
@@ -90,17 +90,24 @@ export function CreateAssignmentDialog({children}: CreateAssignmentDialogProps) 
 
   const form = useForm<AssignmentFormValues>({
     resolver: zodResolver(assignmentSchema),
-    defaultValues: {
-      title: '',
-      description: '',
-      targetGen: 'All',
-      dueDates: daysOfWeek.map(day => ({
-        day,
-        enabled: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].includes(day),
-        date: undefined,
-        time: '17:00'
-      }))
-    },
+    values: {
+        title: assignment.title,
+        description: assignment.description,
+        targetGen: assignment.targetGen,
+        dueDates: daysOfWeek.map(day => {
+            const existingDueDate = assignment.dueDates.find(d => d.day === day);
+            if (existingDueDate) {
+                const date = parseISO(existingDueDate.dateTime);
+                return {
+                    day,
+                    enabled: true,
+                    date: date,
+                    time: format(date, 'HH:mm'),
+                }
+            }
+            return { day, enabled: false, date: undefined, time: '17:00' };
+        })
+    }
   });
 
   const { fields } = useFieldArray({
@@ -109,7 +116,6 @@ export function CreateAssignmentDialog({children}: CreateAssignmentDialogProps) 
   });
 
   const onSubmit = async (data: AssignmentFormValues) => {
-    if (!user) return;
     setIsSubmitting(true);
     const activeDueDates = data.dueDates
         .filter(d => d.enabled && d.date && d.time)
@@ -131,24 +137,24 @@ export function CreateAssignmentDialog({children}: CreateAssignmentDialogProps) 
     }
 
     try {
-        await addAssignment({
+        await updateAssignment(assignment.id, {
           title: data.title,
           description: data.description,
           targetGen: data.targetGen,
-          authorId: user.uid,
+          authorId: assignment.authorId,
           dueDates: activeDueDates,
         });
         toast({
-          title: 'Assignment Created',
-          description: 'Your new assignment has been posted.',
+          title: 'Assignment Updated',
+          description: 'The assignment has been successfully updated.',
         });
         form.reset();
-        setIsOpen(false);
+        onOpenChange(false);
     } catch(error) {
          toast({
             variant: "destructive",
             title: "Error",
-            description: "Failed to create assignment. You may not have permission.",
+            description: "Failed to update assignment. You may not have permission.",
         });
     } finally {
         setIsSubmitting(false);
@@ -156,12 +162,11 @@ export function CreateAssignmentDialog({children}: CreateAssignmentDialogProps) 
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Create a New Assignment</DialogTitle>
-          <DialogDescription>Fill in the details for the new assignment.</DialogDescription>
+          <DialogTitle>Edit Assignment</DialogTitle>
+          <DialogDescription>Make changes to your existing assignment.</DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -311,12 +316,12 @@ export function CreateAssignmentDialog({children}: CreateAssignmentDialogProps) 
             </div>
 
             <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>
+              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Create
+                Save Changes
               </Button>
             </DialogFooter>
           </form>

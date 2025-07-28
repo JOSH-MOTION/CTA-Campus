@@ -10,20 +10,21 @@ import {Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle} f
 import {CreateAnnouncementDialog} from '@/components/announcements/CreateAnnouncementDialog';
 import {Avatar, AvatarFallback} from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { AnnouncementActions } from '@/components/announcements/AnnouncementActions';
 
 export default function AnnouncementsPage() {
   const {role, userData} = useAuth();
   const {announcements, loading} = useAnnouncements();
-  const isTeacher = role === 'teacher' || role === 'admin';
+  const isTeacherOrAdmin = role === 'teacher' || role === 'admin';
 
   const filteredAnnouncements = useMemo(() => {
-    if (isTeacher) {
+    if (isTeacherOrAdmin) {
       return announcements;
     }
     return announcements.filter(
       ann => ann.targetGen === 'All' || ann.targetGen === userData?.gen
     );
-  }, [announcements, isTeacher, userData?.gen]);
+  }, [announcements, isTeacherOrAdmin, userData?.gen]);
 
 
   const sortedAnnouncements = [...filteredAnnouncements].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -35,7 +36,7 @@ export default function AnnouncementsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Announcements</h1>
           <p className="text-muted-foreground">The latest school-wide news and updates.</p>
         </div>
-        {isTeacher && (
+        {isTeacherOrAdmin && (
           <CreateAnnouncementDialog>
             <Button>
               <PlusCircle className="mr-2 h-4 w-4" />
@@ -55,10 +56,15 @@ export default function AnnouncementsPage() {
             <Card key={announcement.id}>
               <CardHeader>
                  <div className="flex justify-between items-start">
-                  <CardTitle>{announcement.title}</CardTitle>
-                  {isTeacher && <Badge variant={announcement.targetGen === 'All' ? 'default' : 'secondary'}>{announcement.targetGen}</Badge>}
+                  <div className="flex-1 pr-2">
+                    <CardTitle>{announcement.title}</CardTitle>
+                    <div className="flex items-center gap-2 mt-1">
+                        {isTeacherOrAdmin && <Badge variant={announcement.targetGen === 'All' ? 'default' : 'secondary'}>{announcement.targetGen}</Badge>}
+                    </div>
+                  </div>
+                  <AnnouncementActions announcement={announcement} />
                 </div>
-                <CardDescription>{announcement.content}</CardDescription>
+                <CardDescription className="pt-2">{announcement.content}</CardDescription>
               </CardHeader>
               <CardFooter className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Avatar className="h-6 w-6">
@@ -76,7 +82,7 @@ export default function AnnouncementsPage() {
           <Rss className="h-12 w-12 text-muted-foreground" />
           <h2 className="mt-4 text-xl font-semibold">No announcements yet</h2>
           <p className="mt-1 text-muted-foreground">
-            {isTeacher ? 'Create the first announcement to get started.' : 'Check back later for updates.'}
+            {isTeacherOrAdmin ? 'Create the first announcement to get started.' : 'Check back later for updates.'}
           </p>
         </div>
       )}
