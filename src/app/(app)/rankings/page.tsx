@@ -114,7 +114,7 @@ export default function RankingsPage() {
             <CardContent>
                 {chartData.length > 0 ? (
                     <ChartContainer config={{}} className="w-full h-[500px]">
-                        <ResponsiveContainer>
+                        <ResponsiveContainer width="99%">
                             <BarChart
                                 data={chartData}
                                 layout="vertical"
@@ -127,7 +127,7 @@ export default function RankingsPage() {
                                     tickLine={false}
                                     axisLine={false}
                                     tick={{ fontSize: 12 }}
-                                    width={120}
+                                    interval={0}
                                 />
                                 <Tooltip
                                     cursor={{ fill: 'hsl(var(--muted))' }}
