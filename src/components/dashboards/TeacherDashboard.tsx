@@ -26,12 +26,29 @@ interface TeacherDashboardProps {
 }
 
 export default function TeacherDashboard({user}: TeacherDashboardProps) {
-  const {userData} = useAuth();
+  const {userData, fetchAllUsers} = useAuth();
   const [selectedGen, setSelectedGen] = useState<string>('');
+  const [allUsers, setAllUsers] = useState<UserData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadUsers() {
+      setLoading(true);
+      const users = await fetchAllUsers();
+      setAllUsers(users);
+      setLoading(false);
+    }
+    loadUsers();
+  }, [fetchAllUsers]);
 
   const taughtGens = useMemo(() => {
     return userData?.gensTaught?.split(',').map(g => g.trim()).filter(Boolean) || [];
   }, [userData?.gensTaught]);
+
+  const studentsInSelectedGen = useMemo(() => {
+    if (!selectedGen) return [];
+    return allUsers.filter(u => u.role === 'student' && u.gen === selectedGen);
+  }, [allUsers, selectedGen]);
 
   useEffect(() => {
     if (taughtGens.length > 0 && !selectedGen) {
@@ -83,9 +100,9 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
                   <Users className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">45</div>
+                  <div className="text-2xl font-bold">{loading ? '...' : studentsInSelectedGen.length}</div>
                   <p className="text-xs text-muted-foreground">
-                    (Data to be fetched)
+                    Total students enrolled
                   </p>
                 </CardContent>
               </Card>
@@ -97,7 +114,7 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
                 <CardContent>
                   <div className="text-2xl font-bold">92%</div>
                    <p className="text-xs text-muted-foreground">
-                    (Data to be fetched)
+                    (Data not yet available)
                   </p>
                 </CardContent>
               </Card>
@@ -109,7 +126,7 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
                 <CardContent>
                   <div className="text-2xl font-bold">8</div>
                    <p className="text-xs text-muted-foreground">
-                    for "Final Project Proposal"
+                    (Data not yet available)
                   </p>
                 </CardContent>
               </Card>
@@ -147,7 +164,7 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p>A list of recent submissions would go here.</p>
+            <p>A list of recent submissions would go here. (Data not yet available)</p>
           </CardContent>
         </Card>
       </div>

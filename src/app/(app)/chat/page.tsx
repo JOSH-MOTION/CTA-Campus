@@ -1,41 +1,46 @@
 // src/app/(app)/chat/page.tsx
 'use client';
 
-import {useState} from 'react';
+import {useState, useEffect} from 'react';
 import {Avatar, AvatarFallback, AvatarImage} from '@/components/ui/avatar';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs';
-import {Search, Send, User, Users} from 'lucide-react';
+import {Search, Send, User, Users, Loader2} from 'lucide-react';
 import {Chat} from '@/components/chat/Chat';
+import {useAuth, UserData} from '@/contexts/AuthContext';
 
-const gen30Users = [
-  {id: '1', name: 'Alice Johnson', avatar: 'https://placehold.co/100x100.png', dataAiHint: 'woman student'},
-  {id: '2', name: 'Bob Williams', avatar: 'https://placehold.co/100x100.png', dataAiHint: 'man student'},
-  {id: '3', name: 'Charlie Brown', avatar: 'https://placehold.co/100x100.png', dataAiHint: 'student portrait'},
-  {id: '4', name: 'Diana Miller', avatar: 'https://placehold.co/100x100.png', dataAiHint: 'woman smiling'},
-];
-
-const gen30Group = {id: 'g1', name: 'Gen 30 Hub', avatar: 'https://placehold.co/100x100.png', dataAiHint: 'group students'};
-
-const initialMessages = {
-  '1': [
-    {sender: 'Alice Johnson', text: 'Hey, how are you preparing for the upcoming exam?', time: '10:30 AM'},
-    {sender: 'You', text: 'I\'m reviewing the lecture notes. Want to study together?', time: '10:31 AM'},
-  ],
-  '2': [{sender: 'Bob Williams', text: 'Can you share the link for the assignment submission?', time: 'Yesterday'}],
+const initialMessages: Record<string, Message[]> = {
   g1: [
     {sender: 'Alice Johnson', text: 'Hello everyone! Just a reminder about the group project deadline on Friday.', time: '9:00 AM'},
     {sender: 'Charlie Brown', text: 'Thanks for the reminder, Alice!', time: '9:05 AM'},
   ],
 };
 
-type ChatEntity = {id: string; name: string; avatar: string; dataAiHint: string};
+type ChatEntity = {id: string; name: string; avatar?: string; dataAiHint: string};
 type Message = {sender: string; text: string; time: string};
 
 export default function ChatPage() {
-  const [selectedChat, setSelectedChat] = useState<ChatEntity | null>(gen30Users[0]);
+  const {fetchAllUsers, userData} = useAuth();
+  const [allStudents, setAllStudents] = useState<UserData[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  const [selectedChat, setSelectedChat] = useState<ChatEntity | null>(null);
   const [messages, setMessages] = useState<Record<string, Message[]>>(initialMessages);
+
+  useEffect(() => {
+    const loadUsers = async () => {
+      setLoading(true);
+      const users = await fetchAllUsers();
+      const students = users.filter(u => u.role === 'student');
+      setAllStudents(students);
+      setLoading(false);
+    };
+    loadUsers();
+  }, [fetchAllUsers]);
+
+  const userGen = userData?.gen;
+  const gen30Group: ChatEntity | null = userGen ? {id: `group-${userGen}`, name: `${userGen} Hub`, dataAiHint: 'group students'} : null;
 
   const handleSelectChat = (entity: ChatEntity) => {
     setSelectedChat(entity);
@@ -79,47 +84,54 @@ export default function ChatPage() {
           </TabsList>
           <div className="flex-1 overflow-y-auto">
             <TabsContent value="dms" className="m-0">
-              <div className="space-y-1 p-2">
-                {gen30Users.map(user => (
-                  <Button
-                    key={user.id}
-                    variant={selectedChat?.id === user.id ? 'secondary' : 'ghost'}
-                    className="h-auto w-full justify-start p-3"
-                    onClick={() => handleSelectChat(user)}
-                  >
-                    <Avatar className="mr-3 h-10 w-10">
-                      <AvatarImage src={user.avatar} alt={user.name} data-ai-hint={user.dataAiHint} />
-                      <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div className="text-left">
-                      <p className="font-semibold">{user.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {messages[user.id]?.slice(-1)[0]?.text || 'No messages yet'}
-                      </p>
-                    </div>
-                  </Button>
-                ))}
-              </div>
+              {loading ? (
+                <div className="flex justify-center items-center p-4">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+              ) : (
+                <div className="space-y-1 p-2">
+                  {allStudents.map(user => (
+                    <Button
+                      key={user.uid}
+                      variant={selectedChat?.id === user.uid ? 'secondary' : 'ghost'}
+                      className="h-auto w-full justify-start p-3"
+                      onClick={() => handleSelectChat({ id: user.uid, name: user.displayName, avatar: user.photoURL, dataAiHint: 'student portrait'})}
+                    >
+                      <Avatar className="mr-3 h-10 w-10">
+                        <AvatarImage src={user.photoURL} alt={user.displayName} />
+                        <AvatarFallback>{user.displayName.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <div className="text-left">
+                        <p className="font-semibold">{user.displayName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {messages[user.uid]?.slice(-1)[0]?.text || 'No messages yet'}
+                        </p>
+                      </div>
+                    </Button>
+                  ))}
+                </div>
+              )}
             </TabsContent>
             <TabsContent value="groups" className="m-0">
-              <div className="space-y-1 p-2">
-                <Button
-                  variant={selectedChat?.id === gen30Group.id ? 'secondary' : 'ghost'}
-                  className="h-auto w-full justify-start p-3"
-                  onClick={() => handleSelectChat(gen30Group)}
-                >
-                  <Avatar className="mr-3 h-10 w-10">
-                    <AvatarImage src={gen30Group.avatar} alt={gen30Group.name} data-ai-hint={gen30Group.dataAiHint} />
-                    <AvatarFallback>G</AvatarFallback>
-                  </Avatar>
-                  <div className="text-left">
-                    <p className="font-semibold">{gen30Group.name}</p>
-                     <p className="text-xs text-muted-foreground">
-                        {messages[gen30Group.id]?.slice(-1)[0]?.text || 'No messages yet'}
-                      </p>
+               {gen30Group && (
+                  <div className="space-y-1 p-2">
+                    <Button
+                      variant={selectedChat?.id === gen30Group.id ? 'secondary' : 'ghost'}
+                      className="h-auto w-full justify-start p-3"
+                      onClick={() => handleSelectChat(gen30Group)}
+                    >
+                      <Avatar className="mr-3 h-10 w-10">
+                        <AvatarFallback>G</AvatarFallback>
+                      </Avatar>
+                      <div className="text-left">
+                        <p className="font-semibold">{gen30Group.name}</p>
+                         <p className="text-xs text-muted-foreground">
+                            {messages[gen30Group.id]?.slice(-1)[0]?.text || 'No messages yet'}
+                          </p>
+                      </div>
+                    </Button>
                   </div>
-                </Button>
-              </div>
+                )}
             </TabsContent>
           </div>
         </Tabs>

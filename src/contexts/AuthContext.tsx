@@ -5,7 +5,7 @@ import {createContext, useContext, useState, ReactNode, useEffect} from 'react';
 import {auth, db} from '@/lib/firebase';
 import type {User} from 'firebase/auth';
 import {onAuthStateChanged}from 'firebase/auth';
-import {doc, getDoc, setDoc} from 'firebase/firestore';
+import {doc, getDoc, setDoc, collection, getDocs} from 'firebase/firestore';
 
 export type UserRole = 'student' | 'teacher' | 'admin';
 
@@ -20,6 +20,7 @@ export interface UserData {
   lessonDay?: string;
   lessonType?: string;
   bio?: string;
+  photoURL?: string;
   // Teacher specific
   gensTaught?: string;
 }
@@ -30,6 +31,7 @@ interface AuthContextType {
   role: UserRole;
   loading: boolean;
   setRole: (role: UserRole) => void;
+  fetchAllUsers: () => Promise<UserData[]>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -102,8 +104,15 @@ export function AuthProvider({children}: {children: ReactNode}) {
     }
   };
 
+  const fetchAllUsers = async (): Promise<UserData[]> => {
+    const usersCollection = collection(db, 'users');
+    const usersSnapshot = await getDocs(usersCollection);
+    const usersList = usersSnapshot.docs.map(doc => doc.data() as UserData);
+    return usersList;
+  };
+
   return (
-    <AuthContext.Provider value={{user, userData, role, loading, setRole: handleSetRole}}>
+    <AuthContext.Provider value={{user, userData, role, loading, setRole: handleSetRole, fetchAllUsers}}>
       {children}
     </AuthContext.Provider>
   );

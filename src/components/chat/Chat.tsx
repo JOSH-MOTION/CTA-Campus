@@ -9,7 +9,7 @@ import {ScrollArea} from '@/components/ui/scroll-area';
 import {Send} from 'lucide-react';
 import {cn} from '@/lib/utils';
 
-type ChatEntity = {id: string; name: string; avatar: string; dataAiHint: string};
+type ChatEntity = {id: string; name: string; avatar?: string; dataAiHint: string};
 type Message = {sender: string; text: string; time: string};
 
 interface ChatProps {
