@@ -23,6 +23,7 @@ import {
   Rocket,
   Code,
   BookOpen,
+  Contact,
 } from 'lucide-react';
 import {SidebarMenu, SidebarMenuItem, SidebarMenuButton} from '@/components/ui/sidebar';
 import Link from 'next/link';
@@ -41,6 +42,7 @@ const studentNavItems = [
   {href: '/roadmap', label: 'Roadmap', icon: Map},
   {href: '/materials', label: 'Class Materials', icon: BookCopy},
   {href: '/resources', label: 'Resources Library', icon: BookOpen},
+  {href: '/directory', label: 'Directory', icon: Contact},
   {href: '/book-session', label: 'Book a Session', icon: CalendarPlus},
   {href: '/work-ready', label: 'Work Ready', icon: Rocket},
 ];
@@ -56,6 +58,7 @@ const teacherNavItems = [
   {href: '/submissions', label: 'Submissions', icon: Upload},
   {href: '/attendance', label: 'Attendance', icon: UserCheck},
   {href: '/roadmap', label: 'Roadmap', icon: Map},
+  {href: '/directory', label: 'Directory', icon: Contact},
   {href: '/profile', label: 'Profile', icon: User},
 ];
 
@@ -65,6 +68,7 @@ const adminNavItems = [
   {href: '/announcements', label: 'Manage Announcements', icon: Megaphone},
   {href: '/bookings', label: 'Manage Bookings', icon: CalendarCheck},
   {href: '/roadmap', label: 'Roadmap', icon: Map},
+  {href: '/directory', label: 'Directory', icon: Contact},
   {href: '/career', label: 'Career Module', icon: GraduationCap},
 ];
 
