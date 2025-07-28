@@ -1,0 +1,31 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Allow reading of all user profiles (for display names, roles, etc.).
+    // Allow users to update only their own document.
+    match /users/{userId} {
+      allow read;
+      allow write: if request.auth.uid == userId;
+    }
+
+    // Allow read/write access to chat messages only if the user is authenticated
+    // and a member of that specific chat.
+    match /chats/{chatId}/messages/{messageId} {
+      allow read, write: if request.auth != null && (
+        // For DMs (e.g., "uid1-uid2"), allow if the user's ID is in the chat ID.
+        (chatId.split('-').length() == 2 && request.auth.uid in chatId.split('-')) ||
+        // For group chats (e.g., "group-Gen 30"), allow if the user's generation
+        // matches the one in the chat ID. This requires reading the user's own document.
+        (chatId.startsWith('group-') && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.gen == chatId.replace('group-', ''))
+      );
+    }
+    
+    // Allow read access on materials for any authenticated user.
+    // Write access should be restricted (e.g., to teachers/admins), but for now we will allow any authenticated user to write.
+    match /materials/{materialId} {
+      allow read, create: if request.auth != null;
+    }
+  }
+}
