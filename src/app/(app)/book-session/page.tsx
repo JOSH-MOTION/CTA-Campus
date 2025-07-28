@@ -102,7 +102,7 @@ export default function BookSessionPage() {
                             <Button
                               variant={'outline'}
                               className={cn(
-                                'pl-3 text-left font-normal',
+                                'w-full pl-3 text-left font-normal',
                                 !field.value && 'text-muted-foreground'
                               )}
                             >

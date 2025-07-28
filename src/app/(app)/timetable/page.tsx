@@ -41,7 +41,7 @@ export default function TimetablePage() {
         <p className="text-muted-foreground">Your class schedule for the week.</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
         {days.map(day => (
           <Card key={day} className="flex flex-col">
             <CardHeader>

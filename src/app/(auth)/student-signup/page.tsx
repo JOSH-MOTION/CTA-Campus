@@ -111,7 +111,7 @@ export default function StudentSignupPage() {
         <Compass className="h-10 w-10" />
         <h1 className="text-4xl font-bold">Campus Compass</h1>
       </div>
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-lg">
         <CardHeader>
           <CardTitle className="text-2xl">Student Sign Up</CardTitle>
           <CardDescription>Create an account to get started.</CardDescription>
@@ -146,7 +146,7 @@ export default function StudentSignupPage() {
                 onChange={e => setFullName(e.target.value)}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="gen">Generation</Label>
                 <Input id="gen" type="text" placeholder="e.g., Gen 30" required value={gen} onChange={handleGenChange} />
@@ -169,7 +169,7 @@ export default function StudentSignupPage() {
             </div>
             <div className="space-y-2">
               <Label>Lesson Day</Label>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Select onValueChange={setLessonDay} value={lessonDay} required>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a day" />

@@ -79,7 +79,7 @@ export default function AvailabilityPage() {
                         Select the days of the week you are available.
                       </p>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                       {daysOfWeek.map((day) => (
                         <FormField
                           key={day}
@@ -126,7 +126,7 @@ export default function AvailabilityPage() {
                 </p>
                 <div className="space-y-4">
                   {fields.map((field, index) => (
-                    <div key={field.id} className="flex items-end gap-4">
+                    <div key={field.id} className="flex flex-wrap items-end gap-4">
                        <FormField
                           control={form.control}
                           name={`timeSlots.${index}.startTime`}
@@ -173,6 +173,7 @@ export default function AvailabilityPage() {
                         size="icon"
                         onClick={() => remove(index)}
                         disabled={fields.length <= 1}
+                        className="shrink-0"
                       >
                         <Trash className="h-4 w-4" />
                       </Button>
