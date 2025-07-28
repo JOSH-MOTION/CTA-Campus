@@ -1,4 +1,4 @@
-// src/components/announcements/EditAnnouncementDialog.tsx
+// src/components/projects/CreateProjectDialog.tsx
 'use client';
 
 import {useState, type ReactNode, useEffect, useMemo} from 'react';
@@ -9,6 +9,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from '@/components/ui/dialog';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
@@ -17,31 +18,30 @@ import {useForm} from 'react-hook-form';
 import {zodResolver} from '@hookform/resolvers/zod';
 import {z} from 'zod';
 import {Form, FormControl, FormField, FormItem, FormLabel, FormMessage} from '@/components/ui/form';
-import {Announcement, useAnnouncements} from '@/contexts/AnnouncementsContext';
+import {useProjects} from '@/contexts/ProjectsContext';
 import {useAuth, UserData} from '@/contexts/AuthContext';
 import {useToast} from '@/hooks/use-toast';
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup} from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 
-const announcementSchema = z.object({
+const projectSchema = z.object({
   title: z.string().min(5, 'Title must be at least 5 characters long.'),
-  content: z.string().min(10, 'Content must be at least 10 characters long.'),
+  description: z.string().min(10, 'Description must be at least 10 characters long.'),
   targetGen: z.string().nonempty('Please select a target audience.'),
 });
 
-type AnnouncementFormValues = z.infer<typeof announcementSchema>;
+type ProjectFormValues = z.infer<typeof projectSchema>;
 
-interface EditAnnouncementDialogProps {
-  announcement: Announcement;
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
+interface CreateProjectDialogProps {
+  children: ReactNode;
 }
 
-export function EditAnnouncementDialog({ announcement, isOpen, onOpenChange }: EditAnnouncementDialogProps) {
+export function CreateProjectDialog({children}: CreateProjectDialogProps) {
+  const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const {updateAnnouncement} = useAnnouncements();
+  const {addProject} = useProjects();
   const {toast} = useToast();
-  const {fetchAllUsers} = useAuth();
+  const {user, fetchAllUsers} = useAuth();
   const [allUsers, setAllUsers] = useState<UserData[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
 
@@ -64,37 +64,34 @@ export function EditAnnouncementDialog({ announcement, isOpen, onOpenChange }: E
     return [...new Set(studentGens)].sort();
   }, [allUsers]);
 
-  const form = useForm<AnnouncementFormValues>({
-    resolver: zodResolver(announcementSchema),
-    values: {
-      title: announcement.title,
-      content: announcement.content,
-      targetGen: announcement.targetGen,
+  const form = useForm<ProjectFormValues>({
+    resolver: zodResolver(projectSchema),
+    defaultValues: {
+      title: '',
+      description: '',
+      targetGen: 'All Students',
     },
   });
 
-  const onSubmit = async (data: AnnouncementFormValues) => {
+  const onSubmit = async (data: ProjectFormValues) => {
+    if (!user) return;
     setIsSubmitting(true);
     try {
-      await updateAnnouncement(announcement.id, {
-        title: data.title,
-        content: data.content,
-        targetGen: data.targetGen,
-        author: announcement.author,
-        authorId: announcement.authorId,
-        date: announcement.date,
+      await addProject({
+        ...data,
+        authorId: user.uid,
       });
       toast({
-        title: 'Announcement Updated',
-        description: 'Your announcement has been successfully updated.',
+        title: 'Project Created',
+        description: 'Your project has been posted.',
       });
       form.reset();
-      onOpenChange(false);
+      setIsOpen(false);
     } catch (error) {
        toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Failed to update announcement. You may not have permission.',
+        description: 'Failed to create project. You may not have permission.',
       });
     } finally {
         setIsSubmitting(false);
@@ -102,12 +99,13 @@ export function EditAnnouncementDialog({ announcement, isOpen, onOpenChange }: E
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Edit Announcement</DialogTitle>
+          <DialogTitle>Create a New Project</DialogTitle>
           <DialogDescription>
-            Make changes to your existing announcement.
+            This project will be visible to the selected audience.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -119,7 +117,7 @@ export function EditAnnouncementDialog({ announcement, isOpen, onOpenChange }: E
                 <FormItem>
                   <FormLabel>Title</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., Upcoming Midterm Exams" {...field} />
+                    <Input placeholder="e.g., E-commerce Website" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -155,24 +153,24 @@ export function EditAnnouncementDialog({ announcement, isOpen, onOpenChange }: E
               />
             <FormField
               control={form.control}
-              name="content"
+              name="description"
               render={({field}) => (
                 <FormItem>
-                  <FormLabel>Content</FormLabel>
+                  <FormLabel>Description</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Provide the full details of the announcement here..." {...field} />
+                    <Textarea placeholder="Provide the requirements for the project here..." {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
             <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+              <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Save Changes
+                Create
               </Button>
             </DialogFooter>
           </form>

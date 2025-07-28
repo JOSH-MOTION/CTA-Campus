@@ -21,13 +21,13 @@ import {Form, FormControl, FormField, FormItem, FormLabel, FormMessage} from '@/
 import {useAnnouncements} from '@/contexts/AnnouncementsContext';
 import {useAuth, UserData} from '@/contexts/AuthContext';
 import {useToast} from '@/hooks/use-toast';
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select';
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup} from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 
 const announcementSchema = z.object({
   title: z.string().min(5, 'Title must be at least 5 characters long.'),
   content: z.string().min(10, 'Content must be at least 10 characters long.'),
-  targetGen: z.string().nonempty('Please select a target generation.'),
+  targetGen: z.string().nonempty('Please select a target audience.'),
 });
 
 type AnnouncementFormValues = z.infer<typeof announcementSchema>;
@@ -61,7 +61,7 @@ export function CreateAnnouncementDialog({children}: CreateAnnouncementDialogPro
     const studentGens = allUsers
       .filter(u => u.role === 'student' && u.gen)
       .map(u => u.gen!);
-    return ['All', ...[...new Set(studentGens)].sort()];
+    return [...new Set(studentGens)].sort();
   }, [allUsers]);
 
   const form = useForm<AnnouncementFormValues>({
@@ -69,7 +69,7 @@ export function CreateAnnouncementDialog({children}: CreateAnnouncementDialogPro
     defaultValues: {
       title: '',
       content: '',
-      targetGen: 'All',
+      targetGen: 'All Students',
     },
   });
 
@@ -106,7 +106,7 @@ export function CreateAnnouncementDialog({children}: CreateAnnouncementDialogPro
         <DialogHeader>
           <DialogTitle>Create a New Announcement</DialogTitle>
           <DialogDescription>
-            This announcement will be visible to all students and staff.
+            This announcement will be visible to the selected audience.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -129,17 +129,23 @@ export function CreateAnnouncementDialog({children}: CreateAnnouncementDialogPro
                 name="targetGen"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Target Generation</FormLabel>
+                    <FormLabel>Target Audience</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loadingUsers}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select a generation" />
+                          <SelectValue placeholder="Select an audience" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {availableGens.map(gen => (
-                          <SelectItem key={gen} value={gen}>{gen}</SelectItem>
-                        ))}
+                        <SelectGroup>
+                          <SelectItem value="Everyone">Everyone (incl. Staff)</SelectItem>
+                          <SelectItem value="All Students">All Students</SelectItem>
+                        </SelectGroup>
+                        <SelectGroup>
+                           {availableGens.map(gen => (
+                            <SelectItem key={gen} value={gen}>{gen}</SelectItem>
+                          ))}
+                        </SelectGroup>
                       </SelectContent>
                     </Select>
                     <FormMessage />

@@ -25,7 +25,7 @@ import {CalendarIcon, Clock, Loader2} from 'lucide-react';
 import {format, parseISO} from 'date-fns';
 import {Calendar} from '@/components/ui/calendar';
 import {useAuth, UserData} from '@/contexts/AuthContext';
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select';
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup} from '@/components/ui/select';
 import {Checkbox} from '@/components/ui/checkbox';
 
 const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -33,7 +33,7 @@ const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Sat
 const assignmentSchema = z.object({
   title: z.string().min(5, 'Title must be at least 5 characters long.'),
   description: z.string().min(10, 'Description must be at least 10 characters long.'),
-  targetGen: z.string().nonempty('Please select a target generation.'),
+  targetGen: z.string().nonempty('Please select a target audience.'),
   dueDates: z.array(z.object({
       day: z.string(),
       enabled: z.boolean(),
@@ -85,7 +85,7 @@ export function EditAssignmentDialog({ assignment, isOpen, onOpenChange }: EditA
     const studentGens = allUsers
       .filter(u => u.role === 'student' && u.gen)
       .map(u => u.gen!);
-    return ['All', ...[...new Set(studentGens)].sort()];
+    return [...new Set(studentGens)].sort();
   }, [allUsers]);
 
   const form = useForm<AssignmentFormValues>({
@@ -189,19 +189,23 @@ export function EditAssignmentDialog({ assignment, isOpen, onOpenChange }: EditA
                 name="targetGen"
                 render={({field}) => (
                   <FormItem>
-                    <FormLabel>Target Generation</FormLabel>
+                    <FormLabel>Target Audience</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loadingUsers}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select a generation" />
+                          <SelectValue placeholder="Select an audience" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {availableGens.map(gen => (
-                          <SelectItem key={gen} value={gen}>
-                            {gen}
-                          </SelectItem>
-                        ))}
+                        <SelectGroup>
+                           <SelectItem value="Everyone">Everyone (incl. Staff)</SelectItem>
+                           <SelectItem value="All Students">All Students</SelectItem>
+                        </SelectGroup>
+                        <SelectGroup>
+                           {availableGens.map(gen => (
+                            <SelectItem key={gen} value={gen}>{gen}</SelectItem>
+                          ))}
+                        </SelectGroup>
                       </SelectContent>
                     </Select>
                     <FormMessage />

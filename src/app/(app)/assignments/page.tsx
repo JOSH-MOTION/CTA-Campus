@@ -18,13 +18,14 @@ export default function AssignmentsPage() {
   const isTeacherOrAdmin = role === 'teacher' || role === 'admin';
 
   const filteredAssignments = useMemo(() => {
-    if (isTeacherOrAdmin) {
-      return assignments;
-    }
-    return assignments.filter(
-      assign => assign.targetGen === 'All' || assign.targetGen === userData?.gen
-    );
-  }, [assignments, isTeacherOrAdmin, userData?.gen]);
+    if (isTeacherOrAdmin) return assignments;
+    return assignments.filter(assign => {
+      if (assign.targetGen === 'Everyone') return true;
+      if (role === 'student' && assign.targetGen === 'All Students') return true;
+      if (role === 'student' && assign.targetGen === userData?.gen) return true;
+      return false;
+    });
+  }, [assignments, isTeacherOrAdmin, role, userData?.gen]);
 
 
   const sortedAssignments = [...filteredAssignments].sort((a, b) => {
@@ -64,7 +65,7 @@ export default function AssignmentsPage() {
                 <div className="flex justify-between items-start">
                   <div className="flex-1 pr-2">
                     <CardTitle>{assignment.title}</CardTitle>
-                     {isTeacherOrAdmin && <Badge variant={assignment.targetGen === 'All' ? 'default' : 'secondary'} className="mt-1">{assignment.targetGen}</Badge>}
+                     {isTeacherOrAdmin && <Badge variant={assignment.targetGen === 'Everyone' ? 'destructive' : assignment.targetGen === 'All Students' ? 'default' : 'secondary'} className="mt-1">{assignment.targetGen}</Badge>}
                   </div>
                   <AssignmentActions assignment={assignment} />
                 </div>

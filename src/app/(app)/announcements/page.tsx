@@ -21,10 +21,13 @@ export default function AnnouncementsPage() {
     if (isTeacherOrAdmin) {
       return announcements;
     }
-    return announcements.filter(
-      ann => ann.targetGen === 'All' || ann.targetGen === userData?.gen
-    );
-  }, [announcements, isTeacherOrAdmin, userData?.gen]);
+    return announcements.filter(ann => {
+      if (ann.targetGen === 'Everyone') return true;
+      if (role === 'student' && ann.targetGen === 'All Students') return true;
+      if (role === 'student' && ann.targetGen === userData?.gen) return true;
+      return false;
+    });
+  }, [announcements, isTeacherOrAdmin, role, userData?.gen]);
 
 
   const sortedAnnouncements = [...filteredAnnouncements].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -59,7 +62,7 @@ export default function AnnouncementsPage() {
                   <div className="flex-1 pr-2">
                     <CardTitle>{announcement.title}</CardTitle>
                     <div className="flex items-center gap-2 mt-1">
-                        {isTeacherOrAdmin && <Badge variant={announcement.targetGen === 'All' ? 'default' : 'secondary'}>{announcement.targetGen}</Badge>}
+                        {isTeacherOrAdmin && <Badge variant={announcement.targetGen === 'Everyone' ? 'destructive' : announcement.targetGen === 'All Students' ? 'default' : 'secondary'}>{announcement.targetGen}</Badge>}
                     </div>
                   </div>
                   <AnnouncementActions announcement={announcement} />

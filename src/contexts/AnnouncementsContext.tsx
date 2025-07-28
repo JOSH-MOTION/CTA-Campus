@@ -14,7 +14,7 @@ export interface Announcement {
   author: string;
   authorId: string;
   date: string;
-  targetGen: string; // e.g., "Gen 30" or "All"
+  targetGen: string; // e.g., "Gen 30", "All Students", or "Everyone"
 }
 
 export type AnnouncementData = Omit<Announcement, 'id' | 'date'>;
@@ -85,7 +85,8 @@ export const AnnouncementsProvider: FC<{children: ReactNode}> = ({children}) => 
   const updateAnnouncement = useCallback(async (id: string, updates: Partial<AnnouncementData>) => {
     if (!user) throw new Error("User not authenticated");
     const announcementDoc = doc(db, 'announcements', id);
-    await updateDoc(announcementDoc, updates);
+    const { id: announcementId, ...updateData } = updates as Announcement;
+    await updateDoc(announcementDoc, updateData);
   }, [user]);
 
   const deleteAnnouncement = useCallback(async (id: string) => {
