@@ -34,6 +34,10 @@ export function Chat({entity, messages, onSendMessage, currentUser}: ChatProps) 
       });
     }
   }, [messages]);
+  
+  useEffect(() => {
+      setReplyTo(undefined);
+  },[entity])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

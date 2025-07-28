@@ -28,16 +28,12 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(true);
 
   const [selectedChat, setSelectedChat] = useState<ChatEntity | null>(null);
-  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeTab, setActiveTab] = useState<'dms' | 'groups'>('dms');
   const messageUnsubscribeRef = useRef<Unsubscribe | null>(null);
 
   const [unreadCounts, setUnreadCounts] = useState<{[chatId: string]: number}>({});
   const [allChatListeners, setAllChatListeners] = useState<Unsubscribe[]>([]);
-
-  const directMessageUserId = searchParams.get('dm');
-  const groupChatId = searchParams.get('group');
 
   useEffect(() => {
     const loadUsers = async () => {
@@ -69,125 +65,86 @@ export default function ChatPage() {
     return groups.sort((a, b) => a.name.localeCompare(b.name));
   }, [role, userData, allUsers]);
 
-  const handleSelectChat = useCallback(
-    (entity: ChatEntity) => {
+  const handleSelectChat = useCallback((entity: ChatEntity) => {
+    setSelectedChat(entity);
+    const newPath = entity.type === 'group' ? `/chat?group=${entity.id.replace('group-', '')}` : `/chat?dm=${entity.id}`;
+    router.push(newPath, {scroll: false});
+  }, [router]);
+
+  useEffect(() => {
+    if (loading || !currentUser) return;
+    
+    // Auto-select chat based on URL on initial load
+    const directMessageUserId = searchParams.get('dm');
+    const groupChatId = searchParams.get('group');
+
+    if (groupChatId) {
+        const groupToSelect = groupChats.find(g => g.id === `group-${groupChatId}`);
+        if (groupToSelect && !selectedChat) {
+          setSelectedChat({...groupToSelect, type: 'group'});
+          setActiveTab('groups');
+        }
+      } else if (directMessageUserId) {
+        const userToDm = allUsers.find(u => u.uid === directMessageUserId);
+        if (userToDm && !selectedChat) {
+            setSelectedChat({
+              id: userToDm.uid,
+              name: userToDm.displayName,
+              type: 'dm',
+              avatar: userToDm.photoURL,
+              dataAiHint: 'user portrait',
+            });
+          setActiveTab('dms');
+        }
+      }
+  }, [loading, allUsers, groupChats, currentUser, searchParams, selectedChat]);
+  
+  
+  useEffect(() => {
+      if (!selectedChat || !currentUser) return;
+
       if (messageUnsubscribeRef.current) {
         messageUnsubscribeRef.current();
       }
 
       let chatId: string;
-      const isDm = entity.type === 'dm' && currentUser;
-      if (isDm) {
-        chatId = getChatId(currentUser.uid, entity.id);
+      if (selectedChat.type === 'dm') {
+        chatId = getChatId(currentUser.uid, selectedChat.id);
       } else {
-        chatId = entity.id;
+        chatId = selectedChat.id;
       }
-
-      setSelectedChat(entity);
-      setCurrentChatId(chatId);
+      
       setMessages([]); // Clear previous messages
       setUnreadCounts(prev => ({...prev, [chatId]: 0}));
-
+      
       const unsubscribe = onMessages(chatId, newMessages => {
         setMessages(newMessages);
       });
       messageUnsubscribeRef.current = unsubscribe;
-      
-      if (entity.type === 'group') {
-        setActiveTab('groups');
-        router.push(`/chat?group=${entity.id.replace('group-', '')}`, {scroll: false});
+
+      if(selectedChat.type === 'group') {
+        setActiveTab('groups')
       } else {
-        setActiveTab('dms');
-        router.push(`/chat?dm=${entity.id}`, {scroll: false});
+        setActiveTab('dms')
       }
-    },
-    [currentUser, router]
-  );
-  
-  const getEntityForToast = useCallback((chatId: string) => {
-      if (!currentUser) return null;
-      const user = otherUsers.find(u => getChatId(currentUser!.uid, u.uid) === chatId);
-      if (user) return {id: user.uid, name: user.displayName, type: 'dm' as ChatEntityType, avatar: user.photoURL, dataAiHint: 'user portrait'};
-      
-      const group = groupChats.find(g => g.id === chatId);
-      if (group) return {id: group.id, name: group.name, type: 'group' as ChatEntityType, dataAiHint: 'group chat'};
 
-      return null;
-  }, [otherUsers, groupChats, currentUser]);
-
-  useEffect(() => {
-    if (loading || !currentUser) return;
-    
-    // Setup listeners for all chats for notifications
-    const allPossibleDmChats = otherUsers.map(u => ({id: u.uid, name: u.displayName, chatId: getChatId(currentUser.uid, u.uid)}));
-    const allPossibleGroupChats = groupChats.map(g => ({...g, chatId: g.id}));
-    const allPossibleChats = [...allPossibleDmChats, ...allPossibleGroupChats];
-    
-    const listeners = allPossibleChats.map(({chatId, name}) => {
-      return onMessages(chatId, (newMessages) => {
-        if(newMessages.length > 0 && chatId !== currentChatId) {
-            const lastMessage = newMessages[newMessages.length - 1];
-            if (lastMessage.senderId !== currentUser.uid) {
-                const currentUnread = unreadCounts[chatId] || 0;
-                if (newMessages.length > currentUnread) {
-                    setUnreadCounts(prev => ({...prev, [chatId]: newMessages.length }));
-
-                    toast({
-                      title: `New message from ${lastMessage.senderName}`,
-                      description: lastMessage.text,
-                      action: (
-                        <Button variant="link" onClick={() => {
-                            const entityToSelect = getEntityForToast(chatId);
-                            if (entityToSelect) {
-                              handleSelectChat(entityToSelect);
-                            }
-                        }}>
-                          View
-                        </Button>
-                      ),
-                    });
-                }
-            }
+      return () => {
+        if (messageUnsubscribeRef.current) {
+          messageUnsubscribeRef.current();
         }
-      });
-    });
-    setAllChatListeners(listeners);
-
-    // Initial chat selection based on URL params
-    let initialEntitySelected = false;
-    if (groupChatId) {
-      const groupToSelect = groupChats.find(g => g.id === `group-${groupChatId}`);
-      if (groupToSelect) {
-        handleSelectChat({...groupToSelect, type: 'group'});
-        setActiveTab('groups');
-        initialEntitySelected = true;
-      }
-    } else if (directMessageUserId) {
-      const userToDm = allUsers.find(u => u.uid === directMessageUserId);
-      if (userToDm) {
-        handleSelectChat({
-          id: userToDm.uid,
-          name: userToDm.displayName,
-          type: 'dm',
-          avatar: userToDm.photoURL,
-          dataAiHint: 'user portrait',
-        });
-        setActiveTab('dms');
-        initialEntitySelected = true;
-      }
-    }
-    
-    return () => {
-        if(messageUnsubscribeRef.current) messageUnsubscribeRef.current();
-        allChatListeners.forEach(unsubscribe => unsubscribe());
-        listeners.forEach(unsubscribe => unsubscribe());
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, currentUser, getEntityForToast, handleSelectChat]);
+      };
+    }, [selectedChat, currentUser]);
 
 
   const handleSendMessage = async (text: string, replyTo?: Message) => {
-    if (!currentChatId || !text.trim() || !currentUser) return;
+    if (!selectedChat || !text.trim() || !currentUser) return;
+
+    let chatId: string;
+    if (selectedChat.type === 'dm') {
+      chatId = getChatId(currentUser.uid, selectedChat.id);
+    } else {
+      chatId = selectedChat.id;
+    }
 
     let messagePayload: any = {
         senderId: currentUser.uid,
@@ -203,7 +160,7 @@ export default function ChatPage() {
         };
     }
     
-    await sendMessage(currentChatId, messagePayload);
+    await sendMessage(chatId, messagePayload);
   };
   
   const handleTabChange = (value: string) => {
@@ -310,6 +267,7 @@ export default function ChatPage() {
       <div className="flex flex-col md:col-span-2 xl:col-span-3">
         {selectedChat ? (
           <Chat
+            key={selectedChat.id}
             entity={selectedChat}
             messages={messages}
             onSendMessage={handleSendMessage}
