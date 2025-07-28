@@ -11,13 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { CheckCircle } from 'lucide-react';
-
-const classes = [
-  { id: 'cs101', name: 'CS101: Intro to Computer Science' },
-  { id: 'ma203', name: 'MA203: Linear Algebra' },
-  { id: 'phy201', name: 'PHY201: Classical Mechanics' },
-  { id: 'eng101', name: 'ENG101: Composition' },
-];
+import { useRoadmap } from '@/contexts/RoadmapContext';
+import { useMemo } from 'react';
 
 const attendanceSchema = z.object({
   classId: z.string().nonempty('Please select a class.'),
@@ -30,6 +25,19 @@ type AttendanceFormValues = z.infer<typeof attendanceSchema>;
 
 export default function AttendancePage() {
   const { toast } = useToast();
+  const { roadmapData } = useRoadmap();
+
+  const classSessions = useMemo(() => {
+    return roadmapData.flatMap(subject =>
+      subject.weeks.flatMap(week =>
+        week.topics.map(topic => ({
+          id: topic.id,
+          name: `${subject.title} - ${topic.title}`,
+        }))
+      )
+    );
+  }, [roadmapData]);
+  
   const form = useForm<AttendanceFormValues>({
     resolver: zodResolver(attendanceSchema),
     defaultValues: {
@@ -77,7 +85,7 @@ export default function AttendancePage() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {classes.map(c => (
+                        {classSessions.map(c => (
                           <SelectItem key={c.id} value={c.id}>
                             {c.name}
                           </SelectItem>
