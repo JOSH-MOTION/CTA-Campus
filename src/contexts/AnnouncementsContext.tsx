@@ -2,6 +2,7 @@
 'use client';
 
 import {createContext, useContext, useState, ReactNode, FC} from 'react';
+import { useNotifications } from './NotificationsContext';
 
 export interface Announcement {
   id: string;
@@ -41,6 +42,8 @@ const AnnouncementsContext = createContext<AnnouncementsContextType | undefined>
 
 export const AnnouncementsProvider: FC<{children: ReactNode}> = ({children}) => {
   const [announcements, setAnnouncements] = useState<Announcement[]>(initialAnnouncements);
+  const { addNotification } = useNotifications();
+
 
   const addAnnouncement = (announcement: Omit<Announcement, 'id' | 'date'>) => {
     const newAnnouncement: Announcement = {
@@ -49,6 +52,12 @@ export const AnnouncementsProvider: FC<{children: ReactNode}> = ({children}) => 
       date: new Date().toISOString(),
     };
     setAnnouncements(prev => [newAnnouncement, ...prev]);
+
+     addNotification({
+      title: `New Announcement: ${newAnnouncement.title}`,
+      description: `Targeted to: ${newAnnouncement.targetGen}`,
+      href: '/announcements',
+    });
   };
 
   return (

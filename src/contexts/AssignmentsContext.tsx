@@ -2,6 +2,7 @@
 'use client';
 
 import {createContext, useContext, useState, ReactNode, FC} from 'react';
+import { useNotifications } from './NotificationsContext';
 
 export interface AssignmentDueDate {
   day: string; // e.g., "Monday"
@@ -42,6 +43,7 @@ const AssignmentsContext = createContext<AssignmentsContextType | undefined>(und
 
 export const AssignmentsProvider: FC<{children: ReactNode}> = ({children}) => {
   const [assignments, setAssignments] = useState<Assignment[]>(initialAssignments);
+  const { addNotification } = useNotifications();
 
   const addAssignment = (assignment: Omit<Assignment, 'id'>) => {
     const newAssignment: Assignment = {
@@ -49,6 +51,12 @@ export const AssignmentsProvider: FC<{children: ReactNode}> = ({children}) => {
       id: (assignments.length + 1).toString(),
     };
     setAssignments(prev => [newAssignment, ...prev]);
+
+     addNotification({
+      title: `New Assignment: ${newAssignment.title}`,
+      description: `A new assignment has been posted for ${newAssignment.targetGen}.`,
+      href: '/assignments',
+    });
   };
 
   return (
