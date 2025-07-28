@@ -10,6 +10,7 @@ import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs';
 import {Search, Send, User, Users, Loader2} from 'lucide-react';
 import {Chat} from '@/components/chat/Chat';
 import {useAuth, UserData} from '@/contexts/AuthContext';
+import {Badge} from '@/components/ui/badge';
 
 const initialMessages: Record<string, Message[]> = {
   'group-Gen 30': [
@@ -169,9 +170,7 @@ export default function ChatPage() {
                       </Avatar>
                       <div className="text-left">
                         <p className="font-semibold">{user.displayName}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {messages[user.uid]?.slice(-1)[0]?.text || 'No messages yet'}
-                        </p>
+                        <p className="text-xs text-muted-foreground capitalize">{user.role}</p>
                       </div>
                     </Button>
                   ))}

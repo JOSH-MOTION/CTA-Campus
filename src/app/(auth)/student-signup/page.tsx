@@ -60,10 +60,7 @@ export default function StudentSignupPage() {
   };
   
   const handleGenChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    if (/^Gen \d*$/.test(value) || value === 'Gen ' || value === 'Gen' || value === '') {
-      setGen(value);
-    }
+    setGen(e.target.value);
   }
 
   const handleSignUp = async (e: React.FormEvent) => {
