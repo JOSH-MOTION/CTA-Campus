@@ -131,7 +131,7 @@ export default function PerformanceHub() {
             <Progress value={overallProgress.percentage} />
           </CardContent>
         </Card>
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-x-6 gap-y-8 md:grid-cols-2">
             <div className="space-y-4">
             {gradingData.map(item => (
                 <div key={item.title} className="space-y-1">
