@@ -1,5 +1,7 @@
+
 import {ContactCard} from '@/components/directory/ContactCard';
 import {Input} from '@/components/ui/input';
+import {Search} from 'lucide-react';
 
 const contacts = [
   {
@@ -62,8 +64,9 @@ export default function DirectoryPage() {
         <p className="text-muted-foreground">Find contact information for faculty and departments.</p>
       </div>
 
-      <div className="relative">
-        <Input placeholder="Search for name, department..." className="w-full" />
+       <div className="relative">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input placeholder="Search for name, department..." className="w-full pl-9" />
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

@@ -1,3 +1,4 @@
+
 'use client';
 
 import {useState} from 'react';
@@ -11,7 +12,7 @@ import {
 } from '@/components/ui/card';
 import {Avatar, AvatarFallback, AvatarImage} from '@/components/ui/avatar';
 import {Button} from '@/components/ui/button';
-import {Mail, Phone, Building, MessageSquareQuote, Loader2, ServerCrash, Bot} from 'lucide-react';
+import {Mail, Phone, Building, MessageSquareQuote, Loader2, ServerCrash, Bot, CalendarPlus} from 'lucide-react';
 import {suggestContactMethod} from '@/ai/flows/suggested-contact-method';
 import {
   Dialog,
@@ -23,6 +24,9 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import {Alert, AlertDescription, AlertTitle} from '../ui/alert';
+import Link from 'next/link';
+import {useAuth} from '@/contexts/AuthContext';
+
 
 export interface Contact {
   name: string;
@@ -42,6 +46,7 @@ interface ContactCardProps {
 }
 
 export function ContactCard({contact}: ContactCardProps) {
+  const {role} = useAuth();
   const [suggestion, setSuggestion] = useState<{contactMethod: string; reason: string} | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -101,7 +106,15 @@ export function ContactCard({contact}: ContactCardProps) {
           <span>{contact.office}</span>
         </div>
       </CardContent>
-      <CardFooter>
+      <CardFooter className="flex flex-col gap-2">
+         {role === 'student' && contact.name !== 'Library Front Desk' && (
+           <Button className="w-full" asChild>
+             <Link href="/book-session">
+              <CalendarPlus className="mr-2 h-4 w-4" />
+              Book a Session
+            </Link>
+          </Button>
+        )}
         <Dialog open={isDialogOpen} onOpenChange={handleOpenChange}>
           <DialogTrigger asChild>
             <Button className="w-full" variant="outline">

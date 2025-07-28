@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -24,6 +25,7 @@ import {
   Code,
   BookOpen,
   Contact,
+  CalendarClock,
 } from 'lucide-react';
 import {SidebarMenu, SidebarMenuItem, SidebarMenuButton} from '@/components/ui/sidebar';
 import Link from 'next/link';
@@ -60,6 +62,7 @@ export const teacherNavItems = [
   {href: '/attendance', label: 'Attendance', icon: UserCheck},
   {href: '/roadmap', label: 'Roadmap', icon: Map},
   {href: '/directory', label: 'Directory', icon: Contact},
+  {href: '/availability', label: 'Manage Availability', icon: CalendarClock},
   {href: '/profile', label: 'Profile', icon: User},
 ];
 
@@ -68,6 +71,7 @@ export const adminNavItems = [
   {href: '/users', label: 'User Management', icon: UserCog},
   {href: '/announcements', label: 'Manage Announcements', icon: Megaphone},
   {href: '/bookings', label: 'Manage Bookings', icon: CalendarCheck},
+  {href: '/availability', label: 'Manage Availability', icon: CalendarClock},
   {href: '/roadmap', label: 'Roadmap', icon: Map},
   {href: '/directory', label: 'Directory', icon: Contact},
   {href: '/career', label: 'Career Module', icon: GraduationCap},
