@@ -15,7 +15,8 @@ import {Unsubscribe} from 'firebase/firestore';
 import {useToast} from '@/hooks/use-toast';
 import {Badge} from '@/components/ui/badge';
 
-type ChatEntity = {id: string; name: string; avatar?: string; dataAiHint: string};
+type ChatEntityType = 'dm' | 'group';
+type ChatEntity = {id: string; name: string; type: ChatEntityType; avatar?: string; dataAiHint: string};
 
 export default function ChatPage() {
   const {user: currentUser, fetchAllUsers, userData, role} = useAuth();
@@ -47,12 +48,12 @@ export default function ChatPage() {
     loadUsers();
   }, [fetchAllUsers]);
 
-  const allStudents = useMemo(() => allUsers.filter(u => u.role === 'student'), [allUsers]);
   const otherUsers = useMemo(() => allUsers.filter(u => u.uid !== currentUser?.uid), [allUsers, currentUser]);
 
   const groupChats = useMemo(() => {
-    const groups: ChatEntity[] = [];
+    const groups: Omit<ChatEntity, 'type'>[] = [];
     if (role === 'teacher' || role === 'admin') {
+      const allStudents = allUsers.filter(u => u.role === 'student');
       const allGens = new Set(allStudents.map(student => student.gen).filter(Boolean));
       allGens.forEach(gen => {
         groups.push({id: `group-${gen}`, name: `${gen} Hub`, dataAiHint: 'group students'});
@@ -65,7 +66,7 @@ export default function ChatPage() {
       });
     }
     return groups.sort((a, b) => a.name.localeCompare(b.name));
-  }, [role, userData, allStudents]);
+  }, [role, userData, allUsers]);
 
   const handleSelectChat = useCallback(
     (entity: ChatEntity) => {
@@ -73,12 +74,15 @@ export default function ChatPage() {
         messageUnsubscribe();
       }
 
-      let chatId = entity.id;
-      if (!entity.id.startsWith('group-') && currentUser) {
+      let chatId: string;
+      if (entity.type === 'dm' && currentUser) {
         chatId = getChatId(currentUser.uid, entity.id);
+      } else {
+        chatId = entity.id;
       }
       
-      setSelectedChat({...entity, id: chatId});
+      const fullSelectedChat = {...entity, id: chatId};
+      setSelectedChat(fullSelectedChat);
       setUnreadCounts(prev => ({...prev, [chatId]: 0}));
 
       const unsubscribe = onMessages(chatId, newMessages => {
@@ -86,7 +90,7 @@ export default function ChatPage() {
       });
       setMessageUnsubscribe(() => unsubscribe);
       
-      if (entity.id.startsWith('group-')) {
+      if (entity.type === 'group') {
         setActiveTab('groups');
         router.push(`/chat?group=${entity.id.replace('group-', '')}`, {scroll: false});
       } else {
@@ -97,17 +101,28 @@ export default function ChatPage() {
     [currentUser, router, messageUnsubscribe]
   );
   
+  const getEntityForToast = useCallback((chatId: string) => {
+      const user = otherUsers.find(u => getChatId(currentUser!.uid, u.uid) === chatId);
+      if (user) return {id: user.uid, name: user.displayName, type: 'dm' as ChatEntityType, avatar: user.photoURL, dataAiHint: 'user portrait'};
+      
+      const group = groupChats.find(g => g.id === chatId);
+      if (group) return {id: group.id, name: group.name, type: 'group' as ChatEntityType, dataAiHint: 'group chat'};
+
+      return null;
+  }, [otherUsers, groupChats, currentUser]);
+
   useEffect(() => {
     if (loading || !currentUser) return;
     
     // Setup listeners for all chats for notifications
-    const allPossibleChats = [...otherUsers.map(u => ({...u, chatId: getChatId(currentUser.uid, u.uid)})), ...groupChats.map(g => ({...g, chatId: g.id}))];
+    const allPossibleDmChats = otherUsers.map(u => ({id: u.uid, name: u.displayName, chatId: getChatId(currentUser.uid, u.uid)}));
+    const allPossibleGroupChats = groupChats.map(g => ({...g, chatId: g.id}));
+    const allPossibleChats = [...allPossibleDmChats, ...allPossibleGroupChats];
     
     const listeners = allPossibleChats.map(({chatId, name}) => {
       return onMessages(chatId, (newMessages) => {
         if(newMessages.length > 0) {
             const lastMessage = newMessages[newMessages.length - 1];
-            // If the chat is not selected and the last message is not from the current user
             if (chatId !== selectedChat?.id && lastMessage.senderId !== currentUser.uid) {
                 setUnreadCounts(prev => ({...prev, [chatId]: (prev[chatId] || 0) + 1 }));
 
@@ -116,9 +131,9 @@ export default function ChatPage() {
                   description: lastMessage.text,
                   action: (
                     <Button variant="link" onClick={() => {
-                        const entityToSelect = allPossibleChats.find(c => c.chatId === chatId);
+                        const entityToSelect = getEntityForToast(chatId);
                         if (entityToSelect) {
-                          handleSelectChat({id: entityToSelect.id, name: entityToSelect.name, avatar: (entityToSelect as UserData).photoURL, dataAiHint: 'user portrait'});
+                          handleSelectChat(entityToSelect);
                         }
                     }}>
                       View
@@ -135,7 +150,7 @@ export default function ChatPage() {
     if (groupChatId) {
       const groupToSelect = groupChats.find(g => g.id === `group-${groupChatId}`);
       if (groupToSelect) {
-        handleSelectChat(groupToSelect);
+        handleSelectChat({...groupToSelect, type: 'group'});
         setActiveTab('groups');
       }
     } else if (directMessageUserId) {
@@ -144,6 +159,7 @@ export default function ChatPage() {
         handleSelectChat({
           id: userToDm.uid,
           name: userToDm.displayName,
+          type: 'dm',
           avatar: userToDm.photoURL,
           dataAiHint: 'user portrait',
         });
@@ -156,7 +172,7 @@ export default function ChatPage() {
         allChatListeners.forEach(unsubscribe => unsubscribe());
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, currentUser]);
+  }, [loading, currentUser, getEntityForToast]);
 
 
   const handleSendMessage = async (text: string, replyTo?: Message) => {
@@ -226,7 +242,7 @@ export default function ChatPage() {
                         key={user.uid}
                         variant={selectedChat?.id === chatId ? 'secondary' : 'ghost'}
                         className="h-auto w-full justify-start p-3 relative"
-                        onClick={() => handleSelectChat({id: user.uid, name: user.displayName, avatar: user.photoURL, dataAiHint: 'student portrait'})}
+                        onClick={() => handleSelectChat({id: user.uid, name: user.displayName, type: 'dm', avatar: user.photoURL, dataAiHint: 'student portrait'})}
                         >
                         <Avatar className="mr-3 h-10 w-10">
                             <AvatarImage src={user.photoURL} alt={user.displayName} />
@@ -259,7 +275,7 @@ export default function ChatPage() {
                         key={group.id}
                         variant={selectedChat?.id === group.id ? 'secondary' : 'ghost'}
                         className="h-auto w-full justify-start p-3 relative"
-                        onClick={() => handleSelectChat(group)}
+                        onClick={() => handleSelectChat({...group, type: 'group'})}
                         >
                         <Avatar className="mr-3 h-10 w-10">
                             <AvatarFallback>G</AvatarFallback>
