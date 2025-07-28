@@ -18,6 +18,7 @@ import {
   BookMarked,
   PencilRuler,
   UserCog,
+  User,
 } from 'lucide-react';
 import {SidebarMenu, SidebarMenuItem, SidebarMenuButton} from '@/components/ui/sidebar';
 import Link from 'next/link';
@@ -39,13 +40,16 @@ const studentNavItems = [
 
 const teacherNavItems = [
   {href: '/', label: 'Dashboard', icon: LayoutDashboard},
-  {href: '/students', label: 'Student Management', icon: Users},
+  {href: '/chat', label: 'Campus Connect', icon: MessageSquare},
+  {href: '/announcements', label: 'Announcements', icon: Megaphone},
   {href: '/assignments', label: 'Assignments', icon: ListOrdered},
+  {href: '/exercises', label: 'Exercises', icon: PencilRuler},
+  {href: '/projects', label: 'Projects', icon: BookMarked},
+  {href: '/materials', label: 'Class Materials', icon: BookCopy},
   {href: '/submissions', label: 'Submissions', icon: Upload},
   {href: '/attendance', label: 'Attendance', icon: UserCheck},
-  {href: '/materials', label: 'Class Materials', icon: BookCopy},
-  {href: '/announcements', label: 'Announcements', icon: Megaphone},
-  {href: '/chat', label: 'Chat', icon: MessageSquare},
+  {href: '/roadmap', label: 'Roadmap', icon: Map},
+  {href: '/profile', label: 'Profile', icon: User},
 ];
 
 const adminNavItems = [
