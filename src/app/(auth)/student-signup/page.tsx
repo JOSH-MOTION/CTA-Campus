@@ -58,6 +58,13 @@ export default function StudentSignupPage() {
   const handleUploadClick = () => {
     fileInputRef.current?.click();
   };
+  
+  const handleGenChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (/^Gen \d*$/.test(value) || value === 'Gen ' || value === 'Gen' || value === '') {
+      setGen(value);
+    }
+  }
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -142,7 +149,7 @@ export default function StudentSignupPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="gen">Generation</Label>
-                <Input id="gen" type="text" placeholder="e.g., Gen 30" required value={gen} onChange={e => setGen(e.target.value)} />
+                <Input id="gen" type="text" placeholder="e.g., Gen 30" required value={gen} onChange={handleGenChange} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="schoolId">School ID</Label>

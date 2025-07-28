@@ -1,3 +1,7 @@
+// src/components/dashboards/TeacherDashboard.tsx
+'use client';
+
+import {useState, useEffect, useMemo} from 'react';
 import {
   Card,
   CardContent,
@@ -5,72 +9,145 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import {Users, BookOpen, BarChart2} from 'lucide-react';
+import {Users, BookOpen, BarChart2, MessageSquare, Group} from 'lucide-react';
 import type {User} from 'firebase/auth';
+import {useAuth, UserData} from '@/contexts/AuthContext';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 
 interface TeacherDashboardProps {
   user: User | null;
 }
 
 export default function TeacherDashboard({user}: TeacherDashboardProps) {
+  const {userData} = useAuth();
+  const [selectedGen, setSelectedGen] = useState<string>('');
+
+  const taughtGens = useMemo(() => {
+    return userData?.gensTaught?.split(',').map(g => g.trim()).filter(Boolean) || [];
+  }, [userData?.gensTaught]);
+
+  useEffect(() => {
+    if (taughtGens.length > 0 && !selectedGen) {
+      setSelectedGen(taughtGens[0]);
+    }
+  }, [taughtGens, selectedGen]);
+
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-3xl font-bold tracking-tight">Welcome, {user?.displayName || 'Teacher'}!</h1>
-        <p className="text-muted-foreground">
-          Manage your classes and students.
-        </p>
+      <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold tracking-tight">Welcome, {user?.displayName || 'Teacher'}!</h1>
+          <p className="text-muted-foreground">Manage your classes and students.</p>
+        </div>
+        {taughtGens.length > 0 && (
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium">Viewing:</p>
+            <Select value={selectedGen} onValueChange={setSelectedGen}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Select a Generation" />
+              </SelectTrigger>
+              <SelectContent>
+                {taughtGens.map(gen => (
+                  <SelectItem key={gen} value={gen}>
+                    {gen}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Students</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">142</div>
-            <p className="text-xs text-muted-foreground">
-              +5 from last semester
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Courses Taught</CardTitle>
-            <BookOpen className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">3</div>
-            <p className="text-xs text-muted-foreground">
-              CS101, MA203, PHY201
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Average Grade
-            </CardTitle>
-            <BarChart2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">B+</div>
-            <p className="text-xs text-muted-foreground">
-              Across all courses
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            {selectedGen ? `${selectedGen} Overview` : 'Dashboard'}
+          </CardTitle>
+          <CardDescription>
+            {selectedGen ? `Key metrics for ${selectedGen}.` : 'Select a generation to view details.'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {selectedGen ? (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Students in Gen</CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">45</div>
+                  <p className="text-xs text-muted-foreground">
+                    (Data to be fetched)
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Avg. Attendance</CardTitle>
+                  <BarChart2 className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">92%</div>
+                   <p className="text-xs text-muted-foreground">
+                    (Data to be fetched)
+                  </p>
+                </CardContent>
+              </Card>
+               <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Pending Submissions</CardTitle>
+                  <BookOpen className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">8</div>
+                   <p className="text-xs text-muted-foreground">
+                    for "Final Project Proposal"
+                  </p>
+                </CardContent>
+              </Card>
+              <Card className="flex flex-col items-center justify-center bg-secondary/50">
+                <CardHeader className="items-center pb-2">
+                   <CardTitle className="text-base font-medium">
+                      Group Chat
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col items-center">
+                    <Group className="h-8 w-8 text-muted-foreground mb-2"/>
+                    <Button>
+                      <MessageSquare className="mr-2 h-4 w-4" />
+                      Open {selectedGen} Chat
+                    </Button>
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
+             <div className="flex h-48 items-center justify-center rounded-lg border-2 border-dashed">
+                <p className="text-muted-foreground">
+                  {taughtGens.length > 0 ? 'Select a generation to get started.' : 'No generations assigned to your profile.'}
+                </p>
+             </div>
+          )}
+        </CardContent>
+      </Card>
+      
       <div className="grid grid-cols-1 gap-6">
         <Card>
           <CardHeader>
             <CardTitle>Recent Submissions</CardTitle>
             <CardDescription>
-              New assignments waiting for your review.
+              New assignments waiting for your review across all generations.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p>Submission details would go here.</p>
+            <p>A list of recent submissions would go here.</p>
           </CardContent>
         </Card>
       </div>

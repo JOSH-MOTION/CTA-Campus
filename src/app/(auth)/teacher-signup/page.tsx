@@ -49,6 +49,13 @@ export default function TeacherSignupPage() {
       reader.readAsDataURL(file);
     }
   };
+  
+  const handleGensTaughtChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // This regex ensures "Gen" is capitalized and followed by numbers and commas.
+    const sanitizedValue = value.replace(/[^Gen\d, ]/g, '').replace(/gen/g, 'Gen');
+    setGensTaught(sanitizedValue);
+  };
 
   const handleUploadClick = () => {
     fileInputRef.current?.click();
@@ -139,7 +146,7 @@ export default function TeacherSignupPage() {
                 placeholder="e.g., Gen 28, Gen 30"
                 required
                 value={gensTaught}
-                onChange={e => setGensTaught(e.target.value)}
+                onChange={handleGensTaughtChange}
               />
             </div>
             <div className="space-y-2">
