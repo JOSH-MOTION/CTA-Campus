@@ -125,7 +125,7 @@ export function StudentCard({ student }: StudentCardProps) {
                     </Card>
                 </div>
                 <div className="md:col-span-2">
-                    <PerformanceHub />
+                    <PerformanceHub studentId={student.uid} />
                 </div>
             </div>
           </DialogContent>
