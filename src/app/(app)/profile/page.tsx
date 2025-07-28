@@ -5,29 +5,61 @@ import {useState, useRef, useEffect} from 'react';
 import {Avatar, AvatarImage, AvatarFallback} from '@/components/ui/avatar';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
-import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
+import {Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter} from '@/components/ui/card';
 import {useAuth} from '@/contexts/AuthContext';
-import {Camera, LogOut, Briefcase, GraduationCap, Calendar, Monitor, Users, BookUser} from 'lucide-react';
-import {auth, storage} from '@/lib/firebase';
+import {Camera, LogOut, Loader2} from 'lucide-react';
+import {auth, storage, db} from '@/lib/firebase';
 import {ref, uploadBytes, getDownloadURL} from 'firebase/storage';
 import {updateProfile} from 'firebase/auth';
+import {doc, updateDoc} from 'firebase/firestore';
 import {useToast} from '@/hooks/use-toast';
-import {Badge} from '@/components/ui/badge';
-import {Separator} from '@/components/ui/separator';
+import {useForm} from 'react-hook-form';
+import {z} from 'zod';
+import {zodResolver} from '@hookform/resolvers/zod';
+import {Form, FormControl, FormField, FormItem, FormLabel, FormMessage} from '@/components/ui/form';
+import {Textarea} from '@/components/ui/textarea';
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select';
+
+const profileSchema = z.object({
+  displayName: z.string().min(1, 'Display name is required.'),
+  bio: z.string().optional(),
+  // student specific
+  gen: z.string().optional(),
+  lessonDay: z.string().optional(),
+  lessonType: z.string().optional(),
+  // teacher specific
+  gensTaught: z.string().optional(),
+});
+
+type ProfileFormValues = z.infer<typeof profileSchema>;
 
 export default function ProfilePage() {
-  const {user, userData, role, loading} = useAuth();
+  const {user, userData, role, loading, setUserData} = useAuth();
   const {toast} = useToast();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const form = useForm<ProfileFormValues>({
+    resolver: zodResolver(profileSchema),
+  });
+
   useEffect(() => {
     if (user?.photoURL) {
       setPreviewUrl(user.photoURL);
     }
-  }, [user]);
+    if (userData) {
+      form.reset({
+        displayName: user?.displayName || '',
+        bio: userData.bio || '',
+        gen: userData.gen || '',
+        lessonDay: userData.lessonDay || '',
+        lessonType: userData.lessonType || '',
+        gensTaught: userData.gensTaught || '',
+      });
+    }
+  }, [user, userData, form]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -45,25 +77,59 @@ export default function ProfilePage() {
     fileInputRef.current?.click();
   };
 
-  const handleSave = async () => {
-    if (selectedFile && user) {
-      setIsUploading(true);
-      const storageRef = ref(storage, `profile-pictures/${user.uid}/${selectedFile.name}`);
-      try {
-        const snapshot = await uploadBytes(storageRef, selectedFile);
-        const downloadURL = await getDownloadURL(snapshot.ref);
+  const handleSavePicture = async () => {
+    if (!selectedFile || !user) return;
+    setIsUploading(true);
+    const storageRef = ref(storage, `profile-pictures/${user.uid}/${selectedFile.name}`);
+    try {
+      const snapshot = await uploadBytes(storageRef, selectedFile);
+      const downloadURL = await getDownloadURL(snapshot.ref);
 
-        await updateProfile(user, {photoURL: downloadURL});
+      await updateProfile(user, {photoURL: downloadURL});
+      const userDocRef = doc(db, 'users', user.uid);
+      await updateDoc(userDocRef, { photoURL: downloadURL });
 
-        setPreviewUrl(downloadURL);
-        setSelectedFile(null);
-        toast({title: 'Success', description: 'Profile picture updated!'});
-      } catch (error) {
-        console.error('Error uploading file:', error);
-        toast({variant: 'destructive', title: 'Error', description: 'Failed to update profile picture.'});
-      } finally {
-        setIsUploading(false);
-      }
+      setPreviewUrl(downloadURL);
+      setSelectedFile(null);
+      if (setUserData) setUserData(prev => prev ? {...prev, photoURL: downloadURL} : null);
+      toast({title: 'Success', description: 'Profile picture updated!'});
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      toast({variant: 'destructive', title: 'Error', description: 'Failed to update profile picture.'});
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleUpdateProfile = async (data: ProfileFormValues) => {
+    if (!user) return;
+    form.clearErrors();
+    const updateData: Partial<ProfileFormValues> = {
+        displayName: data.displayName,
+        bio: data.bio
+    };
+
+    if (role === 'student') {
+        updateData.gen = data.gen;
+        updateData.lessonDay = data.lessonDay;
+        updateData.lessonType = data.lessonType;
+    }
+    if (role === 'teacher') {
+        updateData.gensTaught = data.gensTaught;
+    }
+
+    try {
+        if(user.displayName !== data.displayName) {
+            await updateProfile(user, { displayName: data.displayName });
+        }
+        const userDocRef = doc(db, 'users', user.uid);
+        await updateDoc(userDocRef, updateData);
+        if (setUserData) setUserData(prev => prev ? {...prev, ...updateData} : null);
+
+        toast({title: 'Profile Updated', description: 'Your information has been saved.'});
+    } catch (error) {
+        console.error("Error updating profile: ", error);
+        toast({variant: 'destructive', title: 'Error', description: 'Failed to update profile.'});
     }
   };
 
@@ -81,26 +147,11 @@ export default function ProfilePage() {
 
   const getRoleBasedDescription = () => {
     switch (role) {
-      case 'student':
-        return 'Update your profile picture and personal information.';
-      case 'teacher':
-        return 'Manage your public profile and contact details.';
-      case 'admin':
-        return 'System-wide administrative profile.';
+      case 'student': return 'Update your profile picture and personal information.';
+      case 'teacher': return 'Manage your public profile and contact details.';
+      case 'admin': return 'System-wide administrative profile.';
     }
   };
-  
-  const InfoItem = ({ icon: Icon, label, value }: { icon: React.ElementType, label: string, value?: string }) => (
-    value ? (
-      <div className="flex items-center gap-3">
-        <Icon className="h-5 w-5 text-muted-foreground" />
-        <div>
-          <p className="text-sm text-muted-foreground">{label}</p>
-          <p className="font-medium capitalize">{value}</p>
-        </div>
-      </div>
-    ) : null
-  );
 
   return (
     <div className="container mx-auto max-w-2xl space-y-6 py-8">
@@ -108,12 +159,13 @@ export default function ProfilePage() {
         <h1 className="text-3xl font-bold tracking-tight">Profile</h1>
         <p className="text-muted-foreground">{getRoleBasedDescription()}</p>
       </div>
+
       <Card>
         <CardHeader>
           <CardTitle>Profile Picture</CardTitle>
           <CardDescription>A picture helps other users identify you.</CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col items-center gap-6">
+        <CardContent className="flex flex-col items-center gap-6 text-center">
           <div className="relative">
             <Avatar className="h-32 w-32 border-4 border-background shadow-md">
               <AvatarImage src={previewUrl ?? undefined} alt="Profile picture" />
@@ -126,50 +178,115 @@ export default function ProfilePage() {
             </Button>
             <Input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" />
           </div>
-          <div className="text-center">
-            <h2 className="text-2xl font-semibold">{user.displayName || 'User'}</h2>
-            <p className="text-muted-foreground">{user.email}</p>
-            <Badge variant="secondary" className="mt-2 capitalize">{role}</Badge>
-          </div>
-          <Button onClick={handleSave} disabled={!selectedFile || isUploading}>
-            {isUploading ? 'Saving...' : 'Save Picture'}
+          <Button onClick={handleSavePicture} disabled={!selectedFile || isUploading}>
+            {isUploading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> : 'Save Picture'}
           </Button>
         </CardContent>
       </Card>
       
-      <Card>
-        <CardHeader>
-          <CardTitle>Details</CardTitle>
-          <CardDescription>
-            This information is managed by the administration and is read-only.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {userData.bio && (
-            <>
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Bio</p>
-                <p className="font-medium italic">"{userData.bio}"</p>
-              </div>
-              <Separator />
-            </>
-          )}
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(handleUpdateProfile)}>
+            <Card>
+                <CardHeader>
+                <CardTitle>Personal Details</CardTitle>
+                <CardDescription>
+                    Update your personal information here.
+                </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <FormField
+                        control={form.control}
+                        name="displayName"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Full Name</FormLabel>
+                            <FormControl>
+                                <Input placeholder="Your full name" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="bio"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Bio</FormLabel>
+                            <FormControl>
+                                <Textarea placeholder="Tell us a little about yourself" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
 
-          <div className="grid grid-cols-1 gap-y-4 sm:grid-cols-2">
-            {role === 'student' && (
-              <>
-                <InfoItem icon={GraduationCap} label="Generation" value={userData.gen} />
-                <InfoItem icon={BookUser} label="School ID" value={userData.schoolId} />
-                <InfoItem icon={Calendar} label="Lesson Day" value={userData.lessonDay} />
-                <InfoItem icon={Monitor} label="Lesson Type" value={userData.lessonType} />
-              </>
-            )}
-             {role === 'teacher' && (
-              <InfoItem icon={Users} label="Generations Taught" value={userData.gensTaught} />
-            )}
-          </div>
-        </CardContent>
-      </Card>
+                    {role === 'student' && (
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                             <FormField
+                                control={form.control}
+                                name="gen"
+                                render={({ field }) => (
+                                    <FormItem>
+                                    <FormLabel>Generation</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="e.g. Gen 30" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                             <FormField
+                                control={form.control}
+                                name="lessonDay"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Lesson Day</FormLabel>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select a day" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                <SelectItem value="monday">Monday</SelectItem>
+                                                <SelectItem value="tuesday">Tuesday</SelectItem>
+                                                <SelectItem value="wednesday">Wednesday</SelectItem>
+                                                <SelectItem value="thursday">Thursday</SelectItem>
+                                                <SelectItem value="friday">Friday</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+                    )}
+                     {role === 'teacher' && (
+                        <FormField
+                            control={form.control}
+                            name="gensTaught"
+                            render={({ field }) => (
+                                <FormItem>
+                                <FormLabel>Generations Taught</FormLabel>
+                                <FormControl>
+                                    <Input placeholder="e.g. Gen 28, Gen 30" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    )}
+                </CardContent>
+                <CardFooter>
+                    <Button type="submit" disabled={form.formState.isSubmitting}>
+                         {form.formState.isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> : 'Save Changes'}
+                    </Button>
+                </CardFooter>
+            </Card>
+        </form>
+      </Form>
+
 
       <Card>
         <CardHeader>

@@ -19,6 +19,8 @@ import {RadioGroup, RadioGroupItem} from '@/components/ui/radio-group';
 import {Avatar, AvatarImage, AvatarFallback} from '@/components/ui/avatar';
 import Link from 'next/link';
 
+const availableGens = ['Gen 28', 'Gen 29', 'Gen 30', 'Gen 31', 'Gen 32'];
+
 export default function StudentSignupPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -58,10 +60,6 @@ export default function StudentSignupPage() {
   const handleUploadClick = () => {
     fileInputRef.current?.click();
   };
-  
-  const handleGenChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setGen(e.target.value);
-  }
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,7 +144,16 @@ export default function StudentSignupPage() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="gen">Generation</Label>
-                <Input id="gen" type="text" placeholder="e.g., Gen 30" required value={gen} onChange={handleGenChange} />
+                 <Select onValueChange={setGen} value={gen} required>
+                  <SelectTrigger id="gen">
+                    <SelectValue placeholder="Select a generation" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableGens.map(g => (
+                        <SelectItem key={g} value={g}>{g}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="schoolId">School ID</Label>
