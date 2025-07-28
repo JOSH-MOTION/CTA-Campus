@@ -1,8 +1,8 @@
 // src/app/(app)/materials/page.tsx
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useForm, Controller } from 'react-hook-form';
+import { useState, useMemo, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -10,9 +10,12 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useRoadmap, RoadmapSubject, Week, Topic } from '@/contexts/RoadmapContext';
+import { useRoadmap } from '@/contexts/RoadmapContext';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Link as LinkIcon, Youtube, FileText } from 'lucide-react';
+import { PlusCircle, Link as LinkIcon, Youtube, FileText, Loader2 } from 'lucide-react';
+import { db } from '@/lib/firebase';
+import { collection, addDoc, getDocs, query, orderBy, Timestamp } from 'firebase/firestore';
+
 
 const materialSchema = z.object({
   title: z.string().min(3, 'Title is too short.'),
@@ -27,31 +30,39 @@ type MaterialFormValues = z.infer<typeof materialSchema>;
 
 interface Material extends MaterialFormValues {
   id: string;
+  createdAt: Timestamp;
 }
 
 export default function MaterialsPage() {
   const { roadmapData } = useRoadmap();
   const { toast } = useToast();
-  const [materials, setMaterials] = useState<Material[]>([
-    {
-      id: '1',
-      title: 'HTML Basics Explained',
-      url: 'https://www.youtube.com/watch?v=example1',
-      type: 'video',
-      subject: 'HTML',
-      week: 'Week 1',
-      topic: 'Basic html structure',
-    },
-    {
-      id: '2',
-      title: 'CSS Box Model Slides',
-      url: 'https://slides.example.com/css-box-model',
-      type: 'slides',
-      subject: 'CSS',
-      week: 'Week 2',
-      topic: 'Box model',
-    },
-  ]);
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    const fetchMaterials = async () => {
+      setIsLoading(true);
+      try {
+        const materialsCollection = collection(db, 'materials');
+        const q = query(materialsCollection, orderBy('createdAt', 'desc'));
+        const querySnapshot = await getDocs(q);
+        const fetchedMaterials = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Material));
+        setMaterials(fetchedMaterials);
+      } catch (error) {
+        console.error('Error fetching materials:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to fetch materials from the database.',
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchMaterials();
+  }, [toast]);
 
   const form = useForm<MaterialFormValues>({
     resolver: zodResolver(materialSchema),
@@ -76,14 +87,31 @@ export default function MaterialsPage() {
     return week ? week.topics : [];
   }, [selectedWeekTitle, availableWeeks]);
 
-  const onSubmit = (data: MaterialFormValues) => {
-    const newMaterial: Material = {
-      ...data,
-      id: (materials.length + 1).toString(),
-    };
-    setMaterials(prev => [newMaterial, ...prev]);
-    toast({ title: 'Material Added!', description: 'The new resource is now available.' });
-    form.reset();
+  const onSubmit = async (data: MaterialFormValues) => {
+    setIsSubmitting(true);
+    try {
+      const newMaterialData = {
+        ...data,
+        createdAt: Timestamp.now(),
+      };
+      const docRef = await addDoc(collection(db, 'materials'), newMaterialData);
+      const newMaterial: Material = {
+        id: docRef.id,
+        ...newMaterialData,
+      };
+      setMaterials(prev => [newMaterial, ...prev]);
+      toast({ title: 'Material Added!', description: 'The new resource is now available.' });
+      form.reset();
+    } catch (error) {
+      console.error('Error adding material:', error);
+       toast({
+        variant: 'destructive',
+        title: 'Database Error',
+        description: 'Failed to save the material. Please try again.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const getTopicById = (subjectTitle: string, weekTitle: string, topicId: string) => {
@@ -212,39 +240,53 @@ export default function MaterialsPage() {
                   )}
                 />
               </div>
-              <Button type="submit"><PlusCircle className="mr-2 h-4 w-4" /> Add Material</Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Adding...</>
+                ) : (
+                  <><PlusCircle className="mr-2 h-4 w-4" /> Add Material</>
+                )}
+              </Button>
             </form>
           </Form>
         </CardContent>
       </Card>
 
       <div className="space-y-4">
-         <h2 className="text-2xl font-semibold tracking-tight">Uploaded Materials</h2>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {materials.map(material => (
-            <Card key={material.id}>
-              <CardHeader>
-                <div className="flex items-start justify-between gap-4">
-                    {material.type === 'video' ? <Youtube className="h-8 w-8 text-red-500" /> : <FileText className="h-8 w-8 text-blue-500" />}
-                    <div className="flex-1 text-right">
-                        <CardTitle>{material.title}</CardTitle>
-                        <CardDescription>
-                            {material.subject} - {getTopicById(material.subject, material.week, material.topic)}
-                        </CardDescription>
-                    </div>
-                </div>
-              </CardHeader>
-              <CardFooter>
-                 <Button variant="outline" className="w-full" asChild>
-                    <a href={material.url} target="_blank" rel="noopener noreferrer">
-                        <LinkIcon className="mr-2 h-4 w-4" />
-                        View Material
-                    </a>
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
+        <h2 className="text-2xl font-semibold tracking-tight">Uploaded Materials</h2>
+         {isLoading ? (
+          <div className="flex justify-center items-center h-48">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        ) : materials.length === 0 ? (
+          <div className="text-center text-muted-foreground py-10">No materials have been added yet.</div>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {materials.map(material => (
+              <Card key={material.id}>
+                <CardHeader>
+                  <div className="flex items-start justify-between gap-4">
+                      {material.type === 'video' ? <Youtube className="h-8 w-8 text-red-500" /> : <FileText className="h-8 w-8 text-blue-500" />}
+                      <div className="flex-1 text-right">
+                          <CardTitle>{material.title}</CardTitle>
+                          <CardDescription>
+                              {material.subject} - {getTopicById(material.subject, material.week, material.topic)}
+                          </CardDescription>
+                      </div>
+                  </div>
+                </CardHeader>
+                <CardFooter>
+                  <Button variant="outline" className="w-full" asChild>
+                      <a href={material.url} target="_blank" rel="noopener noreferrer">
+                          <LinkIcon className="mr-2 h-4 w-4" />
+                          View Material
+                      </a>
+                  </Button>
+                </CardFooter>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
