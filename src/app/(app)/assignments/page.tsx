@@ -67,7 +67,7 @@ export default function AssignmentsPage() {
           <h2 className="mt-4 text-xl font-semibold">No assignments yet</h2>
           <p className="mt-1 text-muted-foreground">
             {isTeacher ? 'Create the first assignment to get started.' : 'Check back later for assignments.'}
-          p>
+          </p>
         </div>
       )}
     </div>
