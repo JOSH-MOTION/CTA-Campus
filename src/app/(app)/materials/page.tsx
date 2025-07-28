@@ -20,7 +20,7 @@ import { collection, addDoc, getDocs, query, orderBy, Timestamp } from 'firebase
 const materialSchema = z.object({
   title: z.string().min(3, 'Title is too short.'),
   url: z.string().url('Please enter a valid URL.'),
-  type: z.enum(['video', 'slides']),
+  type: z.enum(['video', 'slides'], { required_error: 'Please select a material type.' }),
   subject: z.string().nonempty('Please select a subject.'),
   week: z.string().nonempty('Please select a week.'),
   topic: z.string().nonempty('Please select a topic.'),
