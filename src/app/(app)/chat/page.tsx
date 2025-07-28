@@ -2,7 +2,7 @@
 'use client';
 
 import {useState, useEffect, useMemo} from 'react';
-import {useSearchParams} from 'next/navigation';
+import {useSearchParams, useRouter} from 'next/navigation';
 import {Avatar, AvatarFallback, AvatarImage} from '@/components/ui/avatar';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
@@ -24,6 +24,7 @@ type Message = {sender: string; text: string; time: string};
 export default function ChatPage() {
   const {fetchAllUsers, userData, role} = useAuth();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [allUsers, setAllUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -70,10 +71,10 @@ export default function ChatPage() {
     // Sort groups alphabetically by name
     return groups.sort((a, b) => a.name.localeCompare(b.name));
   }, [role, userData, allStudents]);
-  
+
   useEffect(() => {
     if (loading) return;
-    
+
     // If a group ID is passed in the URL, select that group.
     if (groupChatId) {
       const groupToSelect = groupChats.find(g => g.id === `group-${groupChatId}`);
@@ -97,6 +98,11 @@ export default function ChatPage() {
 
   const handleSelectChat = (entity: ChatEntity) => {
     setSelectedChat(entity);
+    if (entity.id.startsWith('group-')) {
+      router.push(`/chat?group=${entity.id.replace('group-', '')}`, {scroll: false});
+    } else {
+      router.push(`/chat?dm=${entity.id}`, {scroll: false});
+    }
   };
 
   const handleSendMessage = (text: string) => {
@@ -133,7 +139,7 @@ export default function ChatPage() {
             <Input placeholder="Search" className="pl-9" />
           </div>
         </div>
-        <Tabs value={activeTab} className="flex flex-1 flex-col overflow-hidden">
+        <Tabs defaultValue={activeTab} value={activeTab} className="flex flex-1 flex-col overflow-hidden">
           <TabsList className="mx-4 grid w-auto grid-cols-2">
             <TabsTrigger value="dms">
               <User className="mr-2" /> DMs

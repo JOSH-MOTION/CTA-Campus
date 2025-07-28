@@ -60,12 +60,12 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
       setSelectedGen(availableGens[0]);
     }
   }, [availableGens, selectedGen]);
-  
+
   const handleOpenChat = () => {
     if (selectedGen) {
       router.push(`/chat?group=${selectedGen}`);
     }
-  }
+  };
 
   return (
     <div className="space-y-6">
@@ -102,7 +102,7 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
         </CardHeader>
         <CardContent>
           {selectedGen ? (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Students in Gen</CardTitle>
