@@ -17,12 +17,14 @@ import {
   ListOrdered,
   BookMarked,
   PencilRuler,
+  UserCog,
 } from 'lucide-react';
 import {SidebarMenu, SidebarMenuItem, SidebarMenuButton} from '@/components/ui/sidebar';
 import Link from 'next/link';
 import {usePathname} from 'next/navigation';
+import {useAuth} from '@/contexts/AuthContext';
 
-const navItems = [
+const studentNavItems = [
   {href: '/', label: 'Dashboard', icon: LayoutDashboard},
   {href: '/chat', label: 'Chat', icon: MessageSquare},
   {href: '/announcements', label: 'Announcements', icon: Megaphone},
@@ -31,16 +33,48 @@ const navItems = [
   {href: '/projects', label: 'Projects', icon: BookMarked},
   {href: '/materials', label: 'Class Materials', icon: BookCopy},
   {href: '/submissions', label: 'Submissions', icon: Upload},
+  {href: '/timetable', label: 'Timetable', icon: CalendarCheck},
+  {href: '/directory', label: 'Directory', icon: Users},
+];
+
+const teacherNavItems = [
+  {href: '/', label: 'Dashboard', icon: LayoutDashboard},
   {href: '/students', label: 'Student Management', icon: Users},
+  {href: '/assignments', label: 'Assignments', icon: ListOrdered},
+  {href: '/submissions', label: 'Submissions', icon: Upload},
   {href: '/attendance', label: 'Attendance', icon: UserCheck},
+  {href: '/materials', label: 'Class Materials', icon: BookCopy},
+  {href: '/announcements', label: 'Announcements', icon: Megaphone},
+  {href: '/chat', label: 'Chat', icon: MessageSquare},
+];
+
+const adminNavItems = [
+  {href: '/', label: 'Dashboard', icon: LayoutDashboard},
+  {href: '/users', label: 'User Management', icon: UserCog},
+  {href: '/announcements', label: 'Manage Announcements', icon: Megaphone},
   {href: '/bookings', label: 'Manage Bookings', icon: CalendarCheck},
-  {href: '/dms', label: 'DMs', icon: Mail},
   {href: '/roadmap', label: 'Roadmap', icon: Map},
   {href: '/career', label: 'Career Module', icon: GraduationCap},
 ];
 
 export function SidebarNav() {
   const pathname = usePathname();
+  const {role} = useAuth();
+
+  let navItems;
+  switch (role) {
+    case 'student':
+      navItems = studentNavItems;
+      break;
+    case 'teacher':
+      navItems = teacherNavItems;
+      break;
+    case 'admin':
+      navItems = adminNavItems;
+      break;
+    default:
+      navItems = [];
+  }
 
   return (
     <SidebarMenu className="mt-8">
