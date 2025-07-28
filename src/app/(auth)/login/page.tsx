@@ -89,14 +89,9 @@ export default function LoginPage() {
           </form>
           <div className="mt-4 text-center text-sm">
             Don't have an account?
-            <div className="mt-2 flex justify-center gap-4">
-              <Button variant="link" asChild>
-                <Link href="/student-signup">Sign up as Student</Link>
-              </Button>
-              <Button variant="link" asChild>
-                <Link href="/teacher-signup">Sign up as Teacher</Link>
-              </Button>
-            </div>
+            <Button variant="link" asChild>
+              <Link href="/student-signup">Sign up as Student</Link>
+            </Button>
           </div>
         </CardContent>
       </Card>
