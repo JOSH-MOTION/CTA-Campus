@@ -38,7 +38,7 @@ const AssignmentsContext = createContext<AssignmentsContextType | undefined>(und
 export const AssignmentsProvider: FC<{children: ReactNode}> = ({children}) => {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
-  const { addNotification } = useNotifications();
+  const { addNotificationForGen } = useNotifications();
   const { user } = useAuth();
 
   useEffect(() => {
@@ -80,12 +80,12 @@ export const AssignmentsProvider: FC<{children: ReactNode}> = ({children}) => {
 
     await addDoc(collection(db, 'assignments'), newAssignmentData);
     
-    addNotification({
+    await addNotificationForGen(assignment.targetGen, {
       title: `New Assignment: ${assignment.title}`,
-      description: `A new assignment has been posted for ${assignment.targetGen}.`,
+      description: `A new assignment has been posted.`,
       href: '/assignments',
     });
-  }, [user, addNotification]);
+  }, [user, addNotificationForGen]);
 
   const updateAssignment = useCallback(async (id: string, updates: Partial<AssignmentData>) => {
     if (!user) throw new Error("User not authenticated");

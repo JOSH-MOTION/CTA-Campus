@@ -31,7 +31,7 @@ const ProjectsContext = createContext<ProjectsContextType | undefined>(undefined
 export const ProjectsProvider: FC<{children: ReactNode}> = ({children}) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
-  const { addNotification } = useNotifications();
+  const { addNotificationForGen } = useNotifications();
   const { user } = useAuth();
 
   useEffect(() => {
@@ -72,12 +72,12 @@ export const ProjectsProvider: FC<{children: ReactNode}> = ({children}) => {
 
     await addDoc(collection(db, 'projects'), newProjectData);
     
-    addNotification({
+    await addNotificationForGen(project.targetGen, {
       title: `New Project: ${project.title}`,
-      description: `A new project has been posted for ${project.targetGen}.`,
+      description: `A new project has been posted.`,
       href: '/projects',
     });
-  }, [user, addNotification]);
+  }, [user, addNotificationForGen]);
 
   const updateProject = useCallback(async (id: string, updates: Partial<ProjectData>) => {
     if (!user) throw new Error("User not authenticated");

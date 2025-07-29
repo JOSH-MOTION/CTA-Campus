@@ -31,7 +31,7 @@ const ExercisesContext = createContext<ExercisesContextType | undefined>(undefin
 export const ExercisesProvider: FC<{children: ReactNode}> = ({children}) => {
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(true);
-  const { addNotification } = useNotifications();
+  const { addNotificationForGen } = useNotifications();
   const { user } = useAuth();
 
   useEffect(() => {
@@ -72,12 +72,12 @@ export const ExercisesProvider: FC<{children: ReactNode}> = ({children}) => {
 
     await addDoc(collection(db, 'exercises'), newExerciseData);
     
-    addNotification({
+    await addNotificationForGen(exercise.targetGen, {
       title: `New Exercise: ${exercise.title}`,
-      description: `A new exercise has been posted for ${exercise.targetGen}.`,
+      description: `A new exercise has been posted.`,
       href: '/exercises',
     });
-  }, [user, addNotification]);
+  }, [user, addNotificationForGen]);
 
   const updateExercise = useCallback(async (id: string, updates: Partial<ExerciseData>) => {
     if (!user) throw new Error("User not authenticated");

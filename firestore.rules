@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -51,25 +50,23 @@ service cloud.firestore {
     }
     
     match /submissions/{submissionId} {
-        // Teachers/Admins can see all submissions. Students can only see their own.
-        allow read: if isAuthenticated() && ((isTeacher(request.auth.uid) || isAdmin(request.auth.uid)) || resource.data.studentId == request.auth.uid);
-        // Students can only create submissions for themselves.
+        allow read: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid) || get(resource.data.studentId) == request.auth.uid);
         allow create: if isAuthenticated() && request.resource.data.studentId == request.auth.uid;
-        // Teachers/Admins can delete any submission.
         allow delete: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
     }
 
     match /{path=**}/points/{pointId} {
-      // Points can be read by teachers/admins (for rankings) and by the student themselves.
       allow read: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid) || path[1] == request.auth.uid);
-      // Points can only be created for a user, not by the user themselves (except via trusted server logic like cloud functions).
-      // For this app, we trust the client-side logic under the assumption that an admin or teacher is performing the action
-      // or the point award logic is secured (e.g. idempotency check in awardPoint)
       allow create: if isAuthenticated();
     }
     
     match /chats/{chatId}/{message=**} {
         allow read, write: if isAuthenticated();
+    }
+
+    match /notifications/{notificationId} {
+      allow read, update: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow create: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
     }
   }
 }

@@ -32,7 +32,7 @@ const AnnouncementsContext = createContext<AnnouncementsContextType | undefined>
 export const AnnouncementsProvider: FC<{children: ReactNode}> = ({children}) => {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
-  const { addNotification } = useNotifications();
+  const { addNotificationForGen } = useNotifications();
   const { user } = useAuth();
 
   useEffect(() => {
@@ -73,14 +73,14 @@ export const AnnouncementsProvider: FC<{children: ReactNode}> = ({children}) => 
       date: serverTimestamp(),
     };
     
-    const docRef = await addDoc(collection(db, 'announcements'), newAnnouncementData);
+    await addDoc(collection(db, 'announcements'), newAnnouncementData);
     
-    addNotification({
+    await addNotificationForGen(announcement.targetGen, {
       title: `New Announcement: ${announcement.title}`,
-      description: `Targeted to: ${announcement.targetGen}`,
+      description: `From ${announcement.author}`,
       href: '/announcements',
     });
-  }, [user, addNotification]);
+  }, [user, addNotificationForGen]);
 
   const updateAnnouncement = useCallback(async (id: string, updates: Partial<AnnouncementData>) => {
     if (!user) throw new Error("User not authenticated");
