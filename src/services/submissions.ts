@@ -9,6 +9,8 @@ import {
     Timestamp,
     DocumentData,
     orderBy,
+    doc,
+    deleteDoc,
   } from 'firebase/firestore';
   import { db } from '@/lib/firebase';
   
@@ -114,4 +116,18 @@ import {
     );
 
     return unsubscribe;
+  };
+
+  /**
+   * Deletes a submission from the database.
+   * @param submissionId - The ID of the submission to delete.
+   */
+  export const deleteSubmission = async (submissionId: string) => {
+    try {
+      const submissionDoc = doc(db, 'submissions', submissionId);
+      await deleteDoc(submissionDoc);
+    } catch (error) {
+      console.error('Error deleting submission:', error);
+      throw error;
+    }
   };

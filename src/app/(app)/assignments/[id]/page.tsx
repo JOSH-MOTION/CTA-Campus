@@ -5,17 +5,18 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAssignments } from '@/contexts/AssignmentsContext';
-import { onSubmissions, Submission } from '@/services/submissions';
+import { onSubmissions, Submission, deleteSubmission } from '@/services/submissions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
-import { ArrowLeft, ExternalLink, Loader2, CheckCircle } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Loader2, CheckCircle, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { awardPoint } from '@/services/points';
 import { useToast } from '@/hooks/use-toast';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 export default function AssignmentSubmissionsPage() {
   const { id: assignmentId } = useParams();
@@ -26,6 +27,7 @@ export default function AssignmentSubmissionsPage() {
   const [loading, setLoading] = useState(true);
   const [gradingState, setGradingState] = useState<{[submissionId: string]: 'idle' | 'loading' | 'graded'}>({});
   const { toast } = useToast();
+  const [submissionToDelete, setSubmissionToDelete] = useState<Submission | null>(null);
 
   const assignment = assignments.find(a => a.id === assignmentId);
 
@@ -55,12 +57,11 @@ export default function AssignmentSubmissionsPage() {
   const handleGrade = async (submission: Submission) => {
     setGradingState(prev => ({ ...prev, [submission.id]: 'loading' }));
     try {
-      // Award 5 points for a graded assignment. This can be customized.
-      await awardPoint(submission.studentId, 5, `Graded: ${assignment?.title}`, `graded-${submission.id}`);
+      await awardPoint(submission.studentId, 1, `Graded: ${assignment?.title}`, `graded-${submission.id}`);
       setGradingState(prev => ({ ...prev, [submission.id]: 'graded' }));
       toast({
         title: 'Submission Graded',
-        description: `${submission.studentName} has been awarded 5 points.`,
+        description: `${submission.studentName} has been awarded 1 point.`,
       });
     } catch (error: any) {
        toast({
@@ -75,10 +76,30 @@ export default function AssignmentSubmissionsPage() {
        }
     }
   };
+
+  const handleDeleteSubmission = async () => {
+    if (!submissionToDelete) return;
+    try {
+        await deleteSubmission(submissionToDelete.id);
+        toast({
+            title: 'Submission Deleted',
+            description: `The submission from ${submissionToDelete.studentName} has been removed.`,
+        });
+    } catch (error) {
+        toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: 'Could not delete the submission.',
+        });
+    } finally {
+        setSubmissionToDelete(null);
+    }
+  };
   
   const isLoading = loading || assignmentsLoading;
 
   return (
+    <>
     <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="outline" size="icon" onClick={() => router.back()}>
@@ -131,7 +152,7 @@ export default function AssignmentSubmissionsPage() {
                                             </Link>
                                         </Button>
                                     </TableCell>
-                                    <TableCell className="text-right">
+                                    <TableCell className="text-right space-x-2">
                                         <Button 
                                             variant={currentGradeState === 'graded' ? 'secondary' : 'outline'}
                                             size="sm"
@@ -140,7 +161,14 @@ export default function AssignmentSubmissionsPage() {
                                         >
                                             {currentGradeState === 'loading' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                             {currentGradeState === 'graded' && <CheckCircle className="mr-2 h-4 w-4 text-green-500" />}
-                                            {currentGradeState === 'graded' ? 'Graded' : 'Grade (5 pts)'}
+                                            {currentGradeState === 'graded' ? 'Graded' : 'Grade (1 pt)'}
+                                        </Button>
+                                        <Button 
+                                            variant="destructive"
+                                            size="sm"
+                                            onClick={() => setSubmissionToDelete(submission)}
+                                        >
+                                           <Trash2 className="h-4 w-4" />
                                         </Button>
                                     </TableCell>
                                 </TableRow>
@@ -159,5 +187,21 @@ export default function AssignmentSubmissionsPage() {
         </CardContent>
       </Card>
     </div>
+    <AlertDialog open={!!submissionToDelete} onOpenChange={(open) => !open && setSubmissionToDelete(null)}>
+        <AlertDialogContent>
+        <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the submission from{' '}
+                <span className="font-semibold">{submissionToDelete?.studentName}</span>.
+            </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteSubmission}>Delete</AlertDialogAction>
+        </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
