@@ -57,7 +57,8 @@ export default function AssignmentSubmissionsPage() {
   const handleGrade = async (submission: Submission) => {
     setGradingState(prev => ({ ...prev, [submission.id]: 'loading' }));
     try {
-      await awardPoint(submission.studentId, 1, `Graded: ${assignment?.title}`, `graded-${submission.id}`);
+      // Use "Class Assignments" as the reason to match PerformanceHub categories
+      await awardPoint(submission.studentId, 1, 'Class Assignments', `graded-submission-${submission.id}`);
       setGradingState(prev => ({ ...prev, [submission.id]: 'graded' }));
       toast({
         title: 'Submission Graded',
@@ -83,7 +84,7 @@ export default function AssignmentSubmissionsPage() {
         await deleteSubmission(submissionToDelete.id);
         toast({
             title: 'Submission Deleted',
-            description: `The submission from ${submissionToDelete.studentName} has been removed.`,
+            description: `The submission from ${submissionToDelete?.studentName} has been removed.`,
         });
     } catch (error) {
         toast({
@@ -158,6 +159,7 @@ export default function AssignmentSubmissionsPage() {
                                             size="sm"
                                             onClick={() => handleGrade(submission)}
                                             disabled={currentGradeState !== 'idle'}
+                                            className={currentGradeState === 'graded' ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-800' : ''}
                                         >
                                             {currentGradeState === 'loading' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                             {currentGradeState === 'graded' && <CheckCircle className="mr-2 h-4 w-4 text-green-500" />}

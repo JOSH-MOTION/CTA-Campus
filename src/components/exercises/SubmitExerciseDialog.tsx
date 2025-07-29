@@ -68,7 +68,7 @@ export function SubmitExerciseDialog({ children, exercise, onSubmissionSuccess }
       });
 
       // 2. Award points for the submission
-      await awardPoint(user.uid, 1, 'Class Exercise', `exercise-${exercise.id}`);
+      await awardPoint(user.uid, 1, 'Class Exercises', `exercise-${exercise.id}`);
 
       toast({
         title: 'Exercise Submitted!',

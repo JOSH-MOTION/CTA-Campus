@@ -68,7 +68,7 @@ export function SubmitProjectDialog({ children, project, onSubmissionSuccess }: 
       });
 
       // 2. Award points for the submission
-      await awardPoint(user.uid, 1, 'Weekly Project', `project-${project.id}`);
+      await awardPoint(user.uid, 1, 'Weekly Projects', `project-${project.id}`);
 
       toast({
         title: 'Project Submitted!',
