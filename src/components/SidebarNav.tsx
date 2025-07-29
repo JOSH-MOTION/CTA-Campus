@@ -29,6 +29,7 @@ import {
   Award,
   TrendingUp,
   History,
+  BookCheck,
 } from 'lucide-react';
 import {SidebarMenu, SidebarMenuItem, SidebarMenuButton} from '@/components/ui/sidebar';
 import Link from 'next/link';
@@ -64,8 +65,8 @@ export const teacherNavItems = [
   {href: '/assignments', label: 'Assignments', icon: ListOrdered},
   {href: '/exercises', label: 'Exercises', icon: PencilRuler},
   {href: '/projects', label: 'Projects', icon: BookMarked},
+  {href: '/submissions', label: 'Submissions', icon: BookCheck},
   {href: '/materials', label: 'Class Materials', icon: BookCopy},
-  {href: '/submissions', label: 'Submissions', icon: Upload},
   {href: '/attendance', label: 'Attendance', icon: UserCheck},
   {href: '/roadmap', label: 'Roadmap', icon: Map},
   {href: '/directory', label: 'Directory', icon: Contact},

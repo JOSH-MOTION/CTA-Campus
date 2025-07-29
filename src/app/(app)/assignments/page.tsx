@@ -3,7 +3,7 @@
 
 import { useMemo, useState } from 'react';
 import {Button} from '@/components/ui/button';
-import {PlusCircle, ListOrdered, ArrowRight, Clock, Loader2} from 'lucide-react';
+import {PlusCircle, ListOrdered, ArrowRight, Clock, Loader2, BookCheck} from 'lucide-react';
 import {useAuth} from '@/contexts/AuthContext';
 import {useAssignments} from '@/contexts/AssignmentsContext';
 import {Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle} from '@/components/ui/card';
@@ -11,16 +11,15 @@ import {CreateAssignmentDialog} from '@/components/assignments/CreateAssignmentD
 import {Badge} from '@/components/ui/badge';
 import {format} from 'date-fns';
 import { AssignmentActions } from '@/components/assignments/AssignmentActions';
-import { awardPoint } from '@/services/points';
-import { useToast } from '@/hooks/use-toast';
+import { SubmitAssignmentDialog } from '@/components/assignments/SubmitAssignmentDialog';
+import { useRouter } from 'next/navigation';
 
 
 export default function AssignmentsPage() {
   const {role, userData, user} = useAuth();
   const {assignments, loading} = useAssignments();
   const isTeacherOrAdmin = role === 'teacher' || role === 'admin';
-  const { toast } = useToast();
-  const [submittingId, setSubmittingId] = useState<string | null>(null);
+  const router = useRouter();
 
   const filteredAssignments = useMemo(() => {
     if (isTeacherOrAdmin) return assignments;
@@ -38,26 +37,6 @@ export default function AssignmentsPage() {
       const bLatestDate = Math.max(...b.dueDates.map(d => new Date(d.dateTime).getTime()));
       return bLatestDate - aLatestDate;
   });
-
-  const handleSubmission = async (assignmentId: string) => {
-    if (!user) return;
-    setSubmittingId(assignmentId);
-    try {
-      await awardPoint(user.uid, 1, 'Class Assignment', `assignment-${assignmentId}`);
-      toast({
-        title: 'Assignment Submitted',
-        description: 'You have been awarded 1 point!',
-      });
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error.message === 'duplicate' ? 'You have already received points for this assignment.' : 'Could not submit assignment.',
-      });
-    } finally {
-      setSubmittingId(null);
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -109,14 +88,16 @@ export default function AssignmentsPage() {
               </CardContent>
               <CardFooter>
                 {isTeacherOrAdmin ? (
-                  <Button variant="outline" className="w-full">
+                  <Button variant="outline" className="w-full" onClick={() => router.push(`/assignments/${assignment.id}`)}>
+                    <BookCheck className="mr-2 h-4 w-4" />
                     View Submissions
                   </Button>
                 ) : (
-                  <Button className="w-full" onClick={() => handleSubmission(assignment.id)} disabled={submittingId === assignment.id}>
-                    {submittingId === assignment.id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Submit Work <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
+                  <SubmitAssignmentDialog assignment={assignment}>
+                    <Button className="w-full">
+                      Submit Work <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </SubmitAssignmentDialog>
                 )}
               </CardFooter>
             </Card>
