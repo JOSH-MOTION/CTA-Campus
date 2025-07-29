@@ -7,7 +7,7 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
-import {CheckCircle, Circle} from 'lucide-react';
+import {CheckCircle, Circle, Loader2} from 'lucide-react';
 import {useRoadmap} from '@/contexts/RoadmapContext';
 import {useAuth} from '@/contexts/AuthContext';
 import {Checkbox} from '@/components/ui/checkbox';
@@ -15,9 +15,17 @@ import {Label} from '@/components/ui/label';
 import {cn} from '@/lib/utils';
 
 export default function RoadmapPage() {
-  const {roadmapData, completedWeeks, toggleWeekCompletion} = useRoadmap();
+  const {roadmapData, completedWeeks, toggleWeekCompletion, loading} = useRoadmap();
   const {role} = useAuth();
-  const isTeacher = role === 'teacher';
+  const isTeacher = role === 'teacher' || role === 'admin';
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -55,7 +63,7 @@ export default function RoadmapPage() {
                                 <Checkbox
                                   id={weekId}
                                   checked={isCompleted}
-                                  onCheckedChange={() => toggleWeekCompletion(weekId)}
+                                  onCheckedChange={() => toggleWeekCompletion(weekId, isCompleted)}
                                 />
                                 <Label htmlFor={weekId} className="text-sm font-normal">
                                   Mark as done

@@ -1,6 +1,9 @@
+// src/contexts/RoadmapContext.tsx
 'use client';
 
-import {createContext, useContext, useState, ReactNode, FC} from 'react';
+import {createContext, useContext, useState, ReactNode, FC, useEffect} from 'react';
+import { useAuth } from './AuthContext';
+import { onRoadmapStatus, setWeekCompletion, WeekCompletionStatus } from '@/services/roadmap';
 
 // The structure for a single topic, including its unique ID
 export interface Topic {
@@ -23,8 +26,9 @@ export interface RoadmapSubject {
 
 interface RoadmapContextType {
   completedWeeks: Set<string>;
-  toggleWeekCompletion: (weekId: string) => void;
+  toggleWeekCompletion: (weekId: string, currentStatus: boolean) => void;
   roadmapData: RoadmapSubject[];
+  loading: boolean;
 }
 
 const roadmapData: RoadmapSubject[] = [
@@ -425,21 +429,36 @@ const RoadmapContext = createContext<RoadmapContextType | undefined>(undefined);
 
 export const RoadmapProvider: FC<{children: ReactNode}> = ({children}) => {
   const [completedWeeks, setCompletedWeeks] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(true);
+  const { user, role } = useAuth();
 
-  const toggleWeekCompletion = (weekId: string) => {
-    setCompletedWeeks(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(weekId)) {
-        newSet.delete(weekId);
-      } else {
-        newSet.add(weekId);
-      }
-      return newSet;
+  useEffect(() => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+    const unsubscribe = onRoadmapStatus((status) => {
+      const completed = new Set<string>();
+      Object.entries(status).forEach(([weekId, isCompleted]) => {
+        if (isCompleted) {
+          completed.add(weekId);
+        }
+      });
+      setCompletedWeeks(completed);
+      setLoading(false);
     });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const toggleWeekCompletion = (weekId: string, currentStatus: boolean) => {
+    if (role === 'teacher' || role === 'admin') {
+      setWeekCompletion(weekId, !currentStatus);
+    }
   };
 
   return (
-    <RoadmapContext.Provider value={{roadmapData, completedWeeks, toggleWeekCompletion}}>
+    <RoadmapContext.Provider value={{roadmapData, completedWeeks, toggleWeekCompletion, loading}}>
       {children}
     </RoadmapContext.Provider>
   );
