@@ -47,7 +47,7 @@ export const AssignmentsProvider: FC<{children: ReactNode}> = ({children}) => {
         setLoading(false);
         return;
     }
-    setLoading(true);
+    
     const assignmentsCol = collection(db, 'assignments');
     const q = query(assignmentsCol, orderBy('createdAt', 'desc'));
 
