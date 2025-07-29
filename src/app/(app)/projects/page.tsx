@@ -3,7 +3,7 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, BookMarked, Loader2, ArrowRight, CheckCircle } from 'lucide-react';
+import { PlusCircle, BookMarked, Loader2, ArrowRight, CheckCircle, BookCheck } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProjects } from '@/contexts/ProjectsContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -13,11 +13,13 @@ import { ProjectActions } from '@/components/projects/ProjectActions';
 import { SubmitProjectDialog } from '@/components/projects/SubmitProjectDialog';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { useRouter } from 'next/navigation';
 
 export default function ProjectsPage() {
   const { role, userData, user } = useAuth();
   const { projects, loading } = useProjects();
   const isTeacherOrAdmin = role === 'teacher' || role === 'admin';
+  const router = useRouter();
   const [submittedProjectIds, setSubmittedProjectIds] = useState<Set<string>>(new Set());
   const [checkingSubmissions, setCheckingSubmissions] = useState(true);
 
@@ -105,7 +107,10 @@ export default function ProjectsPage() {
                 <CardContent className="flex-grow"></CardContent>
                 <CardFooter>
                   {isTeacherOrAdmin ? (
-                      <Button variant="outline" className="w-full" disabled>View Submissions (WIP)</Button>
+                      <Button variant="outline" className="w-full" onClick={() => router.push(`/projects/${project.id}`)}>
+                          <BookCheck className="mr-2 h-4 w-4" />
+                          View Submissions
+                      </Button>
                   ) : hasSubmitted ? (
                       <Button className="w-full bg-green-600 hover:bg-green-700" disabled>
                           <CheckCircle className="mr-2 h-4 w-4" />
