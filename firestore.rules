@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -46,14 +47,15 @@ service cloud.firestore {
     
     match /materials/{materialId} {
         allow read: if isAuthenticated();
-        allow create, update, delete: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
+        allow create: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
     }
     
     match /submissions/{submissionId} {
-        allow read: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid) || get(/databases/$(database)/documents/submissions/$(submissionId)).data.studentId == request.auth.uid);
+        // Teachers/Admins can see all submissions. Students can only see their own.
+        allow read: if isAuthenticated() && ((isTeacher(request.auth.uid) || isAdmin(request.auth.uid)) || resource.data.studentId == request.auth.uid);
         // Students can only create submissions for themselves.
         allow create: if isAuthenticated() && request.resource.data.studentId == request.auth.uid;
-        // Teachers and admins can delete submissions.
+        // Teachers/Admins can delete any submission.
         allow delete: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
     }
 
