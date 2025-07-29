@@ -20,7 +20,7 @@ import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import {Button} from '@/components/ui/button';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
 import {Progress} from '@/components/ui/progress';
-import {ChartContainer, ChartTooltipContent} from '@/components/ui/chart';
+import {ChartContainer, ChartTooltipContent, type ChartConfig} from '@/components/ui/chart';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 
@@ -38,16 +38,11 @@ const initialGradingData = [
 ];
 
 const COLORS = [
-  '#0088FE',
-  '#00C49F',
-  '#FFBB28',
-  '#FF8042',
-  '#8884d8',
-  '#82ca9d',
-  '#ffc658',
-  '#a4de6c',
-  '#d0ed57',
-  '#ffc658',
+  'hsl(var(--chart-1))',
+  'hsl(var(--chart-2))',
+  'hsl(var(--chart-3))',
+  'hsl(var(--chart-4))',
+  'hsl(var(--chart-5))',
 ];
 
 export default function PerformanceHub({ studentId }: { studentId?: string }) {
@@ -93,10 +88,22 @@ export default function PerformanceHub({ studentId }: { studentId?: string }) {
     return () => unsubscribe();
   }, [targetUserId]);
 
-  const chartData = useMemo(() => gradingData.map(item => ({
+  const chartData = useMemo(() => gradingData.map((item, index) => ({
     name: item.title,
     value: item.current,
+    fill: COLORS[index % COLORS.length]
   })).filter(item => item.value > 0), [gradingData]);
+
+  const chartConfig = useMemo(() => {
+    const config: ChartConfig = {};
+    chartData.forEach(item => {
+        config[item.name] = {
+            label: item.name,
+            color: item.fill,
+        };
+    });
+    return config;
+  }, [chartData]);
 
   const overallProgress = useMemo(() => {
     const totalCurrent = gradingData.reduce((acc, item) => acc + item.current, 0);
@@ -182,7 +189,7 @@ export default function PerformanceHub({ studentId }: { studentId?: string }) {
             </div>
             <div className="min-h-[300px] w-full h-full">
                 {chartData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={350}>
+                    <ChartContainer config={chartConfig} className="w-full h-[350px]">
                         {chartType === 'bar' ? (
                         <RechartsBarChart
                             data={chartData}
@@ -199,26 +206,27 @@ export default function PerformanceHub({ studentId }: { studentId?: string }) {
                                 tick={{fontSize: 10, width: 100, whiteSpace: 'pre-wrap'}}
                                 className="text-xs"
                                 width={100}
+                                stroke="hsl(var(--foreground))"
                             />
                             <XAxis dataKey="value" type="number" hide />
-                            <Tooltip cursor={{fill: 'hsl(var(--muted))'}} content={<ChartTooltipContent />} />
+                            <Tooltip cursor={{fill: 'hsl(var(--muted))'}} content={<ChartTooltipContent hideLabel />} />
                             <Bar dataKey="value" radius={5}>
-                            {chartData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            {chartData.map((entry) => (
+                                <Cell key={entry.name} fill={entry.fill} />
                             ))}
                             </Bar>
                         </RechartsBarChart>
                         ) : (
-                        <RechartsPieChart margin={{left: 0, right: 0, top: 0, bottom: 0}}>
+                        <RechartsPieChart>
                             <Tooltip content={<ChartTooltipContent nameKey="name" />} />
                             <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80}>
-                            {chartData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            {chartData.map((entry) => (
+                                <Cell key={entry.name} fill={entry.fill} />
                             ))}
                             </Pie>
                         </RechartsPieChart>
                         )}
-                    </ResponsiveContainer>
+                    </ChartContainer>
                 ) : (
                     <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                         <p>No points recorded yet.</p>

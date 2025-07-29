@@ -6,17 +6,17 @@ import TeacherDashboard from '@/components/dashboards/TeacherDashboard';
 import AdminDashboard from '@/components/dashboards/AdminDashboard';
 import {useEffect, useState} from 'react';
 import type {User} from 'firebase/auth';
+import { Loader2 } from 'lucide-react';
 
 export default function DashboardPage() {
-  const {user, role} = useAuth();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
-    return null; // or a loading spinner
+  const {user, role, loading} = useAuth();
+  
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
   }
 
   const renderDashboard = () => {
