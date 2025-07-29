@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -51,10 +50,8 @@ service cloud.firestore {
     }
     
     match /submissions/{submissionId} {
-        // Students can get their own submissions, teachers/admins can get any.
-        allow get: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid) || resource.data.studentId == request.auth.uid);
-        // Students can list submissions they made. Teachers/admins can list all.
-        allow list: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid) || request.query.filters.studentId == request.auth.uid);
+        // Teachers/admins can read any submission. Students can only read their own. This covers get and list.
+        allow read: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid) || resource.data.studentId == request.auth.uid);
         // Students can only create submissions for themselves.
         allow create: if isAuthenticated() && request.resource.data.studentId == request.auth.uid;
         // Teachers/admins can delete submissions.
