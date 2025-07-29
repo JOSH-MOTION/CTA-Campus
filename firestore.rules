@@ -50,23 +50,32 @@ service cloud.firestore {
     }
     
     match /submissions/{submissionId} {
-        allow read: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid) || get(resource.data.studentId) == request.auth.uid);
+        // Students can get their own submissions, teachers/admins can get any.
+        allow get: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid) || resource.data.studentId == request.auth.uid);
+        // Students can list submissions they made. Teachers/admins can list all.
+        allow list: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid) || request.query.where.studentId == request.auth.uid);
+        // Students can only create submissions for themselves.
         allow create: if isAuthenticated() && request.resource.data.studentId == request.auth.uid;
+        // Teachers/admins can delete submissions.
         allow delete: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
     }
+    
+    match /notifications/{notificationId} {
+      // Users can only access their own notifications
+      allow read, write: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow create: if isAuthenticated();
+    }
 
-    match /{path=**}/points/{pointId} {
-      allow read: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid) || path[1] == request.auth.uid);
+    match /users/{userId}/points/{pointId} {
+      // Points can be read by teachers/admins (for rankings) and by the student themselves.
+      allow read: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid) || userId == request.auth.uid);
+      // For this app, we trust the client-side logic under the assumption that an admin or teacher is performing the action
+      // or the point award logic is secured (e.g. idempotency check in awardPoint)
       allow create: if isAuthenticated();
     }
     
     match /chats/{chatId}/{message=**} {
         allow read, write: if isAuthenticated();
-    }
-
-    match /notifications/{notificationId} {
-      allow read, update: if isAuthenticated() && request.auth.uid == resource.data.userId;
-      allow create: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
     }
   }
 }
