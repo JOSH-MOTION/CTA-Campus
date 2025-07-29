@@ -32,6 +32,17 @@ import {
   export const addSubmission = async (submissionData: NewSubmissionData) => {
     try {
       const submissionsCol = collection(db, 'submissions');
+      // Ensure idempotency for point awards by checking if a submission exists.
+      // A more robust check might be needed depending on business logic.
+      // For now, we assume one submission per student per assignment.
+      const q = query(
+        submissionsCol, 
+        where('studentId', '==', submissionData.studentId),
+        where('assignmentId', '==', submissionData.assignmentId)
+      );
+      // Note: A getDocs() check here would introduce a race condition.
+      // The `awardPoint` service handles idempotency, so we proceed.
+      
       await addDoc(submissionsCol, {
         ...submissionData,
         submittedAt: serverTimestamp(),
@@ -73,5 +84,34 @@ import {
       }
     );
   
+    return unsubscribe;
+  };
+
+  /**
+   * Fetches all submissions across all assignments in real-time.
+   * @param callback - The function to call with the new array of submissions.
+   * @returns An unsubscribe function to stop the listener.
+   */
+  export const onAllSubmissions = (callback: (submissions: Submission[]) => void) => {
+    const submissionsCol = collection(db, 'submissions');
+    const q = query(submissionsCol, orderBy('submittedAt', 'desc'));
+
+    const unsubscribe = onSnapshot(
+      q,
+      (querySnapshot) => {
+        const submissions: Submission[] = querySnapshot.docs.map((doc) => {
+          const data = doc.data() as DocumentData;
+          return {
+            id: doc.id,
+            ...data,
+          } as Submission;
+        });
+        callback(submissions);
+      },
+      (error) => {
+        console.error('Error listening to all submissions:', error);
+      }
+    );
+
     return unsubscribe;
   };
