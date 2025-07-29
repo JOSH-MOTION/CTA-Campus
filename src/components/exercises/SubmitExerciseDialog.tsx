@@ -57,7 +57,7 @@ export function SubmitExerciseDialog({ children, exercise, onSubmissionSuccess }
     setIsSubmitting(true);
     try {
       // 1. Add the submission to the database
-      await addSubmission({
+      const newSubmission = await addSubmission({
         studentId: user.uid,
         studentName: userData.displayName,
         studentGen: userData.gen || 'N/A',
@@ -68,11 +68,12 @@ export function SubmitExerciseDialog({ children, exercise, onSubmissionSuccess }
       });
 
       // 2. Award points for the submission
-      await awardPoint(user.uid, 1, 'Class Exercises', `exercise-${exercise.id}`);
+      const activityId = `graded-exercise-${newSubmission.id}`;
+      await awardPoint(user.uid, 1, 'Class Exercises', activityId);
 
       toast({
         title: 'Exercise Submitted!',
-        description: 'Your work has been sent to your teacher and you have been awarded 1 point.',
+        description: 'Your work has been sent to your teacher. It will be graded soon.',
       });
       onSubmissionSuccess();
       form.reset();
@@ -83,7 +84,7 @@ export function SubmitExerciseDialog({ children, exercise, onSubmissionSuccess }
         variant: 'destructive',
         title: isDuplicate ? 'Already Submitted' : 'Error',
         description: isDuplicate
-          ? 'You have already submitted this exercise and received points for it.'
+          ? 'You have already submitted this exercise.'
           : 'Could not submit your exercise.',
       });
       // If it's a duplicate error, we should still update the UI state
@@ -139,7 +140,7 @@ export function SubmitExerciseDialog({ children, exercise, onSubmissionSuccess }
               </Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Submit & Get 1 Point
+                Submit Work
               </Button>
             </DialogFooter>
           </form>

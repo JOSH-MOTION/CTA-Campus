@@ -11,6 +11,7 @@ import {
     orderBy,
     doc,
     deleteDoc,
+    getDocs,
   } from 'firebase/firestore';
   import { db } from '@/lib/firebase';
   
@@ -31,24 +32,25 @@ import {
   /**
    * Creates a new submission for an assignment.
    */
-  export const addSubmission = async (submissionData: NewSubmissionData) => {
+  export const addSubmission = async (submissionData: NewSubmissionData): Promise<{ id: string }> => {
     try {
       const submissionsCol = collection(db, 'submissions');
-      // Ensure idempotency for point awards by checking if a submission exists.
-      // A more robust check might be needed depending on business logic.
-      // For now, we assume one submission per student per assignment.
       const q = query(
-        submissionsCol, 
+        submissionsCol,
         where('studentId', '==', submissionData.studentId),
         where('assignmentId', '==', submissionData.assignmentId)
       );
-      // Note: A getDocs() check here would introduce a race condition.
-      // The `awardPoint` service handles idempotency, so we proceed.
       
-      await addDoc(submissionsCol, {
+      const querySnapshot = await getDocs(q);
+      if (!querySnapshot.empty) {
+          throw new Error('duplicate');
+      }
+      
+      const docRef = await addDoc(submissionsCol, {
         ...submissionData,
         submittedAt: serverTimestamp(),
       });
+      return { id: docRef.id };
     } catch (error) {
       console.error('Error creating submission:', error);
       throw error;
