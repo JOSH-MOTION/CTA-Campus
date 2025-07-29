@@ -1,24 +1,53 @@
 // src/app/(app)/projects/page.tsx
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, BookMarked, Loader2 } from 'lucide-react';
+import { PlusCircle, BookMarked, Loader2, ArrowRight, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProjects } from '@/contexts/ProjectsContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { CreateProjectDialog } from '@/components/projects/CreateProjectDialog';
 import { Badge } from '@/components/ui/badge';
 import { ProjectActions } from '@/components/projects/ProjectActions';
-import { awardPoint } from '@/services/points';
-import { useToast } from '@/hooks/use-toast';
+import { SubmitProjectDialog } from '@/components/projects/SubmitProjectDialog';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 export default function ProjectsPage() {
   const { role, userData, user } = useAuth();
   const { projects, loading } = useProjects();
   const isTeacherOrAdmin = role === 'teacher' || role === 'admin';
-  const { toast } = useToast();
-  const [submittingId, setSubmittingId] = useState<string | null>(null);
+  const [submittedProjectIds, setSubmittedProjectIds] = useState<Set<string>>(new Set());
+  const [checkingSubmissions, setCheckingSubmissions] = useState(true);
+
+  useEffect(() => {
+    const fetchSubmissions = async () => {
+        if (role === 'student' && user) {
+            setCheckingSubmissions(true);
+            const submissionsQuery = query(
+                collection(db, 'submissions'),
+                where('studentId', '==', user.uid)
+            );
+            const querySnapshot = await getDocs(submissionsQuery);
+             const projectSubmissions = new Set<string>();
+            querySnapshot.docs.forEach(doc => {
+              const submission = doc.data();
+              if (projects.some(p => p.id === submission.assignmentId)) {
+                projectSubmissions.add(submission.assignmentId);
+              }
+            });
+            setSubmittedProjectIds(projectSubmissions);
+            setCheckingSubmissions(false);
+        } else {
+            setCheckingSubmissions(false);
+        }
+    };
+     if (!loading) {
+       fetchSubmissions();
+    }
+  }, [user, role, loading, projects]);
+
 
   const filteredProjects = useMemo(() => {
     if (isTeacherOrAdmin) return projects;
@@ -32,28 +61,7 @@ export default function ProjectsPage() {
   
   const sortedProjects = [...filteredProjects].sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
 
-  const handleViewProject = async (projectId: string) => {
-    if (!user) return;
-    setSubmittingId(projectId);
-    try {
-      // For now, we assume viewing the details means they get the point.
-      // A real implementation would have a submission system.
-      // This is a placeholder for 'Weekly Projects'
-      await awardPoint(user.uid, 1, 'Weekly Project', `project-${projectId}`);
-      toast({
-        title: 'Project Submitted',
-        description: 'You have been awarded 1 point!',
-      });
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error.message === 'duplicate' ? 'You have already received points for this project.' : 'Could not submit project.',
-      });
-    } finally {
-      setSubmittingId(null);
-    }
-  };
+  const isLoading = loading || (role === 'student' && checkingSubmissions);
 
   return (
     <div className="space-y-6">
@@ -74,33 +82,48 @@ export default function ProjectsPage() {
         )}
       </div>
 
-      {loading ? (
+      {isLoading ? (
         <div className="flex h-64 flex-col items-center justify-center rounded-lg border-2 border-dashed">
             <Loader2 className="h-12 w-12 animate-spin text-muted-foreground" />
         </div>
       ) : sortedProjects.length > 0 ? (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {sortedProjects.map(project => (
-            <Card key={project.id} className="flex flex-col">
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div className="flex-1 pr-2">
-                    <CardTitle>{project.title}</CardTitle>
-                    {isTeacherOrAdmin && <Badge variant={project.targetGen === 'Everyone' ? 'destructive' : project.targetGen === 'All Students' ? 'default' : 'secondary'} className="mt-1">{project.targetGen}</Badge>}
+          {sortedProjects.map(project => {
+            const hasSubmitted = submittedProjectIds.has(project.id);
+            return (
+              <Card key={project.id} className="flex flex-col">
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1 pr-2">
+                      <CardTitle>{project.title}</CardTitle>
+                      {isTeacherOrAdmin && <Badge variant={project.targetGen === 'Everyone' ? 'destructive' : project.targetGen === 'All Students' ? 'default' : 'secondary'} className="mt-1">{project.targetGen}</Badge>}
+                    </div>
+                    <ProjectActions project={project} />
                   </div>
-                  <ProjectActions project={project} />
-                </div>
-                <CardDescription className="pt-2">{project.description}</CardDescription>
-              </CardHeader>
-              <CardContent className="flex-grow"></CardContent>
-              <CardFooter>
-                 <Button className="w-full" onClick={() => handleViewProject(project.id)} disabled={isTeacherOrAdmin || submittingId === project.id}>
-                    {submittingId === project.id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    View Project Details
-                  </Button>
-              </CardFooter>
-            </Card>
-          ))}
+                  <CardDescription className="pt-2">{project.description}</CardDescription>
+                </CardHeader>
+                <CardContent className="flex-grow"></CardContent>
+                <CardFooter>
+                  {isTeacherOrAdmin ? (
+                      <Button variant="outline" className="w-full" disabled>View Submissions (WIP)</Button>
+                  ) : hasSubmitted ? (
+                      <Button className="w-full bg-green-600 hover:bg-green-700" disabled>
+                          <CheckCircle className="mr-2 h-4 w-4" />
+                          Submitted
+                      </Button>
+                  ) : (
+                      <SubmitProjectDialog project={project} onSubmissionSuccess={() => {
+                          setSubmittedProjectIds(prev => new Set(prev).add(project.id));
+                      }}>
+                          <Button className="w-full">
+                            Submit Work <ArrowRight className="ml-2 h-4 w-4" />
+                          </Button>
+                      </SubmitProjectDialog>
+                  )}
+                </CardFooter>
+              </Card>
+            )
+          })}
         </div>
       ) : (
         <div className="flex h-64 flex-col items-center justify-center rounded-lg border-2 border-dashed">

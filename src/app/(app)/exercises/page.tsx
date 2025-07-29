@@ -1,24 +1,58 @@
 // src/app/(app)/exercises/page.tsx
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, PencilRuler, Loader2 } from 'lucide-react';
+import { PlusCircle, PencilRuler, Loader2, ArrowRight, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useExercises } from '@/contexts/ExercisesContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { CreateExerciseDialog } from '@/components/exercises/CreateExerciseDialog';
 import { Badge } from '@/components/ui/badge';
 import { ExerciseActions } from '@/components/exercises/ExerciseActions';
-import { awardPoint } from '@/services/points';
-import { useToast } from '@/hooks/use-toast';
+import { SubmitExerciseDialog } from '@/components/exercises/SubmitExerciseDialog';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 export default function ExercisesPage() {
   const { role, userData, user } = useAuth();
   const { exercises, loading } = useExercises();
   const isTeacherOrAdmin = role === 'teacher' || role === 'admin';
-  const { toast } = useToast();
-  const [submittingId, setSubmittingId] = useState<string | null>(null);
+  const [submittedExerciseIds, setSubmittedExerciseIds] = useState<Set<string>>(new Set());
+  const [checkingSubmissions, setCheckingSubmissions] = useState(true);
+
+  useEffect(() => {
+    const fetchSubmissions = async () => {
+        if (role === 'student' && user) {
+            setCheckingSubmissions(true);
+            const submissionsQuery = query(
+                collection(db, 'submissions'),
+                where('studentId', '==', user.uid)
+                // We can't filter by a list of exercise IDs here easily,
+                // so we fetch all submissions and filter client-side.
+                // This is acceptable for a student's own submissions.
+            );
+            const querySnapshot = await getDocs(submissionsQuery);
+            const exerciseSubmissions = new Set<string>();
+            querySnapshot.docs.forEach(doc => {
+              const submission = doc.data();
+              // In a real app, we might store a `type` field ('assignment', 'exercise')
+              // For now, we assume any submission with a matching `assignmentId` is for an exercise.
+              // This is imperfect but works for this context.
+              if (exercises.some(ex => ex.id === submission.assignmentId)) {
+                exerciseSubmissions.add(submission.assignmentId);
+              }
+            });
+            setSubmittedExerciseIds(exerciseSubmissions);
+            setCheckingSubmissions(false);
+        } else {
+            setCheckingSubmissions(false);
+        }
+    };
+    if (!loading) {
+       fetchSubmissions();
+    }
+  }, [user, role, loading, exercises]);
 
   const filteredExercises = useMemo(() => {
     if (isTeacherOrAdmin) return exercises;
@@ -32,26 +66,7 @@ export default function ExercisesPage() {
   
   const sortedExercises = [...filteredExercises].sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
 
-  const handleStartExercise = async (exerciseId: string) => {
-    if (!user) return;
-    setSubmittingId(exerciseId);
-    try {
-      await awardPoint(user.uid, 1, 'Class Exercise', `exercise-${exerciseId}`);
-      toast({
-        title: 'Exercise Submitted',
-        description: 'You have been awarded 1 point!',
-      });
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error.message === 'duplicate' ? 'You have already received points for this exercise.' : 'Could not submit exercise.',
-      });
-    } finally {
-      setSubmittingId(null);
-    }
-  };
-
+  const isLoading = loading || (role === 'student' && checkingSubmissions);
 
   return (
     <div className="space-y-6">
@@ -59,7 +74,7 @@ export default function ExercisesPage() {
         <div className="space-y-1">
           <h1 className="text-3xl font-bold tracking-tight">Exercises</h1>
           <p className="text-muted-foreground">
-            {isTeacherOrAdmin ? 'Create and manage exercises.' : 'View and complete your exercises.'}
+            {isTeacherOrAdmin ? 'Create and manage exercises.' : 'View and submit your exercises.'}
           </p>
         </div>
         {isTeacherOrAdmin && (
@@ -72,33 +87,48 @@ export default function ExercisesPage() {
         )}
       </div>
 
-      {loading ? (
+      {isLoading ? (
         <div className="flex h-64 flex-col items-center justify-center rounded-lg border-2 border-dashed">
             <Loader2 className="h-12 w-12 animate-spin text-muted-foreground" />
         </div>
       ) : sortedExercises.length > 0 ? (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {sortedExercises.map(exercise => (
-            <Card key={exercise.id} className="flex flex-col">
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div className="flex-1 pr-2">
-                    <CardTitle>{exercise.title}</CardTitle>
-                    {isTeacherOrAdmin && <Badge variant={exercise.targetGen === 'Everyone' ? 'destructive' : exercise.targetGen === 'All Students' ? 'default' : 'secondary'} className="mt-1">{exercise.targetGen}</Badge>}
+          {sortedExercises.map(exercise => {
+            const hasSubmitted = submittedExerciseIds.has(exercise.id);
+            return (
+              <Card key={exercise.id} className="flex flex-col">
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1 pr-2">
+                      <CardTitle>{exercise.title}</CardTitle>
+                      {isTeacherOrAdmin && <Badge variant={exercise.targetGen === 'Everyone' ? 'destructive' : exercise.targetGen === 'All Students' ? 'default' : 'secondary'} className="mt-1">{exercise.targetGen}</Badge>}
+                    </div>
+                    <ExerciseActions exercise={exercise} />
                   </div>
-                  <ExerciseActions exercise={exercise} />
-                </div>
-                <CardDescription className="pt-2">{exercise.description}</CardDescription>
-              </CardHeader>
-              <CardContent className="flex-grow"></CardContent>
-              <CardFooter>
-                 <Button className="w-full" onClick={() => handleStartExercise(exercise.id)} disabled={isTeacherOrAdmin || submittingId === exercise.id}>
-                    {submittingId === exercise.id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Start Exercise
-                  </Button>
-              </CardFooter>
-            </Card>
-          ))}
+                  <CardDescription className="pt-2">{exercise.description}</CardDescription>
+                </CardHeader>
+                <CardContent className="flex-grow"></CardContent>
+                <CardFooter>
+                  {isTeacherOrAdmin ? (
+                     <Button variant="outline" className="w-full" disabled>View Submissions (WIP)</Button>
+                  ) : hasSubmitted ? (
+                    <Button className="w-full bg-green-600 hover:bg-green-700" disabled>
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                      Submitted
+                    </Button>
+                  ) : (
+                    <SubmitExerciseDialog exercise={exercise} onSubmissionSuccess={() => {
+                        setSubmittedExerciseIds(prev => new Set(prev).add(exercise.id));
+                    }}>
+                      <Button className="w-full">
+                        Submit Work <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </SubmitExerciseDialog>
+                  )}
+                </CardFooter>
+              </Card>
+            )
+          })}
         </div>
       ) : (
         <div className="flex h-64 flex-col items-center justify-center rounded-lg border-2 border-dashed">
