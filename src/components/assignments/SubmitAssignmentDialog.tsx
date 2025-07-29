@@ -35,9 +35,10 @@ type SubmissionFormValues = z.infer<typeof submissionSchema>;
 interface SubmitAssignmentDialogProps {
   children: ReactNode;
   assignment: Assignment;
+  onSubmissionSuccess: () => void;
 }
 
-export function SubmitAssignmentDialog({ children, assignment }: SubmitAssignmentDialogProps) {
+export function SubmitAssignmentDialog({ children, assignment, onSubmissionSuccess }: SubmitAssignmentDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
@@ -73,6 +74,7 @@ export function SubmitAssignmentDialog({ children, assignment }: SubmitAssignmen
         title: 'Assignment Submitted!',
         description: 'Your work has been sent to your teacher and you have been awarded 1 point.',
       });
+      onSubmissionSuccess();
       form.reset();
       setIsOpen(false);
     } catch (error: any) {
@@ -84,6 +86,10 @@ export function SubmitAssignmentDialog({ children, assignment }: SubmitAssignmen
           ? 'You have already submitted this assignment and received points for it.'
           : 'Could not submit your assignment.',
       });
+      // If it's a duplicate error, we should still update the UI state
+      if (isDuplicate) {
+          onSubmissionSuccess();
+      }
     } finally {
       setIsSubmitting(false);
     }
