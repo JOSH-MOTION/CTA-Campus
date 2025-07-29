@@ -1,7 +1,7 @@
 // src/app/(app)/submissions/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -10,20 +10,23 @@ import { ExternalLink, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { onAllSubmissions, Submission } from '@/services/submissions';
 import { formatDistanceToNow } from 'date-fns';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth, UserData } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useAssignments } from '@/contexts/AssignmentsContext';
 import { useProjects } from '@/contexts/ProjectsContext';
 import { useExercises } from '@/contexts/ExercisesContext';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function SubmissionsPage() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
-  const { role } = useAuth();
+  const { role, fetchAllUsers } = useAuth();
   const router = useRouter();
   const { assignments } = useAssignments();
   const { projects } = useProjects();
   const { exercises } = useExercises();
+  const [allUsers, setAllUsers] = useState<UserData[]>([]);
+  const [selectedGen, setSelectedGen] = useState('all');
 
   useEffect(() => {
     if (role === 'student') {
@@ -36,8 +39,29 @@ export default function SubmissionsPage() {
       setSubmissions(newSubmissions);
       setLoading(false);
     });
+    
+    const loadUsers = async () => {
+        const users = await fetchAllUsers();
+        setAllUsers(users);
+    }
+    loadUsers();
+
     return () => unsubscribe();
-  }, [role, router]);
+  }, [role, router, fetchAllUsers]);
+  
+  const allStudents = useMemo(() => allUsers.filter(u => u.role === 'student'), [allUsers]);
+
+  const availableGens = useMemo(() => {
+    const gens = new Set(allStudents.map(student => student.gen).filter(Boolean));
+    return ['all', ...Array.from(gens).sort()];
+  }, [allStudents]);
+  
+  const filteredSubmissions = useMemo(() => {
+    if (selectedGen === 'all') {
+      return submissions;
+    }
+    return submissions.filter(s => s.studentGen === selectedGen);
+  }, [submissions, selectedGen]);
 
   const getSubmissionParentType = (assignmentId: string): 'assignments' | 'projects' | 'exercises' | null => {
     if (assignments.some(a => a.id === assignmentId)) return 'assignments';
@@ -50,16 +74,32 @@ export default function SubmissionsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-3xl font-bold tracking-tight">All Submissions</h1>
-        <p className="text-muted-foreground">
-          A live feed of all student submissions across all coursework.
-        </p>
+      <div className="flex flex-col items-start gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold tracking-tight">All Submissions</h1>
+          <p className="text-muted-foreground">
+            A live feed of all student submissions across all coursework.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+            <p className="text-sm font-medium">Filter by Gen:</p>
+            <Select value={selectedGen} onValueChange={setSelectedGen}>
+              <SelectTrigger className="w-full md:w-[180px]">
+                <SelectValue placeholder="Select a Generation" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableGens.map(gen => (
+                  <SelectItem key={gen} value={gen} className="capitalize">{gen}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
       </div>
+
 
        <Card>
         <CardHeader>
-          <CardTitle>Recent Submissions ({submissions.length})</CardTitle>
+          <CardTitle>Recent Submissions ({filteredSubmissions.length})</CardTitle>
           <CardDescription>
             The latest work submitted by students, ordered by most recent.
           </CardDescription>
@@ -81,8 +121,8 @@ export default function SubmissionsPage() {
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {submissions.length > 0 ? (
-                        submissions.map(submission => {
+                    {filteredSubmissions.length > 0 ? (
+                        filteredSubmissions.map(submission => {
                             const parentType = getSubmissionParentType(submission.assignmentId);
                             const href = parentType ? `/${parentType}/${submission.assignmentId}` : '#';
                             
@@ -111,7 +151,7 @@ export default function SubmissionsPage() {
                     ) : (
                         <TableRow>
                             <TableCell colSpan={5} className="h-24 text-center">
-                                No submissions yet.
+                                No submissions yet for the selected generation.
                             </TableCell>
                         </TableRow>
                     )}
