@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -15,12 +15,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { CalendarIcon, Clock, Loader2 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, parse } from 'date-fns';
 import { useAuth, UserData } from '@/contexts/AuthContext';
-
-const availableTimeSlots = [
-  '09:00 AM', '10:00 AM', '11:00 AM', '02:00 PM', '03:00 PM', '04:00 PM'
-];
 
 const bookingSchema = z.object({
   staffId: z.string().nonempty('Please select a staff member.'),
@@ -36,6 +32,13 @@ export default function BookSessionPage() {
   const { fetchAllUsers } = useAuth();
   const [staff, setStaff] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  const form = useForm<BookingFormValues>({
+    resolver: zodResolver(bookingSchema),
+  });
+  
+  const selectedStaffId = form.watch('staffId');
+  const selectedStaff = useMemo(() => staff.find(s => s.uid === selectedStaffId), [staff, selectedStaffId]);
 
   useEffect(() => {
     const loadStaff = async () => {
@@ -47,17 +50,39 @@ export default function BookSessionPage() {
     };
     loadStaff();
   }, [fetchAllUsers]);
-  
-  const form = useForm<BookingFormValues>({
-    resolver: zodResolver(bookingSchema),
-  });
+
+  const availableTimeSlots = useMemo(() => {
+    if (!selectedStaff || !selectedStaff.timeSlots) return [];
+    
+    return selectedStaff.timeSlots.flatMap(slot => {
+        const start = parse(slot.startTime, 'HH:mm', new Date());
+        const end = parse(slot.endTime, 'HH:mm', new Date());
+        const slots = [];
+        let current = start;
+        while(current < end) {
+            slots.push(format(current, 'HH:mm'));
+            current.setHours(current.getHours() + 1);
+        }
+        return slots;
+    });
+
+  }, [selectedStaff]);
+
+  const isDayDisabled = (date: Date) => {
+    if (!selectedStaff || !selectedStaff.availableDays) {
+        // If no staff is selected or they have no available days set, disable all days
+        return true;
+    }
+    const dayOfWeek = format(date, 'EEEE'); // e.g., "Monday"
+    return !selectedStaff.availableDays.includes(dayOfWeek) || date < new Date();
+  };
 
   const onSubmit = (data: BookingFormValues) => {
     console.log(data);
-    const selectedStaff = staff.find(s => s.uid === data.staffId);
+    const selectedStaffMember = staff.find(s => s.uid === data.staffId);
     toast({
       title: 'Booking Confirmed!',
-      description: `Your session with ${selectedStaff?.displayName} on ${format(data.date, 'PPP')} at ${data.time} is booked.`,
+      description: `Your session with ${selectedStaffMember?.displayName} on ${format(data.date, 'PPP')} at ${data.time} is booked.`,
     });
     form.reset();
   };
@@ -83,7 +108,11 @@ export default function BookSessionPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Staff Member</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loading}>
+                    <Select onValueChange={(value) => {
+                        field.onChange(value);
+                        form.setValue('date', undefined as any);
+                        form.setValue('time', '');
+                    }} defaultValue={field.value} disabled={loading}>
                       <FormControl>
                         <SelectTrigger>
                            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -113,6 +142,7 @@ export default function BookSessionPage() {
                           <FormControl>
                             <Button
                               variant={'outline'}
+                              disabled={!selectedStaffId}
                               className={cn(
                                 'w-full pl-3 text-left font-normal',
                                 !field.value && 'text-muted-foreground'
@@ -128,7 +158,7 @@ export default function BookSessionPage() {
                             mode="single"
                             selected={field.value}
                             onSelect={field.onChange}
-                            disabled={(date) => date < new Date() || date.getDay() === 0}
+                            disabled={isDayDisabled}
                             initialFocus
                           />
                         </PopoverContent>
@@ -144,7 +174,7 @@ export default function BookSessionPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Time</FormLabel>
-                       <Select onValueChange={field.onChange} defaultValue={field.value}>
+                       <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!selectedStaffId || !form.getValues('date')}>
                         <FormControl>
                           <SelectTrigger>
                              <Clock className="mr-2 h-4 w-4" />
@@ -152,9 +182,9 @@ export default function BookSessionPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {availableTimeSlots.map(time => (
-                            <SelectItem key={time} value={time}>{time}</SelectItem>
-                          ))}
+                          {availableTimeSlots.length > 0 ? availableTimeSlots.map(time => (
+                            <SelectItem key={time} value={time}>{format(parse(time, 'HH:mm', new Date()), 'p')}</SelectItem>
+                          )) : <SelectItem value="disabled" disabled>No slots available</SelectItem>}
                         </SelectContent>
                       </Select>
                       <FormMessage />

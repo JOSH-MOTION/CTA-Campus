@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -11,10 +11,13 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { Trash } from 'lucide-react';
+import { Loader2, Trash } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
-const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const timeSlots = Array.from({ length: 9 }, (_, i) => `${i + 9}:00`); // 9:00 to 17:00
+const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const timeSlots = Array.from({ length: 24 }, (_, i) => `${i.toString().padStart(2, '0')}:00`);
 
 const availabilitySchema = z.object({
   availableDays: z.array(z.string()).refine(value => value.some(item => item), {
@@ -30,26 +33,64 @@ type AvailabilityFormValues = z.infer<typeof availabilitySchema>;
 
 export default function AvailabilityPage() {
   const { toast } = useToast();
+  const { user, userData, setUserData, loading } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const form = useForm<AvailabilityFormValues>({
     resolver: zodResolver(availabilitySchema),
     defaultValues: {
-      availableDays: ['Monday'],
+      availableDays: [],
       timeSlots: [{ startTime: '09:00', endTime: '17:00' }],
     },
   });
+  
+  useEffect(() => {
+    if (userData) {
+      form.reset({
+        availableDays: userData.availableDays || [],
+        timeSlots: userData.timeSlots && userData.timeSlots.length > 0 ? userData.timeSlots : [{ startTime: '09:00', endTime: '17:00' }],
+      });
+    }
+  }, [userData, form]);
+
 
   const { fields, append, remove } = useFieldArray({
     name: 'timeSlots',
     control: form.control,
   });
 
-  const onSubmit = (data: AvailabilityFormValues) => {
-    console.log(data);
-    toast({
-      title: 'Availability Saved!',
-      description: 'Your booking availability has been updated successfully.',
-    });
+  const onSubmit = async (data: AvailabilityFormValues) => {
+    if (!user) return;
+    setIsSubmitting(true);
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, {
+        availableDays: data.availableDays,
+        timeSlots: data.timeSlots,
+      });
+
+      if(setUserData) {
+        setUserData(prev => prev ? ({ ...prev, availableDays: data.availableDays, timeSlots: data.timeSlots }) : null);
+      }
+
+      toast({
+        title: 'Availability Saved!',
+        description: 'Your booking availability has been updated successfully.',
+      });
+    } catch (error) {
+       toast({
+        variant: 'destructive',
+        title: 'Error Saving',
+        description: 'Could not save your availability.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
+  if (loading) {
+    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -96,7 +137,7 @@ export default function AvailabilityPage() {
                                     checked={field.value?.includes(day)}
                                     onCheckedChange={(checked) => {
                                       return checked
-                                        ? field.onChange([...field.value, day])
+                                        ? field.onChange([...(field.value || []), day])
                                         : field.onChange(
                                             field.value?.filter(
                                               (value) => value !== day
@@ -190,7 +231,10 @@ export default function AvailabilityPage() {
               </div>
 
 
-              <Button type="submit">Save Availability</Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save Availability
+              </Button>
             </form>
           </Form>
         </CardContent>

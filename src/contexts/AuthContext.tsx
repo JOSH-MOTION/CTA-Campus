@@ -23,6 +23,8 @@ export interface UserData {
   photoURL?: string;
   // Teacher specific
   gensTaught?: string;
+  availableDays?: string[];
+  timeSlots?: { startTime: string; endTime: string }[];
 }
 
 interface AuthContextType {
