@@ -9,7 +9,8 @@ import {
     query,
     where,
     writeBatch,
-    collectionGroup
+    collectionGroup,
+    setDoc
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
@@ -28,17 +29,27 @@ export const awardPoint = async (userId: string, points: number, reason: string,
     // The user has already been awarded points for this specific activity.
     throw new Error('duplicate');
   }
-
-  // Firestore requires a separate addDoc call to get an auto-generated ID,
-  // but for an idempotent operation, we want a predictable ID.
-  // We'll use setDoc with the activityId as the document ID.
-  await addDoc(collection(db, 'users', userId, 'points'), {
+  
+  await setDoc(pointDocRef, {
     points,
     reason,
     activityId, // Store the activity ID to prevent duplicates
     awardedAt: serverTimestamp(),
   });
 };
+
+/**
+ * Checks if a point has already been awarded for a specific activity.
+ * @param userId The user's ID
+ * @param activityId The unique ID of the activity
+ * @returns true if the point has been awarded, false otherwise
+ */
+export const hasPointBeenAwarded = async (userId: string, activityId: string): Promise<boolean> => {
+    const pointDocRef = doc(db, 'users', userId, 'points', activityId);
+    const docSnap = await getDoc(pointDocRef);
+    return docSnap.exists();
+};
+
 
 /**
  * Retrieves the total points for a single user.

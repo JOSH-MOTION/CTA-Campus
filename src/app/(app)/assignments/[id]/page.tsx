@@ -14,10 +14,11 @@ import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
 import { ArrowLeft, ExternalLink, Loader2, CheckCircle, Trash2 } from 'lucide-react';
 import Link from 'next/link';
-import { awardPoint } from '@/services/points';
+import { awardPoint, hasPointBeenAwarded } from '@/services/points';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useNotifications } from '@/contexts/NotificationsContext';
+import { cn } from '@/lib/utils';
 
 export default function AssignmentSubmissionsPage() {
   const { id: assignmentId } = useParams();
@@ -36,14 +37,16 @@ export default function AssignmentSubmissionsPage() {
   useEffect(() => {
     if (typeof assignmentId !== 'string') return;
     setLoading(true);
-    const unsubscribe = onSubmissions(assignmentId, (newSubmissions) => {
+    const unsubscribe = onSubmissions(assignmentId, async (newSubmissions) => {
       setSubmissions(newSubmissions);
       const initialGradingState: {[submissionId: string]: 'idle' | 'loading' | 'graded'} = {};
-      newSubmissions.forEach(s => {
-        // Here you might check if it's already graded in your DB
-        // For now, we'll just initialize all as 'idle'
-        initialGradingState[s.id] = 'idle';
-      });
+      
+      for (const s of newSubmissions) {
+        const activityId = `graded-submission-${s.id}`;
+        const isGraded = await hasPointBeenAwarded(s.studentId, activityId);
+        initialGradingState[s.id] = isGraded ? 'graded' : 'idle';
+      }
+
       setGradingState(initialGradingState);
       setLoading(false);
     });
@@ -58,9 +61,9 @@ export default function AssignmentSubmissionsPage() {
 
   const handleGrade = async (submission: Submission) => {
     setGradingState(prev => ({ ...prev, [submission.id]: 'loading' }));
+    const activityId = `graded-submission-${submission.id}`;
     try {
-      // Use "Class Assignments" as the reason to match PerformanceHub categories
-      await awardPoint(submission.studentId, 1, 'Class Assignments', `graded-submission-${submission.id}`);
+      await awardPoint(submission.studentId, 1, 'Class Assignments', activityId);
       setGradingState(prev => ({ ...prev, [submission.id]: 'graded' }));
       toast({
         title: 'Submission Graded',
@@ -165,19 +168,19 @@ export default function AssignmentSubmissionsPage() {
                                     </TableCell>
                                     <TableCell className="text-right space-x-2">
                                         <Button 
-                                            variant={currentGradeState === 'graded' ? 'secondary' : 'outline'}
+                                            variant={currentGradeState === 'graded' ? 'default' : 'outline'}
                                             size="sm"
                                             onClick={() => handleGrade(submission)}
                                             disabled={currentGradeState !== 'idle'}
-                                            className={currentGradeState === 'graded' ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-800' : ''}
+                                            className={cn(currentGradeState === 'graded' && 'bg-green-600 hover:bg-green-700 text-white')}
                                         >
                                             {currentGradeState === 'loading' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                            {currentGradeState === 'graded' && <CheckCircle className="mr-2 h-4 w-4 text-green-500" />}
+                                            {currentGradeState === 'graded' && <CheckCircle className="mr-2 h-4 w-4" />}
                                             {currentGradeState === 'graded' ? 'Graded' : 'Grade (1 pt)'}
                                         </Button>
                                         <Button 
                                             variant="destructive"
-                                            size="sm"
+                                            size="icon"
                                             onClick={() => setSubmissionToDelete(submission)}
                                         >
                                            <Trash2 className="h-4 w-4" />
