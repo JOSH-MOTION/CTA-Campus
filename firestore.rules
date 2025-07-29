@@ -50,12 +50,9 @@ service cloud.firestore {
     }
     
     match /submissions/{submissionId} {
-        // A user can read a submission if they are a teacher/admin, or if they are the student who made the submission.
-        allow read: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid) || resource.data.studentId == request.auth.uid);
-        // Students can only create submissions for themselves.
-        allow create: if isAuthenticated() && request.resource.data.studentId == request.auth.uid;
-        // Teachers/admins can delete submissions.
-        allow delete: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
+      allow read: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid) || resource.data.studentId == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.studentId == request.auth.uid;
+      allow delete: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
     }
     
     match /notifications/{notificationId} {
