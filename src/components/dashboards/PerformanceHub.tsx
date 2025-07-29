@@ -180,7 +180,7 @@ export default function PerformanceHub({ studentId }: { studentId?: string }) {
             </div>
             <div className="min-h-[300px] w-full h-full">
                 {chartData.length > 0 ? (
-                    <ChartContainer config={{}} className="w-full h-full">
+                    <ResponsiveContainer width="100%" height={350}>
                         {chartType === 'bar' ? (
                         <RechartsBarChart
                             data={chartData}
@@ -216,7 +216,7 @@ export default function PerformanceHub({ studentId }: { studentId?: string }) {
                             </Pie>
                         </RechartsPieChart>
                         )}
-                    </ChartContainer>
+                    </ResponsiveContainer>
                 ) : (
                     <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                         <p>No points recorded yet.</p>
