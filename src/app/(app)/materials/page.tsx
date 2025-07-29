@@ -24,17 +24,17 @@ const materialSchema = z.object({
   slidesUrl: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
   subject: z.string().nonempty('Please select a subject.'),
   week: z.string().nonempty('Please select a week.'),
-  topic: z.string().nonempty('Please select a topic.'),
 }).refine(data => data.videoUrl || data.slidesUrl, {
     message: "Please provide at least one link for a video or slides.",
-    path: ["videoUrl"], // You can associate the error with one of the fields
+    path: ["videoUrl"],
 });
 
 type MaterialFormValues = z.infer<typeof materialSchema>;
 
-interface Material extends MaterialFormValues {
+interface Material extends Omit<MaterialFormValues, 'week'> {
   id: string;
   createdAt: Timestamp;
+  week: string;
 }
 
 export default function MaterialsPage() {
@@ -80,19 +80,12 @@ export default function MaterialsPage() {
   });
 
   const selectedSubjectTitle = form.watch('subject');
-  const selectedWeekTitle = form.watch('week');
 
   const availableWeeks = useMemo(() => {
     if (!selectedSubjectTitle) return [];
     const subject = roadmapData.find(s => s.title === selectedSubjectTitle);
     return subject ? subject.weeks : [];
   }, [selectedSubjectTitle, roadmapData]);
-
-  const availableTopics = useMemo(() => {
-    if (!selectedWeekTitle) return [];
-    const week = availableWeeks.find(w => w.title === selectedWeekTitle);
-    return week ? week.topics : [];
-  }, [selectedWeekTitle, availableWeeks]);
 
   const onSubmit = async (data: MaterialFormValues) => {
     setIsSubmitting(true);
@@ -120,13 +113,6 @@ export default function MaterialsPage() {
       setIsSubmitting(false);
     }
   };
-
-  const getTopicById = (subjectTitle: string, weekTitle: string, topicId: string) => {
-    const subject = roadmapData.find(s => s.title === subjectTitle);
-    const week = subject?.weeks.find(w => w.title === weekTitle);
-    const topic = week?.topics.find(t => t.id === topicId || t.title === topicId);
-    return topic?.title || 'Unknown Topic';
-  }
 
   return (
     <div className="space-y-6">
@@ -186,7 +172,7 @@ export default function MaterialsPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <FormField
                     control={form.control}
                     name="subject"
@@ -223,24 +209,6 @@ export default function MaterialsPage() {
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name="topic"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Topic</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value} disabled={!selectedWeekTitle}>
-                          <FormControl>
-                            <SelectTrigger><SelectValue placeholder="Select Topic" /></SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {availableTopics.map(t => <SelectItem key={t.id} value={t.title}>{t.title}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
                 </div>
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? (
@@ -271,7 +239,7 @@ export default function MaterialsPage() {
                 <CardHeader>
                   <CardTitle>{material.title}</CardTitle>
                   <CardDescription>
-                      {material.subject} - {getTopicById(material.subject, material.week, material.topic)}
+                      {material.subject} - {material.week}
                   </CardDescription>
                 </CardHeader>
                 <CardFooter className="flex flex-col gap-2 items-stretch">
