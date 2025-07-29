@@ -10,7 +10,8 @@ import {
     where,
     writeBatch,
     collectionGroup,
-    setDoc
+    setDoc,
+    deleteDoc
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
@@ -36,6 +37,22 @@ export const awardPoint = async (userId: string, points: number, reason: string,
     activityId, // Store the activity ID to prevent duplicates
     awardedAt: serverTimestamp(),
   });
+};
+
+/**
+ * Removes a point record associated with a specific activity.
+ * @param userId The user's ID
+ * @param activityId The unique ID of the activity to remove the point for
+ */
+export const removePoint = async (userId: string, activityId: string): Promise<void> => {
+    const pointDocRef = doc(db, 'users', userId, 'points', activityId);
+    try {
+        await deleteDoc(pointDocRef);
+    } catch(error) {
+        console.error("Error removing point:", error);
+        // We don't throw here, as the submission might have been deleted anyway.
+        // It's not critical if the point record was already gone.
+    }
 };
 
 /**

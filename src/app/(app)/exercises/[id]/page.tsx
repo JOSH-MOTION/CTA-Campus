@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
 import { ArrowLeft, ExternalLink, Loader2, CheckCircle, Trash2 } from 'lucide-react';
 import Link from 'next/link';
-import { awardPoint, hasPointBeenAwarded } from '@/services/points';
+import { awardPoint, hasPointBeenAwarded, removePoint } from '@/services/points';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useNotifications } from '@/contexts/NotificationsContext';
@@ -92,10 +92,12 @@ export default function ExerciseSubmissionsPage() {
   const handleDeleteSubmission = async () => {
     if (!submissionToDelete) return;
     try {
+        const activityId = `graded-exercise-${submissionToDelete.id}`;
         await deleteSubmission(submissionToDelete.id);
+        await removePoint(submissionToDelete.studentId, activityId);
         toast({
             title: 'Submission Deleted',
-            description: `The submission from ${submissionToDelete?.studentName} has been removed.`,
+            description: `The submission from ${submissionToDelete?.studentName} has been removed and points have been revoked.`,
         });
     } catch (error) {
         toast({
@@ -206,7 +208,7 @@ export default function ExerciseSubmissionsPage() {
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
                 This action cannot be undone. This will permanently delete the submission from{' '}
-                <span className="font-semibold">{submissionToDelete?.studentName}</span>.
+                <span className="font-semibold">{submissionToDelete?.studentName}</span>. Any points awarded will be revoked.
             </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
