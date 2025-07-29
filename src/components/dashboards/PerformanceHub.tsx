@@ -15,7 +15,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 
 import {Button} from '@/components/ui/button';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
@@ -66,7 +66,9 @@ export default function PerformanceHub({ studentId }: { studentId?: string }) {
 
     setLoading(true);
     const pointsCol = collection(db, 'users', targetUserId, 'points');
-    const unsubscribe = onSnapshot(pointsCol, (querySnapshot) => {
+    const q = query(pointsCol);
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const userPoints: { [key: string]: number } = {};
       querySnapshot.forEach(doc => {
         const data = doc.data();
@@ -75,7 +77,7 @@ export default function PerformanceHub({ studentId }: { studentId?: string }) {
           userPoints[reason] = (userPoints[reason] || 0) + data.points;
         }
       });
-
+      
       const updatedGradingData = initialGradingData.map(item => ({
         ...item,
         current: userPoints[item.title] || 0,

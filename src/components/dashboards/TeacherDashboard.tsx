@@ -8,8 +8,9 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter
 } from '@/components/ui/card';
-import {Users, BookOpen, BarChart2, MessageSquare, Group} from 'lucide-react';
+import {Users, BookOpen, BarChart2, MessageSquare, Group, ArrowRight, Loader2, ListChecks} from 'lucide-react';
 import type {User} from 'firebase/auth';
 import {useAuth, UserData} from '@/contexts/AuthContext';
 import {
@@ -21,6 +22,10 @@ import {
 } from '@/components/ui/select';
 import {Button} from '@/components/ui/button';
 import {useRouter} from 'next/navigation';
+import { onAllSubmissions, Submission } from '@/services/submissions';
+import { Avatar, AvatarFallback } from '../ui/avatar';
+import Link from 'next/link';
+import { formatDistanceToNow } from 'date-fns';
 
 interface TeacherDashboardProps {
   user: User | null;
@@ -31,6 +36,8 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
   const [selectedGen, setSelectedGen] = useState<string>('');
   const [allUsers, setAllUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [loadingSubmissions, setLoadingSubmissions] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
@@ -41,6 +48,13 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
       setLoading(false);
     }
     loadUsers();
+
+    const unsubscribe = onAllSubmissions((newSubmissions) => {
+        setSubmissions(newSubmissions);
+        setLoadingSubmissions(false);
+    });
+
+    return () => unsubscribe();
   }, [fetchAllUsers]);
 
   const availableGens = useMemo(() => {
@@ -60,6 +74,8 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
       setSelectedGen(availableGens[0]);
     }
   }, [availableGens, selectedGen]);
+  
+  const recentSubmissions = useMemo(() => submissions.slice(0, 5), [submissions]);
 
   const handleOpenChat = () => {
     if (selectedGen) {
@@ -93,77 +109,115 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
         )}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{selectedGen ? `${selectedGen} Overview` : 'Dashboard'}</CardTitle>
-          <CardDescription>
-            {selectedGen ? `Key metrics for ${selectedGen}.` : 'Select a generation to view details.'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {selectedGen ? (
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Students in Gen</CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+            <Card>
+                <CardHeader>
+                <CardTitle>{selectedGen ? `${selectedGen} Overview` : 'Dashboard'}</CardTitle>
+                <CardDescription>
+                    {selectedGen ? `Key metrics for ${selectedGen}.` : 'Select a generation to view details.'}
+                </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{loading ? '...' : studentsInSelectedGen.length}</div>
-                  <p className="text-xs text-muted-foreground">Total students enrolled</p>
+                {selectedGen ? (
+                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-2">
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Students in Gen</CardTitle>
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                        <div className="text-2xl font-bold">{loading ? '...' : studentsInSelectedGen.length}</div>
+                        <p className="text-xs text-muted-foreground">Total students enrolled</p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Pending Submissions</CardTitle>
+                        <BookOpen className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                        <div className="text-2xl font-bold">N/A</div>
+                        <p className="text-xs text-muted-foreground">(Data not yet available)</p>
+                        </CardContent>
+                    </Card>
+                     <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Avg. Attendance</CardTitle>
+                        <BarChart2 className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                        <div className="text-2xl font-bold">N/A</div>
+                        <p className="text-xs text-muted-foreground">(Data not yet available)</p>
+                        </CardContent>
+                    </Card>
+                    <Card className="flex flex-col items-center justify-center bg-secondary/50">
+                        <CardHeader className="items-center pb-2">
+                        <CardTitle className="text-base font-medium">Group Chat</CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex flex-col items-center">
+                        <Group className="h-8 w-8 text-muted-foreground mb-2" />
+                        <Button onClick={handleOpenChat}>
+                            <MessageSquare className="mr-2 h-4 w-4" />
+                            Open {selectedGen} Chat
+                        </Button>
+                        </CardContent>
+                    </Card>
+                    </div>
+                ) : (
+                    <div className="flex h-48 items-center justify-center rounded-lg border-2 border-dashed">
+                    <p className="text-muted-foreground">{loading ? 'Loading...' : 'No student generations found.'}</p>
+                    </div>
+                )}
                 </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Avg. Attendance</CardTitle>
-                  <BarChart2 className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">N/A</div>
-                  <p className="text-xs text-muted-foreground">(Data not yet available)</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Pending Submissions</CardTitle>
-                  <BookOpen className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">N/A</div>
-                  <p className="text-xs text-muted-foreground">(Data not yet available)</p>
-                </CardContent>
-              </Card>
-              <Card className="flex flex-col items-center justify-center bg-secondary/50">
-                <CardHeader className="items-center pb-2">
-                  <CardTitle className="text-base font-medium">Group Chat</CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-col items-center">
-                  <Group className="h-8 w-8 text-muted-foreground mb-2" />
-                  <Button onClick={handleOpenChat}>
-                    <MessageSquare className="mr-2 h-4 w-4" />
-                    Open {selectedGen} Chat
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-          ) : (
-            <div className="flex h-48 items-center justify-center rounded-lg border-2 border-dashed">
-              <p className="text-muted-foreground">{loading ? 'Loading...' : 'No student generations found.'}</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            </Card>
+        </div>
 
-      <div className="grid grid-cols-1 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Submissions</CardTitle>
-            <CardDescription>New assignments waiting for your review across all generations.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">A list of recent submissions would go here. (Feature not yet implemented)</p>
-          </CardContent>
-        </Card>
+        <div className="lg:col-span-1">
+            <Card className="flex h-full flex-col">
+            <CardHeader>
+                <CardTitle>Recent Submissions</CardTitle>
+                <CardDescription>The latest work from your students.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex-1">
+                {loadingSubmissions ? (
+                    <div className="flex h-full items-center justify-center">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                ) : recentSubmissions.length > 0 ? (
+                    <div className="space-y-4">
+                        {recentSubmissions.map(sub => (
+                             <div key={sub.id} className="flex items-center gap-4">
+                                <Avatar className="h-10 w-10 border">
+                                    <AvatarFallback>{sub.studentName.charAt(0)}</AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1">
+                                    <p className="font-medium text-sm">{sub.studentName} <span className="text-muted-foreground">submitted</span></p>
+                                    <p className="text-sm font-semibold truncate hover:underline">
+                                         <Link href={`/assignments/${sub.assignmentId}`}>{sub.assignmentTitle}</Link>
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">{formatDistanceToNow(sub.submittedAt.toDate(), { addSuffix: true })}</p>
+                                </div>
+                             </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="flex h-full flex-col items-center justify-center rounded-lg border-2 border-dashed text-center p-4">
+                        <ListChecks className="h-10 w-10 text-muted-foreground" />
+                        <p className="mt-2 font-semibold">All caught up!</p>
+                        <p className="text-sm text-muted-foreground">No new submissions yet.</p>
+                    </div>
+                )}
+            </CardContent>
+            <CardFooter>
+                <Button asChild variant="outline" className="w-full">
+                    <Link href="/submissions">
+                        View All Submissions <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                </Button>
+            </CardFooter>
+            </Card>
+        </div>
       </div>
     </div>
   );
