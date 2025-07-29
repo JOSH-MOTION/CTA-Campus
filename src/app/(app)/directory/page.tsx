@@ -31,8 +31,8 @@ export default function DirectoryPage() {
       role: user.role === 'teacher' ? 'Teacher' : 'Administrator',
       department: user.role === 'teacher' ? `Teaches: ${user.gensTaught || 'N/A'}` : 'Administration',
       email: user.email,
-      phone: '555-000-0000', // Placeholder
-      office: 'Not specified', // Placeholder
+      linkedin: user.linkedin,
+      github: user.github,
       avatar: user.photoURL || `https://placehold.co/100x100.png?text=${user.displayName.charAt(0)}`,
       dataAiHint: user.role === 'teacher' ? 'teacher portrait' : 'admin portrait',
       availability: 'Please check the booking schedule for availability.', // Placeholder

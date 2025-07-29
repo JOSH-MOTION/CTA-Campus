@@ -7,7 +7,7 @@ import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter} from '@/components/ui/card';
 import {useAuth} from '@/contexts/AuthContext';
-import {Camera, LogOut, Loader2} from 'lucide-react';
+import {Camera, LogOut, Loader2, Linkedin, Github} from 'lucide-react';
 import {auth, storage, db} from '@/lib/firebase';
 import {ref, uploadBytes, getDownloadURL} from 'firebase/storage';
 import {updateProfile} from 'firebase/auth';
@@ -29,6 +29,8 @@ const profileSchema = z.object({
   lessonType: z.string().optional(),
   // teacher specific
   gensTaught: z.string().optional(),
+  linkedin: z.string().url("Please enter a valid URL.").optional().or(z.literal('')),
+  github: z.string().url("Please enter a valid URL.").optional().or(z.literal('')),
 });
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
@@ -57,6 +59,8 @@ export default function ProfilePage() {
         lessonDay: userData.lessonDay || '',
         lessonType: userData.lessonType || '',
         gensTaught: userData.gensTaught || '',
+        linkedin: userData.linkedin || '',
+        github: userData.github || '',
       });
     }
   }, [user, userData, form]);
@@ -114,8 +118,10 @@ export default function ProfilePage() {
         updateData.lessonDay = data.lessonDay;
         updateData.lessonType = data.lessonType;
     }
-    if (role === 'teacher') {
+    if (role === 'teacher' || role === 'admin') {
         updateData.gensTaught = data.gensTaught;
+        updateData.linkedin = data.linkedin;
+        updateData.github = data.github;
     }
 
     try {
@@ -262,20 +268,48 @@ export default function ProfilePage() {
                             />
                         </div>
                     )}
-                     {role === 'teacher' && (
-                        <FormField
-                            control={form.control}
-                            name="gensTaught"
-                            render={({ field }) => (
-                                <FormItem>
-                                <FormLabel>Generations Taught</FormLabel>
-                                <FormControl>
-                                    <Input placeholder="e.g. Gen 28, Gen 30" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                     {(role === 'teacher' || role === 'admin') && (
+                        <>
+                            <FormField
+                                control={form.control}
+                                name="gensTaught"
+                                render={({ field }) => (
+                                    <FormItem>
+                                    <FormLabel>Generations Taught</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="e.g. Gen 28, Gen 30" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                             <FormField
+                                control={form.control}
+                                name="linkedin"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="flex items-center gap-2"><Linkedin className="h-4 w-4" /> LinkedIn URL</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="https://linkedin.com/in/..." {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                             <FormField
+                                control={form.control}
+                                name="github"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="flex items-center gap-2"><Github className="h-4 w-4" /> GitHub URL</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="https://github.com/..." {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </>
                     )}
                 </CardContent>
                 <CardFooter>

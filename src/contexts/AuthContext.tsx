@@ -25,6 +25,8 @@ export interface UserData {
   gensTaught?: string;
   availableDays?: string[];
   timeSlots?: { startTime: string; endTime: string }[];
+  linkedin?: string;
+  github?: string;
 }
 
 interface AuthContextType {

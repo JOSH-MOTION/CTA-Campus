@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/card';
 import {Avatar, AvatarFallback, AvatarImage} from '@/components/ui/avatar';
 import {Button} from '@/components/ui/button';
-import {Mail, Phone, Building, MessageSquareQuote, Loader2, ServerCrash, Bot, CalendarPlus, MessageSquare} from 'lucide-react';
+import {Mail, Linkedin, Github, MessageSquareQuote, Loader2, ServerCrash, Bot, CalendarPlus, MessageSquare} from 'lucide-react';
 import {suggestContactMethod} from '@/ai/flows/suggested-contact-method';
 import {
   Dialog,
@@ -35,8 +35,8 @@ export interface Contact {
   role: string;
   department: string;
   email: string;
-  phone: string;
-  office: string;
+  linkedin?: string;
+  github?: string;
   avatar: string;
   dataAiHint: string;
   availability: string;
@@ -107,14 +107,22 @@ export function ContactCard({contact}: ContactCardProps) {
             {contact.email}
           </a>
         </div>
-        <div className="flex items-center gap-3">
-          <Phone className="h-4 w-4 shrink-0" />
-          <span>{contact.phone}</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <Building className="h-4 w-4 shrink-0" />
-          <span>{contact.office}</span>
-        </div>
+        {contact.linkedin && (
+          <div className="flex items-center gap-3">
+            <Linkedin className="h-4 w-4 shrink-0" />
+            <a href={contact.linkedin} target="_blank" rel="noopener noreferrer" className="truncate hover:underline">
+              LinkedIn Profile
+            </a>
+          </div>
+        )}
+        {contact.github && (
+          <div className="flex items-center gap-3">
+            <Github className="h-4 w-4 shrink-0" />
+            <a href={contact.github} target="_blank" rel="noopener noreferrer" className="truncate hover:underline">
+              GitHub Profile
+            </a>
+          </div>
+        )}
       </CardContent>
       <CardFooter className="flex flex-col gap-2">
          {role === 'student' && isFaculty && (

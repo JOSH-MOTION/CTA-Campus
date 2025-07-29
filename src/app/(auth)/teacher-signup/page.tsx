@@ -12,7 +12,7 @@ import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
 import {useToast} from '@/hooks/use-toast';
 import {useAuth} from '@/contexts/AuthContext';
-import {Camera, Compass} from 'lucide-react';
+import {Camera, Compass, Github, Linkedin} from 'lucide-react';
 import {Textarea} from '@/components/ui/textarea';
 import {Avatar, AvatarImage, AvatarFallback} from '@/components/ui/avatar';
 import Link from 'next/link';
@@ -23,6 +23,8 @@ export default function TeacherSignupPage() {
   const [fullName, setFullName] = useState('');
   const [gensTaught, setGensTaught] = useState('');
   const [bio, setBio] = useState('');
+  const [linkedin, setLinkedin] = useState('');
+  const [github, setGithub] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -79,6 +81,8 @@ export default function TeacherSignupPage() {
         role: 'teacher',
         gensTaught,
         bio,
+        linkedin,
+        github
       });
 
       setRole('teacher');
@@ -169,6 +173,14 @@ export default function TeacherSignupPage() {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
               />
+            </div>
+             <div className="space-y-2">
+                <Label htmlFor="linkedin" className="flex items-center gap-2"><Linkedin className="h-4 w-4" /> LinkedIn URL (Optional)</Label>
+                <Input id="linkedin" type="url" placeholder="https://linkedin.com/in/..." value={linkedin} onChange={e => setLinkedin(e.target.value)} />
+            </div>
+             <div className="space-y-2">
+                <Label htmlFor="github" className="flex items-center gap-2"><Github className="h-4 w-4" /> GitHub URL (Optional)</Label>
+                <Input id="github" type="url" placeholder="https://github.com/..." value={github} onChange={e => setGithub(e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="bio">Bio (Optional)</Label>
