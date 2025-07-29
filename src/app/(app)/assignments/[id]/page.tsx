@@ -17,6 +17,7 @@ import Link from 'next/link';
 import { awardPoint } from '@/services/points';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { useNotifications } from '@/contexts/NotificationsContext';
 
 export default function AssignmentSubmissionsPage() {
   const { id: assignmentId } = useParams();
@@ -28,6 +29,7 @@ export default function AssignmentSubmissionsPage() {
   const [gradingState, setGradingState] = useState<{[submissionId: string]: 'idle' | 'loading' | 'graded'}>({});
   const { toast } = useToast();
   const [submissionToDelete, setSubmissionToDelete] = useState<Submission | null>(null);
+  const { addNotificationForUser } = useNotifications();
 
   const assignment = assignments.find(a => a.id === assignmentId);
 
@@ -64,6 +66,14 @@ export default function AssignmentSubmissionsPage() {
         title: 'Submission Graded',
         description: `${submission.studentName} has been awarded 1 point.`,
       });
+      
+      // Send notification to the student
+      await addNotificationForUser(submission.studentId, {
+        title: `Your assignment "${submission.assignmentTitle}" has been graded!`,
+        description: 'You have been awarded 1 point.',
+        href: '/assignments',
+      });
+
     } catch (error: any) {
        toast({
         variant: 'destructive',
