@@ -12,6 +12,17 @@ import {Avatar, AvatarFallback} from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { AnnouncementActions } from '@/components/announcements/AnnouncementActions';
 
+// Function to find and wrap URLs in anchor tags
+const linkify = (text: string) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    return text.split(urlRegex).map((part, i) => {
+        if (part.match(urlRegex)) {
+            return <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80">{part}</a>;
+        }
+        return part;
+    });
+};
+
 export default function AnnouncementsPage() {
   const {role, userData} = useAuth();
   const {announcements, loading} = useAnnouncements();
@@ -67,7 +78,7 @@ export default function AnnouncementsPage() {
                   </div>
                   <AnnouncementActions announcement={announcement} />
                 </div>
-                <CardDescription className="pt-2">{announcement.content}</CardDescription>
+                <CardDescription className="pt-2 whitespace-pre-wrap break-words">{linkify(announcement.content)}</CardDescription>
               </CardHeader>
               <CardFooter className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Avatar className="h-6 w-6">

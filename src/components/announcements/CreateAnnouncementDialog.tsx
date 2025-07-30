@@ -92,7 +92,7 @@ export function CreateAnnouncementDialog({children}: CreateAnnouncementDialogPro
        toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Failed to create announcement. You may not have permission.',
+        description: 'Failed to create announcement.',
       });
     } finally {
         setIsSubmitting(false);
