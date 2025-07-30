@@ -31,7 +31,7 @@ import {
   History,
   BookCheck,
 } from 'lucide-react';
-import {SidebarMenu, SidebarMenuItem, SidebarMenuButton} from '@/components/ui/sidebar';
+import {SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarMenuBadge} from '@/components/ui/sidebar';
 import Link from 'next/link';
 import {usePathname} from 'next/navigation';
 import {useAuth} from '@/contexts/AuthContext';
@@ -94,7 +94,7 @@ export const adminNavItems = [
 
 export function SidebarNav() {
   const pathname = usePathname();
-  const {role} = useAuth();
+  const {role, totalUnreadChats} = useAuth();
   const {setOpenMobile} = useSidebar();
 
   let navItems;
@@ -122,12 +122,18 @@ export function SidebarNav() {
         const isActive =
           (pathname === '/' && item.href === '/') ||
           (item.href !== '/' && pathname.startsWith(item.href));
+        
+        const isChat = item.href === '/chat';
+
         return (
           <SidebarMenuItem key={item.label}>
             <SidebarMenuButton asChild isActive={isActive} tooltip={item.label}>
               <Link href={item.href} onClick={handleLinkClick}>
                 <item.icon />
                 <span>{item.label}</span>
+                {isChat && totalUnreadChats > 0 && (
+                    <SidebarMenuBadge>{totalUnreadChats > 9 ? '9+' : totalUnreadChats}</SidebarMenuBadge>
+                )}
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

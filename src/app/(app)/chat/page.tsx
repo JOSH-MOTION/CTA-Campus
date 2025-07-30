@@ -21,13 +21,12 @@ type ChatEntityType = 'dm' | 'group';
 type ChatEntity = {id: string; name: string; type: ChatEntityType; avatar?: string; dataAiHint: string};
 
 export default function ChatPage() {
-  const {user: currentUser, fetchAllUsers, userData, role} = useAuth();
+  const {user: currentUser, fetchAllUsers, userData, role, allUsers, unreadChatCounts, markChatAsRead} = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
   const {toast} = useToast();
   const { addNotificationForUser } = useNotifications();
 
-  const [allUsers, setAllUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [selectedChat, setSelectedChat] = useState<ChatEntity | null>(null);
@@ -35,18 +34,11 @@ export default function ChatPage() {
   const [activeTab, setActiveTab] = useState<'dms' | 'groups'>('dms');
   const messageUnsubscribeRef = useRef<Unsubscribe | null>(null);
 
-  const [unreadCounts, setUnreadCounts] = useState<{[chatId: string]: number}>({});
-  const allChatListeners = useRef<Unsubscribe[]>([]);
-
   useEffect(() => {
-    const loadUsers = async () => {
-      setLoading(true);
-      const users = await fetchAllUsers();
-      setAllUsers(users);
+    if (allUsers.length > 0) {
       setLoading(false);
-    };
-    loadUsers();
-  }, [fetchAllUsers]);
+    }
+  }, [allUsers]);
 
   const otherUsers = useMemo(() => {
     if (!currentUser || !role) return [];
@@ -87,7 +79,16 @@ export default function ChatPage() {
     setSelectedChat(entity);
     const newPath = entity.type === 'group' ? `/chat?group=${entity.id.replace('group-', '')}` : `/chat?dm=${entity.id}`;
     router.push(newPath, {scroll: false});
-  }, [router]);
+    
+    let chatId: string;
+    if (entity.type === 'dm' && currentUser) {
+        chatId = getChatId(currentUser.uid, entity.id);
+    } else {
+        chatId = entity.id;
+    }
+    markChatAsRead(chatId);
+
+  }, [router, currentUser, markChatAsRead]);
 
   useEffect(() => {
     if (loading || !currentUser) return;
@@ -117,38 +118,6 @@ export default function ChatPage() {
       }
   }, [loading, allUsers, groupChats, currentUser, searchParams, selectedChat]);
   
-  
-  useEffect(() => {
-    if (!currentUser) return;
-
-    const allChatEntities: ChatEntity[] = [
-      ...otherUsers.map(u => ({ id: getChatId(currentUser.uid, u.uid), name: u.displayName, type: 'dm' as const, avatar: u.photoURL, dataAiHint: 'user portrait' })),
-      ...groupChats.map(g => ({ ...g, type: 'group' as const })),
-    ];
-    
-    // Clear old listeners
-    allChatListeners.current.forEach(unsub => unsub());
-    allChatListeners.current = [];
-
-    allChatEntities.forEach(chat => {
-      const unsub = onMessages(chat.id, (newMessages) => {
-        if (!selectedChat || selectedChat.id !== chat.id) {
-          const lastSeenTimestamp = localStorage.getItem(`lastSeen_${chat.id}`) || '0';
-          const newUnreadCount = newMessages.filter(m => m.timestamp && m.timestamp.toMillis() > parseInt(lastSeenTimestamp, 10)).length;
-          
-          if(newUnreadCount > 0){
-             setUnreadCounts(prev => ({...prev, [chat.id]: newUnreadCount }));
-          }
-        }
-      });
-      allChatListeners.current.push(unsub);
-    });
-
-    return () => {
-      allChatListeners.current.forEach(unsub => unsub());
-    };
-  }, [allUsers, groupChats, currentUser, selectedChat]);
-
 
   useEffect(() => {
       if (!selectedChat || !currentUser) return;
@@ -165,9 +134,7 @@ export default function ChatPage() {
       }
       
       setMessages([]); // Clear previous messages
-      setUnreadCounts(prev => ({...prev, [chatId]: 0}));
-      localStorage.setItem(`lastSeen_${chatId}`, Date.now().toString());
-
+      markChatAsRead(chatId);
       
       const unsubscribe = onMessages(chatId, newMessages => {
         setMessages(newMessages);
@@ -185,7 +152,7 @@ export default function ChatPage() {
           messageUnsubscribeRef.current();
         }
       };
-    }, [selectedChat, currentUser]);
+    }, [selectedChat, currentUser, markChatAsRead]);
 
     const handleSendMessage = async (text: string, replyTo?: Message) => {
         if (!selectedChat || !text.trim() || !currentUser) return;
@@ -281,7 +248,7 @@ export default function ChatPage() {
                 <div className="space-y-1 p-2">
                   {otherUsers.map(user => {
                     const chatId = getChatId(currentUser!.uid, user.uid);
-                    const unreadCount = unreadCounts[chatId] || 0;
+                    const unreadCount = unreadChatCounts[chatId] || 0;
                     return (
                         <Button
                         key={user.uid}
@@ -314,7 +281,7 @@ export default function ChatPage() {
               ) : (
                 <div className="space-y-1 p-2">
                   {groupChats.map(group => {
-                     const unreadCount = unreadCounts[group.id] || 0;
+                     const unreadCount = unreadChatCounts[group.id] || 0;
                      return (
                         <Button
                         key={group.id}

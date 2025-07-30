@@ -1,11 +1,12 @@
 // src/contexts/AuthContext.tsx
 'use client';
 
-import {createContext, useContext, useState, ReactNode, useEffect, useCallback, FC} from 'react';
+import {createContext, useContext, useState, ReactNode, useEffect, useCallback, FC, useMemo} from 'react';
 import {auth, db} from '@/lib/firebase';
 import type {User} from 'firebase/auth';
 import {onAuthStateChanged}from 'firebase/auth';
-import {doc, getDoc, setDoc, collection, getDocs} from 'firebase/firestore';
+import {doc, getDoc, setDoc, collection, getDocs, Unsubscribe} from 'firebase/firestore';
+import { getChatId, onMessages } from '@/services/chat';
 
 export type UserRole = 'student' | 'teacher' | 'admin';
 
@@ -38,6 +39,9 @@ interface AuthContextType {
   setRole: (role: UserRole) => void;
   fetchAllUsers: () => Promise<UserData[]>;
   allUsers: UserData[];
+  unreadChatCounts: {[chatId: string]: number};
+  totalUnreadChats: number;
+  markChatAsRead: (chatId: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -49,6 +53,9 @@ const AuthContext = createContext<AuthContextType>({
     setRole: () => {},
     fetchAllUsers: async () => [],
     allUsers: [],
+    unreadChatCounts: {},
+    totalUnreadChats: 0,
+    markChatAsRead: () => {},
 });
 
 export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
@@ -57,6 +64,8 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
   const [role, setRole] = useState<UserRole | null>(null);
   const [loading, setLoading] = useState(true);
   const [allUsers, setAllUsers] = useState<UserData[]>([]);
+  const [unreadChatCounts, setUnreadChatCounts] = useState<{[chatId: string]: number}>({});
+  const totalUnreadChats = useMemo(() => Object.values(unreadChatCounts).reduce((acc, count) => acc + count, 0), [unreadChatCounts]);
 
   const fetchAllUsers = useCallback(async (): Promise<UserData[]> => {
     const usersCollection = collection(db, 'users');
@@ -65,6 +74,11 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
     setAllUsers(usersList);
     return usersList;
   }, []);
+
+  const markChatAsRead = (chatId: string) => {
+    setUnreadChatCounts(prev => ({ ...prev, [chatId]: 0 }));
+    localStorage.setItem(`lastSeen_${chatId}`, Date.now().toString());
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -96,6 +110,56 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
     return () => unsubscribe();
   }, [fetchAllUsers]);
 
+  // Global listener for unread messages
+  useEffect(() => {
+    if (!user || !userData || allUsers.length === 0) {
+      setUnreadChatCounts({});
+      return;
+    }
+
+    const otherUsers = allUsers.filter(u => u.uid !== user.uid);
+    const groupChats: {id: string}[] = [];
+    if(userData.role === 'teacher' || userData.role === 'admin') {
+      const allGens = new Set(allUsers.filter(u => u.role === 'student' && u.gen).map(u => u.gen));
+      allGens.forEach(gen => groupChats.push({ id: `group-${gen}`}));
+    } else if (userData.role === 'student' && userData.gen) {
+      groupChats.push({id: `group-${userData.gen}`});
+    }
+
+    const allChatIds = [
+      ...otherUsers.map(u => getChatId(user.uid, u.uid)),
+      ...groupChats.map(g => g.id),
+    ];
+    
+    const listeners: Unsubscribe[] = [];
+
+    allChatIds.forEach(chatId => {
+      const unsub = onMessages(chatId, (messages) => {
+        const lastSeenTimestamp = parseInt(localStorage.getItem(`lastSeen_${chatId}`) || '0', 10);
+        const newUnreadCount = messages.filter(m => 
+          m.timestamp && m.timestamp.toMillis() > lastSeenTimestamp && m.senderId !== user.uid
+        ).length;
+
+        if (newUnreadCount > 0) {
+          setUnreadChatCounts(prev => ({ ...prev, [chatId]: newUnreadCount }));
+        }
+      });
+      listeners.push(unsub);
+    });
+    
+    // Initial check
+    allChatIds.forEach(chatId => {
+        const lastSeen = localStorage.getItem(`lastSeen_${chatId}`);
+        if(!lastSeen) {
+             localStorage.setItem(`lastSeen_${chatId}`, '0');
+        }
+    });
+
+    return () => {
+      listeners.forEach(unsub => unsub());
+    };
+  }, [user, userData, allUsers]);
+
   const handleSetRole = async (newRole: UserRole) => {
     setRole(newRole);
     localStorage.setItem('userRole', newRole);
@@ -114,7 +178,7 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
   };
 
   return (
-    <AuthContext.Provider value={{user, userData, setUserData, role, loading, setRole: handleSetRole, fetchAllUsers, allUsers}}>
+    <AuthContext.Provider value={{user, userData, setUserData, role, loading, setRole: handleSetRole, fetchAllUsers, allUsers, unreadChatCounts, totalUnreadChats, markChatAsRead}}>
       {children}
     </AuthContext.Provider>
   );
