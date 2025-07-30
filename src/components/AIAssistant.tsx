@@ -1,7 +1,8 @@
+// src/components/AIAssistant.tsx
 'use client';
 
 import {useState, useRef, useEffect, type FormEvent} from 'react';
-import {Bot, User, Loader2, CornerDownLeft, Sparkles} from 'lucide-react';
+import {Bot, User, Loader2, CornerDownLeft, Sparkles, Trash2} from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -19,18 +20,33 @@ import {faqChatbot} from '@/ai/flows/faq-chatbot';
 import {cn} from '@/lib/utils';
 import {useToast} from '@/hooks/use-toast';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
-
-interface Message {
-  role: 'user' | 'assistant';
-  content: string;
-}
+import { useAuth } from '@/contexts/AuthContext';
+import { Message, onAiChatHistory, addAiChatMessage, clearAiChatHistory } from '@/services/aiChat';
+import { Unsubscribe } from 'firebase/firestore';
 
 export function AIAssistant() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const {toast} = useToast();
+  const { user } = useAuth();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const historyUnsubscribeRef = useRef<Unsubscribe | null>(null);
+
+
+  useEffect(() => {
+    if (user) {
+      if (historyUnsubscribeRef.current) {
+        historyUnsubscribeRef.current();
+      }
+      historyUnsubscribeRef.current = onAiChatHistory(user.uid, setMessages);
+    }
+    return () => {
+      if (historyUnsubscribeRef.current) {
+        historyUnsubscribeRef.current();
+      }
+    };
+  }, [user]);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -43,20 +59,25 @@ export function AIAssistant() {
 
   const handleSendMessage = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() || !user) return;
 
-    const userMessage: Message = {role: 'user', content: input};
-    setMessages(prev => [...prev, userMessage]);
+    const userMessage: Omit<Message, 'id'> = {role: 'user', content: input};
     setInput('');
     setIsLoading(true);
 
     try {
+      // Optimistically add user message to DB
+      await addAiChatMessage(user.uid, userMessage);
+      
       const response = await faqChatbot({query: input});
-      const assistantMessage: Message = {
+      const assistantMessage: Omit<Message, 'id'> = {
         role: 'assistant',
         content: response.answer,
       };
-      setMessages(prev => [...prev, assistantMessage]);
+      
+      // Add assistant message to DB
+      await addAiChatMessage(user.uid, assistantMessage);
+
     } catch (error) {
       console.error('Error with chatbot:', error);
       toast({
@@ -64,11 +85,29 @@ export function AIAssistant() {
         title: 'Error',
         description: "Sorry, I'm having trouble connecting. Please try again later.",
       });
-      setMessages(prev => prev.slice(0, -1));
+      // Here you might want to implement logic to remove the optimistic user message if it failed
     } finally {
       setIsLoading(false);
     }
   };
+
+  const handleClearHistory = async () => {
+      if (!user) return;
+      try {
+          await clearAiChatHistory(user.uid);
+          setMessages([]);
+          toast({
+              title: "History Cleared",
+              description: "Your chat history with the assistant has been deleted."
+          })
+      } catch (error) {
+          toast({
+              variant: 'destructive',
+              title: 'Error',
+              description: 'Could not clear your chat history.'
+          })
+      }
+  }
 
   return (
     <Sheet>
@@ -88,17 +127,33 @@ export function AIAssistant() {
       </TooltipProvider>
       <SheetContent className="flex w-full flex-col sm:max-w-lg">
         <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <Sparkles className="text-accent" />
-            AI-Powered Assistant
-          </SheetTitle>
+          <div className="flex justify-between items-center">
+            <SheetTitle className="flex items-center gap-2">
+              <Sparkles className="text-accent" />
+              AI-Powered Assistant
+            </SheetTitle>
+            {messages.length > 0 && (
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" onClick={handleClearHistory}>
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Clear History</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+            )}
+          </div>
           <SheetDescription>
-            Answers FAQs related to campus facilities, policies, and procedures.
+            Answers FAQs related to campus facilities, policies, and procedures. Your chat history is saved.
           </SheetDescription>
         </SheetHeader>
         <ScrollArea className="flex-1 overflow-hidden" ref={scrollAreaRef}>
           <div className="space-y-4 pr-4 py-4">
-            {messages.length === 0 && (
+            {messages.length === 0 && !isLoading && (
               <div className="flex h-full items-center justify-center">
                 <p className="text-center text-muted-foreground">
                   Ask me anything about campus life!
@@ -155,13 +210,13 @@ export function AIAssistant() {
               onChange={e => setInput(e.target.value)}
               placeholder="Ask about library hours..."
               className="pr-12"
-              disabled={isLoading}
+              disabled={isLoading || !user}
             />
             <Button
               type="submit"
               size="icon"
               className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
-              disabled={isLoading || !input.trim()}
+              disabled={isLoading || !input.trim() || !user}
               variant="ghost"
             >
               <CornerDownLeft className="h-4 w-4" />
