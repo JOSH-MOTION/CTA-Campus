@@ -31,9 +31,9 @@ const prompt = ai.definePrompt({
   output: {schema: FaqChatbotOutputSchema},
   prompt: `You are a helpful AI assistant that answers questions about campus facilities, policies, and procedures.
 
-  User query: {{{query}}}
+User query: {{{query}}}
 
-  Answer:`,
+Answer:`,
 });
 
 const faqChatbotFlow = ai.defineFlow(
