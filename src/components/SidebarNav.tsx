@@ -36,6 +36,7 @@ import Link from 'next/link';
 import {usePathname} from 'next/navigation';
 import {useAuth} from '@/contexts/AuthContext';
 import {useSidebar} from '@/components/ui/sidebar';
+import { useCallback } from 'react';
 
 export const studentNavItems = [
   {href: '/', label: 'Dashboard', icon: LayoutDashboard},
@@ -112,9 +113,9 @@ export function SidebarNav() {
       navItems = [];
   }
 
-  const handleLinkClick = () => {
+  const handleLinkClick = useCallback(() => {
     setOpenMobile(false);
-  };
+  }, [setOpenMobile]);
 
   return (
     <SidebarMenu className="mt-8">

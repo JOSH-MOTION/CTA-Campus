@@ -5,7 +5,7 @@ import {createContext, useContext, useState, ReactNode, useEffect, useCallback, 
 import {auth, db} from '@/lib/firebase';
 import type {User} from 'firebase/auth';
 import {onAuthStateChanged}from 'firebase/auth';
-import {doc, getDoc, setDoc, collection, getDocs, Unsubscribe} from 'firebase/firestore';
+import {doc, getDoc, setDoc, collection, getDocs, Unsubscribe, onSnapshot} from 'firebase/firestore';
 import { getChatId, onMessages } from '@/services/chat';
 
 export type UserRole = 'student' | 'teacher' | 'admin';
@@ -68,20 +68,25 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
   const totalUnreadChats = useMemo(() => Object.values(unreadChatCounts).reduce((acc, count) => acc + count, 0), [unreadChatCounts]);
 
   const fetchAllUsers = useCallback(async (): Promise<UserData[]> => {
-    const usersCollection = collection(db, 'users');
-    const usersSnapshot = await getDocs(usersCollection);
-    const usersList = usersSnapshot.docs.map(doc => doc.data() as UserData);
-    setAllUsers(usersList);
-    return usersList;
+    try {
+        const usersCollection = collection(db, 'users');
+        const usersSnapshot = await getDocs(usersCollection);
+        const usersList = usersSnapshot.docs.map(doc => doc.data() as UserData);
+        setAllUsers(usersList);
+        return usersList;
+    } catch(e) {
+        console.error("Error fetching all users:", e);
+        return [];
+    }
   }, []);
 
   const markChatAsRead = (chatId: string) => {
     setUnreadChatCounts(prev => ({ ...prev, [chatId]: 0 }));
     localStorage.setItem(`lastSeen_${chatId}`, Date.now().toString());
   };
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+  
+    useEffect(() => {
+    const authUnsubscribe = onAuthStateChanged(auth, async (user) => {
       setLoading(true);
       if (user) {
         setUser(user);
@@ -92,11 +97,9 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
           setUserData(data);
           setRole(data.role);
           localStorage.setItem('userRole', data.role);
-          await fetchAllUsers(); // Fetch all users after getting current user data
         } else {
-            // Case for newly signed up user where doc might not be available
-             const storedRole = localStorage.getItem('userRole') as UserRole;
-             if(storedRole) setRole(storedRole);
+            const storedRole = localStorage.getItem('userRole') as UserRole;
+            if(storedRole) setRole(storedRole);
         }
       } else {
         setUser(null);
@@ -104,11 +107,25 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
         setRole(null);
         localStorage.removeItem('userRole');
         setAllUsers([]);
+        setUnreadChatCounts({});
       }
       setLoading(false);
     });
+
+    return () => authUnsubscribe();
+  }, []);
+
+
+  // Listener for all users
+   useEffect(() => {
+    const usersCol = collection(db, 'users');
+    const unsubscribe = onSnapshot(usersCol, (snapshot) => {
+        const usersList = snapshot.docs.map(doc => doc.data() as UserData);
+        setAllUsers(usersList);
+    });
     return () => unsubscribe();
-  }, [fetchAllUsers]);
+   }, []);
+
 
   // Global listener for unread messages
   useEffect(() => {
@@ -142,6 +159,9 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
 
         if (newUnreadCount > 0) {
           setUnreadChatCounts(prev => ({ ...prev, [chatId]: newUnreadCount }));
+        } else {
+          // ensure count is 0 if no new messages
+          setUnreadChatCounts(prev => ({ ...prev, [chatId]: 0 }));
         }
       });
       listeners.push(unsub);
