@@ -122,6 +122,8 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
     const unsubscribe = onSnapshot(usersCol, (snapshot) => {
         const usersList = snapshot.docs.map(doc => doc.data() as UserData);
         setAllUsers(usersList);
+    }, (error) => {
+        console.error("Error fetching all users:", error);
     });
     return () => unsubscribe();
    }, []);
@@ -138,7 +140,9 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
     const groupChats: {id: string}[] = [];
     if(userData.role === 'teacher' || userData.role === 'admin') {
       const allGens = new Set(allUsers.filter(u => u.role === 'student' && u.gen).map(u => u.gen));
-      allGens.forEach(gen => groupChats.push({ id: `group-${gen}`}));
+      allGens.forEach(gen => {
+        if(gen) groupChats.push({ id: `group-${gen}`})
+      });
     } else if (userData.role === 'student' && userData.gen) {
       groupChats.push({id: `group-${userData.gen}`});
     }
