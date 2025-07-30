@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useMemo } from 'react';
 import {
   Accordion,
   AccordionContent,
@@ -9,15 +10,42 @@ import {
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import {CheckCircle, Circle, Loader2} from 'lucide-react';
 import {useRoadmap} from '@/contexts/RoadmapContext';
-import {useAuth} from '@/contexts/AuthContext';
+import {useAuth, UserData} from '@/contexts/AuthContext';
 import {Checkbox} from '@/components/ui/checkbox';
 import {Label} from '@/components/ui/label';
 import {cn} from '@/lib/utils';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 export default function RoadmapPage() {
-  const {roadmapData, completedWeeks, toggleWeekCompletion, loading} = useRoadmap();
-  const {role} = useAuth();
-  const isTeacher = role === 'teacher' || role === 'admin';
+  const {roadmapData, completedWeeks, completionMap, toggleWeekCompletion, loading} = useRoadmap();
+  const {role, userData} = useAuth();
+  const isTeacherOrAdmin = role === 'teacher' || role === 'admin';
+  
+  // For teachers, determine which generations they can manage
+  const manageableGens = useMemo(() => {
+    if (!userData || !isTeacherOrAdmin) return [];
+    if (role === 'admin') {
+      const allGens = new Set<string>();
+      Object.values(completionMap).forEach(genMap => {
+        Object.keys(genMap).forEach(gen => allGens.add(gen));
+      });
+      // A bit of a hack to discover all gens, ideally this comes from a central list
+      // For now, let's assume userData.gensTaught is a good starting point for admins too.
+      const taughtGens = userData?.gensTaught?.split(',').map(g => g.trim()).filter(Boolean) || [];
+      taughtGens.forEach(g => allGens.add(g));
+      return Array.from(allGens).sort();
+    }
+    return userData.gensTaught?.split(',').map(g => g.trim()).filter(Boolean) || [];
+  }, [userData, isTeacherOrAdmin, role, completionMap]);
+
+  const [selectedGen, setSelectedGen] = useState(manageableGens[0] || '');
+
+  // Select the first available generation by default for teachers
+  useEffect(() => {
+    if (isTeacherOrAdmin && manageableGens.length > 0 && !selectedGen) {
+      setSelectedGen(manageableGens[0]);
+    }
+  }, [isTeacherOrAdmin, manageableGens, selectedGen]);
 
   if (loading) {
     return (
@@ -29,12 +57,29 @@ export default function RoadmapPage() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-3xl font-bold tracking-tight">Academic Roadmap</h1>
-        <p className="text-muted-foreground">The full curriculum from start to finish.</p>
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+        <div className="space-y-1">
+            <h1 className="text-3xl font-bold tracking-tight">Academic Roadmap</h1>
+            <p className="text-muted-foreground">The full curriculum from start to finish.</p>
+        </div>
+        {isTeacherOrAdmin && manageableGens.length > 0 && (
+            <div className="flex items-center gap-2">
+                <Label htmlFor="gen-selector">Viewing progress for:</Label>
+                <Select value={selectedGen} onValueChange={setSelectedGen}>
+                    <SelectTrigger id="gen-selector" className="w-[180px]">
+                        <SelectValue placeholder="Select Gen" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {manageableGens.map(gen => (
+                            <SelectItem key={gen} value={gen}>{gen}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+        )}
       </div>
 
-      <Accordion type="single" collapsible className="w-full space-y-4">
+      <Accordion type="single" collapsible className="w-full space-y-4" defaultValue="item-0">
         {roadmapData.map((topic, index) => (
           <AccordionItem
             key={index}
@@ -52,20 +97,24 @@ export default function RoadmapPage() {
                 <div className="grid gap-4 md:grid-cols-2">
                   {topic.weeks.map(week => {
                     const weekId = `${topic.title}-${week.title}`;
-                    const isCompleted = completedWeeks.has(weekId);
+                    const isCompletedForStudent = completedWeeks.has(weekId);
+                    const isCompletedForTeacherView = isTeacherOrAdmin ? completionMap[weekId]?.[selectedGen] ?? false : false;
+                    const isCompleted = isTeacherOrAdmin ? isCompletedForTeacherView : isCompletedForStudent;
+
                     return (
                       <Card key={weekId}>
                         <CardHeader>
                           <div className="flex items-center justify-between">
                             <CardTitle className="text-base">{week.title}</CardTitle>
-                            {isTeacher ? (
+                            {isTeacherOrAdmin ? (
                               <div className="flex items-center space-x-2">
                                 <Checkbox
-                                  id={weekId}
+                                  id={`${weekId}-${selectedGen}`}
                                   checked={isCompleted}
-                                  onCheckedChange={() => toggleWeekCompletion(weekId, isCompleted)}
+                                  onCheckedChange={() => toggleWeekCompletion(weekId, selectedGen, isCompleted)}
+                                  disabled={!selectedGen}
                                 />
-                                <Label htmlFor={weekId} className="text-sm font-normal">
+                                <Label htmlFor={`${weekId}-${selectedGen}`} className="text-sm font-normal">
                                   Mark as done
                                 </Label>
                               </div>

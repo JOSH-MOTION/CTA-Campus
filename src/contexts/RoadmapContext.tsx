@@ -3,7 +3,7 @@
 
 import {createContext, useContext, useState, ReactNode, FC, useEffect} from 'react';
 import { useAuth } from './AuthContext';
-import { onRoadmapStatus, setWeekCompletion, WeekCompletionStatus } from '@/services/roadmap';
+import { onRoadmapStatus, setWeekCompletion, WeekCompletionStatusMap } from '@/services/roadmap';
 
 // The structure for a single topic, including its unique ID
 export interface Topic {
@@ -26,7 +26,8 @@ export interface RoadmapSubject {
 
 interface RoadmapContextType {
   completedWeeks: Set<string>;
-  toggleWeekCompletion: (weekId: string, currentStatus: boolean) => void;
+  completionMap: WeekCompletionStatusMap;
+  toggleWeekCompletion: (weekId: string, gen: string, currentStatus: boolean) => void;
   roadmapData: RoadmapSubject[];
   loading: boolean;
 }
@@ -428,37 +429,43 @@ const roadmapData: RoadmapSubject[] = [
 const RoadmapContext = createContext<RoadmapContextType | undefined>(undefined);
 
 export const RoadmapProvider: FC<{children: ReactNode}> = ({children}) => {
+  const [completionMap, setCompletionMap] = useState<WeekCompletionStatusMap>({});
   const [completedWeeks, setCompletedWeeks] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
-  const { user, role } = useAuth();
+  const { user, userData } = useAuth();
 
   useEffect(() => {
     if (!user) {
       setLoading(false);
       return;
     }
-    const unsubscribe = onRoadmapStatus((status) => {
-      const completed = new Set<string>();
-      Object.entries(status).forEach(([weekId, isCompleted]) => {
-        if (isCompleted) {
-          completed.add(weekId);
+    const unsubscribe = onRoadmapStatus((statusMap) => {
+        setCompletionMap(statusMap);
+        
+        // For students, calculate their specific completed weeks
+        if (userData?.gen) {
+            const userGen = userData.gen;
+            const completed = new Set<string>();
+            Object.entries(statusMap).forEach(([weekId, genMap]) => {
+                if (genMap[userGen]) {
+                    completed.add(weekId);
+                }
+            });
+            setCompletedWeeks(completed);
         }
-      });
-      setCompletedWeeks(completed);
-      setLoading(false);
+      
+        setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, userData?.gen]);
 
-  const toggleWeekCompletion = (weekId: string, currentStatus: boolean) => {
-    if (role === 'teacher' || role === 'admin') {
-      setWeekCompletion(weekId, !currentStatus);
-    }
+  const toggleWeekCompletion = (weekId: string, gen: string, currentStatus: boolean) => {
+    setWeekCompletion(weekId, gen, !currentStatus);
   };
 
   return (
-    <RoadmapContext.Provider value={{roadmapData, completedWeeks, toggleWeekCompletion, loading}}>
+    <RoadmapContext.Provider value={{roadmapData, completedWeeks, completionMap, toggleWeekCompletion, loading}}>
       {children}
     </RoadmapContext.Provider>
   );
