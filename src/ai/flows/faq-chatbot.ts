@@ -33,7 +33,7 @@ const prompt = ai.definePrompt({
 
   User query: {{{query}}}
 
-  Answer:`, // Removed unnecessary backticks
+  Answer:`,
 });
 
 const faqChatbotFlow = ai.defineFlow(
