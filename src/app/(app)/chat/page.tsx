@@ -211,7 +211,7 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="grid h-[calc(100vh-8rem)] grid-cols-1 md:grid-cols-3 xl:grid-cols-4">
+    <div className="grid h-[calc(100vh_-_theme(spacing.16))] grid-cols-1 md:grid-cols-3 xl:grid-cols-4">
       <div className="flex flex-col border-r bg-card md:col-span-1 xl:col-span-1">
         <div className="p-4">
           <h1 className="text-2xl font-bold">Campus Connect</h1>
