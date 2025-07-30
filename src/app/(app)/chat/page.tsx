@@ -35,7 +35,7 @@ export default function ChatPage() {
   const messageUnsubscribeRef = useRef<Unsubscribe | null>(null);
 
   const [unreadCounts, setUnreadCounts] = useState<{[chatId: string]: number}>({});
-  const [allChatListeners, setAllChatListeners] = useState<Unsubscribe[]>([]);
+  const allChatListeners = useRef<Unsubscribe[]>([]);
 
   useEffect(() => {
     const loadUsers = async () => {
