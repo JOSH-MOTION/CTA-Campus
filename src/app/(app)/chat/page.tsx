@@ -15,6 +15,7 @@ import {Unsubscribe} from 'firebase/firestore';
 import {useToast} from '@/hooks/use-toast';
 import {Badge} from '@/components/ui/badge';
 import { useNotifications } from '@/contexts/NotificationsContext';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 type ChatEntityType = 'dm' | 'group';
 type ChatEntity = {id: string; name: string; type: ChatEntityType; avatar?: string; dataAiHint: string};
@@ -270,7 +271,7 @@ export default function ChatPage() {
               <Users className="mr-2" /> Groups
             </TabsTrigger>
           </TabsList>
-          <div className="flex-1 overflow-y-auto">
+          <ScrollArea className="flex-1">
             <TabsContent value="dms" className="m-0">
               {loading ? (
                 <div className="flex justify-center items-center p-4">
@@ -336,7 +337,7 @@ export default function ChatPage() {
                 </div>
               )}
             </TabsContent>
-          </div>
+          </ScrollArea>
         </Tabs>
       </div>
 
