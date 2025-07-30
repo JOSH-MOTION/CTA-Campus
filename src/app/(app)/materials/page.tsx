@@ -65,16 +65,17 @@ export default function MaterialsPage() {
   }, [toast]);
   
   const unlockedWeekIds = useMemo(() => {
-    if (isTeacherOrAdmin) return null;
+    if (isTeacherOrAdmin) return null; // Teachers/admins see everything
 
-    const unlocked = new Set<string>();
+    // Students start with all their completed weeks unlocked
+    const unlocked = new Set<string>(completedWeeks);
 
     roadmapData.forEach(subject => {
         let lastCompletedWeekIndex = -1;
+        // Find the index of the last completed week in this subject
         subject.weeks.forEach((week, index) => {
             const weekId = `${subject.title}-${week.title}`;
             if (completedWeeks.has(weekId)) {
-                unlocked.add(weekId);
                 lastCompletedWeekIndex = index;
             }
         });
@@ -83,6 +84,10 @@ export default function MaterialsPage() {
         if (lastCompletedWeekIndex !== -1 && lastCompletedWeekIndex + 1 < subject.weeks.length) {
             const nextWeek = subject.weeks[lastCompletedWeekIndex + 1];
             unlocked.add(`${subject.title}-${nextWeek.title}`);
+        } else if (lastCompletedWeekIndex === -1 && subject.weeks.length > 0) {
+            // If no weeks are completed in this subject, unlock the first one
+            const firstWeek = subject.weeks[0];
+            unlocked.add(`${subject.title}-${firstWeek.title}`);
         }
     });
 
