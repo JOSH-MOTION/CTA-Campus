@@ -302,8 +302,8 @@ export default function ChatPage() {
               <Users className="mr-2" /> Groups
             </TabsTrigger>
           </TabsList>
-          <div className="flex-1 relative">
-            <ScrollArea className="absolute h-full w-full">
+          <div className="flex-1 overflow-y-auto">
+            <ScrollArea className="h-full">
                 <TabsContent value="dms" className="m-0">
                 {loading ? (
                     <div className="flex justify-center items-center p-4">
