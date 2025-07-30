@@ -39,7 +39,17 @@ export function AIAssistant() {
       if (historyUnsubscribeRef.current) {
         historyUnsubscribeRef.current();
       }
-      historyUnsubscribeRef.current = onAiChatHistory(user.uid, setMessages);
+      // Set loading to true when starting to listen
+      setIsLoading(true);
+      historyUnsubscribeRef.current = onAiChatHistory(user.uid, (newMessages) => {
+        setMessages(newMessages);
+        // Set loading to false once the initial data is loaded
+        setIsLoading(false);
+      });
+    } else {
+        // Clear messages and stop loading if user logs out
+        setMessages([]);
+        setIsLoading(false);
     }
     return () => {
       if (historyUnsubscribeRef.current) {
@@ -62,7 +72,7 @@ export function AIAssistant() {
     if (!input.trim() || !user) return;
 
     const currentInput = input;
-    const optimisticUserMessage: Message = { id: 'temp-user', role: 'user', content: currentInput };
+    const optimisticUserMessage: Message = { id: `temp-${Date.now()}`, role: 'user', content: currentInput, timestamp: new Date().toISOString() };
     
     setMessages(prev => [...prev, optimisticUserMessage]);
     setInput('');
@@ -74,17 +84,14 @@ export function AIAssistant() {
       const assistantMessageContent = response.answer;
 
       // 2. Create the final message objects to be saved
-      const userMessage: Omit<Message, 'id'> = { role: 'user', content: currentInput };
-      const assistantMessage: Omit<Message, 'id'> = { role: 'assistant', content: assistantMessageContent };
+      const userMessage: Omit<Message, 'id' | 'timestamp'> = { role: 'user', content: currentInput };
+      const assistantMessage: Omit<Message, 'id' | 'timestamp'> = { role: 'assistant', content: assistantMessageContent };
 
       // 3. Save both to the database
       await addAiChatMessage(user.uid, userMessage);
       await addAiChatMessage(user.uid, assistantMessage);
-
-      // The onSnapshot listener will automatically update the UI with the real messages from DB
-      // including the assistant's response. We just need to remove the optimistic one.
-      setMessages(prev => prev.filter(m => m.id !== 'temp-user'));
-
+      // The onSnapshot listener will automatically update the UI with the real messages.
+      
     } catch (error) {
       console.error('Error with chatbot:', error);
       toast({
@@ -93,11 +100,13 @@ export function AIAssistant() {
         description: "Sorry, I'm having trouble connecting. Please try again later.",
       });
       // Remove the optimistic user message on error
-      setMessages(prev => prev.filter(m => m.id !== 'temp-user'));
+      setMessages(prev => prev.filter(m => m.id !== optimisticUserMessage.id));
     } finally {
-      setIsLoading(true); // Keep loading true until snapshot updates
+      // The listener will turn off the loading state when it receives the new messages.
+      // This is more reliable than turning it off here directly.
     }
   };
+
 
   const handleClearHistory = async () => {
       if (!user) return;
@@ -116,18 +125,6 @@ export function AIAssistant() {
           })
       }
   }
-
-  // Effect to turn off loading state once the messages state reflects the new data
-  // This is a workaround for the async nature of Firestore listeners
-  useEffect(() => {
-    if (isLoading) {
-      const lastMessage = messages[messages.length - 1];
-      if (lastMessage && lastMessage.id !== 'temp-user') {
-        setIsLoading(false);
-      }
-    }
-  }, [messages, isLoading]);
-
 
   return (
     <Sheet>
@@ -180,7 +177,7 @@ export function AIAssistant() {
                 </p>
               </div>
             )}
-            {messages.map((message, index) => (
+            {messages.map((message) => (
               <div
                 key={message.id}
                 className={cn('flex items-start gap-3', message.role === 'user' ? 'justify-end' : '')}
@@ -209,7 +206,7 @@ export function AIAssistant() {
                 )}
               </div>
             ))}
-            {isLoading && (
+            {isLoading && messages.length > 0 && messages[messages.length-1].role === 'user' && (
               <div className="flex items-start gap-3">
                 <Avatar className="h-8 w-8 border">
                   <AvatarFallback className="bg-primary text-primary-foreground">

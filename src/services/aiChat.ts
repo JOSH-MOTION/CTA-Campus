@@ -9,6 +9,7 @@ import {
     deleteDoc,
     getDocs,
     writeBatch,
+    Timestamp,
   } from 'firebase/firestore';
   import { db } from '@/lib/firebase';
   
@@ -16,6 +17,7 @@ import {
     id: string;
     role: 'user' | 'assistant';
     content: string;
+    timestamp: string; // ISO string for consistency
   }
   
   /**
@@ -32,7 +34,12 @@ import {
       q,
       (querySnapshot) => {
         const messages: Message[] = querySnapshot.docs.map(doc => {
-          return { id: doc.id, ...doc.data() } as Message;
+          const data = doc.data();
+          return { 
+              id: doc.id, 
+              ...data,
+              timestamp: (data.timestamp as Timestamp)?.toDate().toISOString() || new Date().toISOString()
+            } as Message;
         });
         callback(messages);
       },
@@ -49,7 +56,7 @@ import {
    * @param userId - The ID of the user.
    * @param message - The message object to add (role and content).
    */
-  export const addAiChatMessage = async (userId: string, message: Omit<Message, 'id'>) => {
+  export const addAiChatMessage = async (userId: string, message: Omit<Message, 'id' | 'timestamp'>) => {
     try {
       const historyCol = collection(db, 'users', userId, 'ai_chat_history');
       await addDoc(historyCol, {
