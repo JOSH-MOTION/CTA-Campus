@@ -3,85 +3,100 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper function to check for teacher or admin role
-    function isTeacherOrAdmin(userId) {
-      return get(/databases/$(database)/documents/users/$(userId)).data.role in ['teacher', 'admin'];
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
     }
 
-    // Users can read/update their own data. Any authenticated user can read public profiles.
+    function isTeacherOrAdmin() {
+      // Use the custom claims if set, or get from the user's document.
+      // For this app, we rely on the document data.
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['teacher', 'admin'];
+    }
+
+    function isStudent() {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'student';
+    }
+
+    // Default deny all reads and writes
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // USER PROFILES
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow update: if request.auth.uid == userId;
-      allow create: if request.auth.uid == userId;
+      // Any authenticated user can read any other user's profile (for Directory, Chat, etc.)
+      allow read: if isAuthenticated();
+      // A user can only create or update their own profile.
+      allow write: if request.auth.uid == userId;
     }
 
-    // Public content readable by any authenticated user, writable only by teachers/admins.
-    match /announcements/{announcementId} {
-      allow read: if request.auth != null;
-      allow write: if isTeacherOrAdmin(request.auth.uid);
+    // ANNOUNCEMENTS, ASSIGNMENTS, PROJECTS, EXERCISES, RESOURCES
+    // All authenticated users can read these collections.
+    // Only teachers or admins can write to them.
+    match /announcements/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isTeacherOrAdmin();
+    }
+    match /assignments/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isTeacherOrAdmin();
+    }
+    match /projects/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isTeacherOrAdmin();
+    }
+    match /exercises/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isTeacherOrAdmin();
+    }
+    match /resources/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isTeacherOrAdmin();
+    }
+    match /materials/{docId} {
+        allow read: if isAuthenticated();
+        allow write: if isTeacherOrAdmin();
     }
 
-    match /assignments/{assignmentId} {
-      allow read: if request.auth != null;
-      allow write: if isTeacherOrAdmin(request.auth.uid);
-    }
-    
-    match /exercises/{exerciseId} {
-      allow read: if request.auth != null;
-      allow write: if isTeacherOrAdmin(request.auth.uid);
-    }
-
-    match /projects/{projectId} {
-      allow read: if request.auth != null;
-      allow write: if isTeacherOrAdmin(request.auth.uid);
-    }
-
-    match /resources/{resourceId} {
-      allow read: if request.auth != null;
-      allow write: if isTeacherOrAdmin(request.auth.uid);
-    }
-    
-    match /materials/{materialId} {
-        allow read: if request.auth != null;
-        allow write: if isTeacherOrAdmin(request.auth.uid);
-    }
-
-    // Submissions can be created by the student, but only read/deleted by teachers/admins.
+    // SUBMISSIONS
     match /submissions/{submissionId} {
-      allow read: if isTeacherOrAdmin(request.auth.uid);
-      allow create: if request.auth.uid == request.resource.data.studentId;
-      allow delete: if isTeacherOrAdmin(request.auth.uid);
-      allow update: if false; // Submissions should not be updatable
-    }
-
-    // Users can only manage their own points.
-    match /users/{userId}/points/{pointId} {
-      allow read, write: if request.auth.uid == userId;
+        // Students can only create submissions for themselves.
+        allow create: if isStudent() && request.resource.data.studentId == request.auth.uid;
+        // Teachers/Admins can read and delete any submission.
+        allow read, delete: if isTeacherOrAdmin();
     }
     
-    // Users can only manage their own AI chat history
-    match /users/{userId}/ai-chat-history/{messageId} {
-        allow read, write, delete: if request.auth.uid == userId;
-    }
-
-    // Notifications are specific to each user.
-    match /notifications/{notificationId} {
-      allow read, write: if request.auth.uid == request.resource.data.userId;
-    }
-    
-    // Roadmap status is read-only for students, writable for teachers/admins
+    // ROADMAP STATUS
     match /roadmap_status/{weekId} {
-        allow read: if request.auth != null;
-        allow write: if isTeacherOrAdmin(request.auth.uid);
+        // Any authenticated user can read the status.
+        allow read: if isAuthenticated();
+        // Only teachers/admins can change the completion status.
+        allow write: if isTeacherOrAdmin();
     }
 
-    // Chat messages are readable/writable by participants.
-    // For DMs (e.g., 'uid1-uid2'), check if the user is one of the two.
-    // For group chats (e.g., 'group-Gen30'), we'll need a more complex rule,
-    // but for now, we will allow any authenticated user to read/write to any group chat.
-    // A production app would lock this down further with user roles/group memberships.
+    // NOTIFICATIONS & POINTS
+    // Users can only access their own subcollections.
+    match /users/{userId}/notifications/{notificationId} {
+        allow read, write: if request.auth.uid == userId;
+    }
+    match /users/{userId}/points/{pointId} {
+        allow read, write: if request.auth.uid == userId;
+    }
+
+    // AI CHAT HISTORY
+    match /users/{userId}/ai-chats/{chatId} {
+        allow read, write: if request.auth.uid == userId;
+    }
+    
+    // CHATS
     match /chats/{chatId}/messages/{messageId} {
-        allow read, write: if request.auth != null;
+        // Allow read/write if the user is part of the chat.
+        // For DMs, the chatId is 'uid1-uid2'.
+        // For groups, the chatId is 'group-GenXX'.
+        // We'll allow any authenticated user to read/write for now for simplicity,
+        // as determining membership within rules can be complex without a dedicated 'members' list.
+        allow read, write: if isAuthenticated();
     }
   }
 }
