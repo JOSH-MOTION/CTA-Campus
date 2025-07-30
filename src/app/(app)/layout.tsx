@@ -30,6 +30,7 @@ import {Button} from '@/components/ui/button';
 import {User} from 'lucide-react';
 import Link from 'next/link';
 import { NotificationBell } from '@/components/NotificationBell';
+import { cn } from '@/lib/utils';
 
 const MemoizedProtectedLayout = memo(function ProtectedLayout({children}: {children: ReactNode}) {
   const {user, role, loading} = useAuth();
@@ -131,7 +132,10 @@ const MemoizedProtectedLayout = memo(function ProtectedLayout({children}: {child
                         </div>
                       </header>
                       <main className="flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
-                      <div className="fixed bottom-6 right-6 z-50">
+                      <div className={cn(
+                        "fixed bottom-6 right-6 z-50",
+                        pathname === '/chat' && 'bottom-24 md:bottom-6'
+                      )}>
                           <AIAssistant />
                       </div>
                     </SidebarInset>
