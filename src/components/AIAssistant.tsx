@@ -62,21 +62,28 @@ export function AIAssistant() {
     if (!input.trim() || !user) return;
 
     const currentInput = input;
-    const userMessage: Message = { id: 'temp-user', role: 'user', content: currentInput };
+    const optimisticUserMessage: Message = { id: 'temp-user', role: 'user', content: currentInput };
     
+    setMessages(prev => [...prev, optimisticUserMessage]);
     setInput('');
-    setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
-
+    
     try {
+      // 1. Get AI response
       const response = await faqChatbot({query: currentInput});
       const assistantMessageContent = response.answer;
 
-      const userMessageToSave: Omit<Message, 'id'> = { role: 'user', content: currentInput };
-      await addAiChatMessage(user.uid, userMessageToSave);
-      
-      const assistantMessageToSave: Omit<Message, 'id'> = { role: 'assistant', content: assistantMessageContent };
-      await addAiChatMessage(user.uid, assistantMessageToSave);
+      // 2. Create the final message objects to be saved
+      const userMessage: Omit<Message, 'id'> = { role: 'user', content: currentInput };
+      const assistantMessage: Omit<Message, 'id'> = { role: 'assistant', content: assistantMessageContent };
+
+      // 3. Save both to the database
+      await addAiChatMessage(user.uid, userMessage);
+      await addAiChatMessage(user.uid, assistantMessage);
+
+      // The onSnapshot listener will automatically update the UI with the real messages from DB
+      // including the assistant's response. We just need to remove the optimistic one.
+      setMessages(prev => prev.filter(m => m.id !== 'temp-user'));
 
     } catch (error) {
       console.error('Error with chatbot:', error);
@@ -88,7 +95,7 @@ export function AIAssistant() {
       // Remove the optimistic user message on error
       setMessages(prev => prev.filter(m => m.id !== 'temp-user'));
     } finally {
-      setIsLoading(false);
+      setIsLoading(true); // Keep loading true until snapshot updates
     }
   };
 
@@ -96,7 +103,7 @@ export function AIAssistant() {
       if (!user) return;
       try {
           await clearAiChatHistory(user.uid);
-          setMessages([]);
+          // The onSnapshot listener will update the messages to an empty array
           toast({
               title: "History Cleared",
               description: "Your chat history with the assistant has been deleted."
@@ -109,6 +116,18 @@ export function AIAssistant() {
           })
       }
   }
+
+  // Effect to turn off loading state once the messages state reflects the new data
+  // This is a workaround for the async nature of Firestore listeners
+  useEffect(() => {
+    if (isLoading) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage && lastMessage.id !== 'temp-user') {
+        setIsLoading(false);
+      }
+    }
+  }, [messages, isLoading]);
+
 
   return (
     <Sheet>
@@ -154,7 +173,7 @@ export function AIAssistant() {
         </SheetHeader>
         <ScrollArea className="flex-1 overflow-hidden" ref={scrollAreaRef}>
           <div className="space-y-4 pr-4 py-4">
-            {messages.filter(m => m.id !== 'temp-user').length === 0 && !isLoading && (
+            {messages.length === 0 && !isLoading && (
               <div className="flex h-full items-center justify-center">
                 <p className="text-center text-muted-foreground">
                   Ask me anything about campus life!
@@ -163,7 +182,7 @@ export function AIAssistant() {
             )}
             {messages.map((message, index) => (
               <div
-                key={message.id === 'temp-user' ? `temp-${index}`: message.id}
+                key={message.id}
                 className={cn('flex items-start gap-3', message.role === 'user' ? 'justify-end' : '')}
               >
                 {message.role === 'assistant' && (
@@ -190,7 +209,7 @@ export function AIAssistant() {
                 )}
               </div>
             ))}
-            {isLoading && messages.filter(m => m.id !== 'temp-user').length > 0 && (
+            {isLoading && (
               <div className="flex items-start gap-3">
                 <Avatar className="h-8 w-8 border">
                   <AvatarFallback className="bg-primary text-primary-foreground">
