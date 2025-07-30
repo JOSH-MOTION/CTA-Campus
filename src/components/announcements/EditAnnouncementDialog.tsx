@@ -80,9 +80,6 @@ export function EditAnnouncementDialog({ announcement, isOpen, onOpenChange }: E
         title: data.title,
         content: data.content,
         targetGen: data.targetGen,
-        author: announcement.author,
-        authorId: announcement.authorId,
-        date: announcement.date,
       });
       toast({
         title: 'Announcement Updated',

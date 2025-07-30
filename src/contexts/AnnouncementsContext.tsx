@@ -17,11 +17,11 @@ export interface Announcement {
   targetGen: string; // e.g., "Gen 30", "All Students", or "Everyone"
 }
 
-export type AnnouncementData = Omit<Announcement, 'id' | 'date'>;
+export type AnnouncementData = Omit<Announcement, 'id' | 'date' | 'author' | 'authorId'>;
 
 interface AnnouncementsContextType {
   announcements: Announcement[];
-  addAnnouncement: (announcement: AnnouncementData) => Promise<void>;
+  addAnnouncement: (announcement: Omit<Announcement, 'id' | 'date'>) => Promise<void>;
   updateAnnouncement: (id: string, updates: Partial<AnnouncementData>) => Promise<void>;
   deleteAnnouncement: (id: string) => Promise<void>;
   loading: boolean;
@@ -65,7 +65,7 @@ export const AnnouncementsProvider: FC<{children: ReactNode}> = ({children}) => 
     return () => unsubscribe();
   }, [user]);
 
-  const addAnnouncement = useCallback(async (announcement: AnnouncementData) => {
+  const addAnnouncement = useCallback(async (announcement: Omit<Announcement, 'id' | 'date'>) => {
     if (!user) throw new Error("User not authenticated");
 
     const newAnnouncementData = {
@@ -85,8 +85,7 @@ export const AnnouncementsProvider: FC<{children: ReactNode}> = ({children}) => 
   const updateAnnouncement = useCallback(async (id: string, updates: Partial<AnnouncementData>) => {
     if (!user) throw new Error("User not authenticated");
     const announcementDoc = doc(db, 'announcements', id);
-    const { id: announcementId, ...updateData } = updates as Announcement;
-    await updateDoc(announcementDoc, updateData);
+    await updateDoc(announcementDoc, updates);
   }, [user]);
 
   const deleteAnnouncement = useCallback(async (id: string) => {
