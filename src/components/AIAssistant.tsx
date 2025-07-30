@@ -21,39 +21,20 @@ import {cn} from '@/lib/utils';
 import {useToast} from '@/hooks/use-toast';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { useAuth } from '@/contexts/AuthContext';
-import { Message, onAiChatHistory, addAiChatMessage, clearAiChatHistory } from '@/services/aiChat';
-import { Unsubscribe } from 'firebase/firestore';
+
+interface Message {
+    id: string;
+    role: 'user' | 'assistant';
+    content: string;
+}
 
 export function AIAssistant() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
   const {toast} = useToast();
   const { user } = useAuth();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const historyUnsubscribeRef = useRef<Unsubscribe | null>(null);
-
-  useEffect(() => {
-    if (user) {
-      if (historyUnsubscribeRef.current) {
-        historyUnsubscribeRef.current();
-      }
-      setIsHistoryLoading(true);
-      historyUnsubscribeRef.current = onAiChatHistory(user.uid, (newMessages) => {
-        setMessages(newMessages);
-        setIsHistoryLoading(false);
-      });
-    } else {
-        setMessages([]);
-        setIsHistoryLoading(false);
-    }
-    return () => {
-      if (historyUnsubscribeRef.current) {
-        historyUnsubscribeRef.current();
-      }
-    };
-  }, [user]);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -68,22 +49,17 @@ export function AIAssistant() {
     e.preventDefault();
     if (!input.trim() || !user) return;
 
-    const currentInput = input;
-    const optimisticUserMessage: Message = { id: `temp-${Date.now()}`, role: 'user', content: currentInput, timestamp: new Date().toISOString() };
+    const userMessage: Message = { id: `user-${Date.now()}`, role: 'user', content: input };
+    setMessages(prev => [...prev, userMessage]);
     
-    setMessages(prev => [...prev, optimisticUserMessage]);
+    const currentInput = input;
     setInput('');
     setIsLoading(true);
     
     try {
       const response = await faqChatbot({query: currentInput});
-      const assistantMessageContent = response.answer;
-
-      const userMessage: Omit<Message, 'id' | 'timestamp'> = { role: 'user', content: currentInput };
-      const assistantMessage: Omit<Message, 'id' | 'timestamp'> = { role: 'assistant', content: assistantMessageContent };
-
-      await addAiChatMessage(user.uid, userMessage);
-      await addAiChatMessage(user.uid, assistantMessage);
+      const assistantMessage: Message = { id: `assistant-${Date.now()}`, role: 'assistant', content: response.answer };
+      setMessages(prev => [...prev, assistantMessage]);
       
     } catch (error) {
       console.error('Error with chatbot:', error);
@@ -92,27 +68,14 @@ export function AIAssistant() {
         title: 'Error',
         description: "Sorry, I'm having trouble connecting. Please try again later.",
       });
-      setMessages(prev => prev.filter(m => m.id !== optimisticUserMessage.id));
+      setMessages(prev => prev.filter(m => m.id !== userMessage.id));
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleClearHistory = async () => {
-      if (!user) return;
-      try {
-          await clearAiChatHistory(user.uid);
-          toast({
-              title: "History Cleared",
-              description: "Your chat history with the assistant has been deleted."
-          })
-      } catch (error) {
-          toast({
-              variant: 'destructive',
-              title: 'Error',
-              description: 'Could not clear your chat history.'
-          })
-      }
+  const handleClearHistory = () => {
+    setMessages([]);
   }
 
   return (
@@ -154,16 +117,12 @@ export function AIAssistant() {
             )}
           </div>
           <SheetDescription>
-            Answers FAQs related to campus facilities, policies, and procedures. Your chat history is saved.
+            Answers FAQs related to campus facilities, policies, and procedures. Your chat history is not saved.
           </SheetDescription>
         </SheetHeader>
         <ScrollArea className="flex-1 overflow-hidden" ref={scrollAreaRef}>
           <div className="space-y-4 pr-4 py-4">
-             {isHistoryLoading ? (
-               <div className="flex h-full items-center justify-center">
-                 <Loader2 className="h-6 w-6 animate-spin" />
-               </div>
-             ) : messages.length === 0 ? (
+             {messages.length === 0 ? (
               <div className="flex h-full items-center justify-center">
                 <p className="text-center text-muted-foreground">
                   Ask me anything about campus life!
@@ -221,13 +180,13 @@ export function AIAssistant() {
               onChange={e => setInput(e.target.value)}
               placeholder="Ask about library hours..."
               className="pr-12"
-              disabled={isLoading || isHistoryLoading || !user}
+              disabled={isLoading || !user}
             />
             <Button
               type="submit"
               size="icon"
               className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
-              disabled={isLoading || isHistoryLoading || !input.trim() || !user}
+              disabled={isLoading || !input.trim() || !user}
               variant="ghost"
             >
               <CornerDownLeft className="h-4 w-4" />
