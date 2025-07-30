@@ -14,8 +14,10 @@ import { useRoadmap } from '@/contexts/RoadmapContext';
 import { useToast } from '@/hooks/use-toast';
 import { PlusCircle, Youtube, FileText, Loader2 } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, getDocs, query, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, orderBy, Timestamp } from 'firebase/firestore';
 import { useAuth } from '@/contexts/AuthContext';
+import { Material, addMaterial } from '@/services/materials';
+import { MaterialActions } from '@/components/materials/MaterialActions';
 
 
 const materialSchema = z.object({
@@ -31,12 +33,6 @@ const materialSchema = z.object({
 
 type MaterialFormValues = z.infer<typeof materialSchema>;
 
-interface Material extends Omit<MaterialFormValues, 'week'> {
-  id: string;
-  createdAt: Timestamp;
-  week: string;
-}
-
 export default function MaterialsPage() {
   const { roadmapData } = useRoadmap();
   const { toast } = useToast();
@@ -47,27 +43,25 @@ export default function MaterialsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    const fetchMaterials = async () => {
-      setIsLoading(true);
-      try {
-        const materialsCollection = collection(db, 'materials');
-        const q = query(materialsCollection, orderBy('createdAt', 'desc'));
-        const querySnapshot = await getDocs(q);
-        const fetchedMaterials = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Material));
-        setMaterials(fetchedMaterials);
-      } catch (error) {
-        console.error('Error fetching materials:', error);
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: 'Failed to fetch materials from the database.',
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    setIsLoading(true);
+    const materialsCollection = collection(db, 'materials');
+    const q = query(materialsCollection, orderBy('createdAt', 'desc'));
+    
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const fetchedMaterials = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Material));
+      setMaterials(fetchedMaterials);
+      setIsLoading(false);
+    }, (error) => {
+      console.error('Error fetching materials:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to fetch materials from the database.',
+      });
+      setIsLoading(false);
+    });
 
-    fetchMaterials();
+    return () => unsubscribe();
   }, [toast]);
 
   const form = useForm<MaterialFormValues>({
@@ -90,16 +84,7 @@ export default function MaterialsPage() {
   const onSubmit = async (data: MaterialFormValues) => {
     setIsSubmitting(true);
     try {
-      const newMaterialData = {
-        ...data,
-        createdAt: Timestamp.now(),
-      };
-      const docRef = await addDoc(collection(db, 'materials'), newMaterialData);
-      const newMaterial: Material = {
-        id: docRef.id,
-        ...newMaterialData,
-      };
-      setMaterials(prev => [newMaterial, ...prev]);
+      await addMaterial(data);
       toast({ title: 'Material Added!', description: 'The new resource is now available.' });
       form.reset();
     } catch (error) {
@@ -237,10 +222,15 @@ export default function MaterialsPage() {
             {materials.map(material => (
               <Card key={material.id}>
                 <CardHeader>
-                  <CardTitle>{material.title}</CardTitle>
-                  <CardDescription>
-                      {material.subject} - {material.week}
-                  </CardDescription>
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1 pr-2">
+                       <CardTitle>{material.title}</CardTitle>
+                        <CardDescription>
+                            {material.subject} - {material.week}
+                        </CardDescription>
+                    </div>
+                    {isTeacher && <MaterialActions material={material} />}
+                  </div>
                 </CardHeader>
                 <CardFooter className="flex flex-col gap-2 items-stretch">
                    {material.videoUrl && (
