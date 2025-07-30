@@ -61,22 +61,22 @@ export function AIAssistant() {
     e.preventDefault();
     if (!input.trim() || !user) return;
 
-    const userMessage: Omit<Message, 'id'> = {role: 'user', content: input};
+    const currentInput = input;
+    const userMessage: Message = { id: 'temp-user', role: 'user', content: currentInput };
+    
     setInput('');
+    setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
 
     try {
-      // Optimistically add user message to DB
-      await addAiChatMessage(user.uid, userMessage);
+      const response = await faqChatbot({query: currentInput});
+      const assistantMessageContent = response.answer;
+
+      const userMessageToSave: Omit<Message, 'id'> = { role: 'user', content: currentInput };
+      await addAiChatMessage(user.uid, userMessageToSave);
       
-      const response = await faqChatbot({query: input});
-      const assistantMessage: Omit<Message, 'id'> = {
-        role: 'assistant',
-        content: response.answer,
-      };
-      
-      // Add assistant message to DB
-      await addAiChatMessage(user.uid, assistantMessage);
+      const assistantMessageToSave: Omit<Message, 'id'> = { role: 'assistant', content: assistantMessageContent };
+      await addAiChatMessage(user.uid, assistantMessageToSave);
 
     } catch (error) {
       console.error('Error with chatbot:', error);
@@ -85,7 +85,8 @@ export function AIAssistant() {
         title: 'Error',
         description: "Sorry, I'm having trouble connecting. Please try again later.",
       });
-      // Here you might want to implement logic to remove the optimistic user message if it failed
+      // Remove the optimistic user message on error
+      setMessages(prev => prev.filter(m => m.id !== 'temp-user'));
     } finally {
       setIsLoading(false);
     }
@@ -153,7 +154,7 @@ export function AIAssistant() {
         </SheetHeader>
         <ScrollArea className="flex-1 overflow-hidden" ref={scrollAreaRef}>
           <div className="space-y-4 pr-4 py-4">
-            {messages.length === 0 && !isLoading && (
+            {messages.filter(m => m.id !== 'temp-user').length === 0 && !isLoading && (
               <div className="flex h-full items-center justify-center">
                 <p className="text-center text-muted-foreground">
                   Ask me anything about campus life!
@@ -162,7 +163,7 @@ export function AIAssistant() {
             )}
             {messages.map((message, index) => (
               <div
-                key={index}
+                key={message.id === 'temp-user' ? `temp-${index}`: message.id}
                 className={cn('flex items-start gap-3', message.role === 'user' ? 'justify-end' : '')}
               >
                 {message.role === 'assistant' && (
@@ -189,7 +190,7 @@ export function AIAssistant() {
                 )}
               </div>
             ))}
-            {isLoading && (
+            {isLoading && messages.filter(m => m.id !== 'temp-user').length > 0 && (
               <div className="flex items-start gap-3">
                 <Avatar className="h-8 w-8 border">
                   <AvatarFallback className="bg-primary text-primary-foreground">
