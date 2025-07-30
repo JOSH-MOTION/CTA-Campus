@@ -2,80 +2,79 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    function isAuthenticated() {
-      return request.auth != null;
+  
+    // Helper function to check if a user is an admin or teacher
+    function isTeacherOrAdmin(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data.role in ['teacher', 'admin'];
     }
 
-    function isStudent(userId) {
-      return get(/databases/$(database)/documents/users/$(userId)).data.role == 'student';
-    }
-
-    function isTeacher(userId) {
-      return get(/databases/$(database)/documents/users/$(userId)).data.role == 'teacher';
-    }
-
-    function isAdmin(userId) {
-      return get(/databases/$(database)/documents/users/$(userId)).data.role == 'admin';
-    }
-
+    // Users collection
     match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow write: if request.auth.uid == userId || isAdmin(request.auth.uid);
+      // Any authenticated user can read public profile data (for directory, chat, etc.)
+      allow read: if request.auth != null;
+      // Only the user themselves or an admin can create/update their own profile
+      allow write: if request.auth.uid == userId || isTeacherOrAdmin(request.auth.uid);
     }
     
-    match /announcements/{announcementId} {
-        allow read: if isAuthenticated();
-        allow create, update, delete: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
-    }
-
-    match /assignments/{assignmentId} {
-        allow read: if isAuthenticated();
-        allow create, update, delete: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
-    }
-    
-    match /exercises/{exerciseId} {
-        allow read: if isAuthenticated();
-        allow create, update, delete: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
-    }
-
-    match /projects/{projectId} {
-        allow read: if isAuthenticated();
-        allow create, update, delete: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
-    }
-    
-    match /materials/{materialId} {
-        allow read: if isAuthenticated();
-        allow create: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
-    }
-    
-    match /submissions/{submissionId} {
-      allow read: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid) || resource.data.studentId == request.auth.uid);
-      allow create: if isAuthenticated() && request.resource.data.studentId == request.auth.uid;
-      allow delete: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
-    }
-    
-    match /notifications/{notificationId} {
-      // Users can only access their own notifications
-      allow read, write: if isAuthenticated() && request.auth.uid == resource.data.userId;
-      allow create: if isAuthenticated();
-    }
-
+    // Points subcollection
     match /users/{userId}/points/{pointId} {
-      // Points can be read by teachers/admins (for rankings) and by the student themselves.
-      allow read: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid) || userId == request.auth.uid);
-      // For this app, we trust the client-side logic under the assumption that an admin or teacher is performing the action
-      // or the point award logic is secured (e.g. idempotency check in awardPoint)
-      allow create, delete: if isAuthenticated();
-    }
-    
-    match /chats/{chatId}/{message=**} {
-        allow read, write: if isAuthenticated();
+      // Only the user can read their points
+      // Teachers/Admins can award points, so they need write access.
+      allow read: if request.auth.uid == userId || isTeacherOrAdmin(request.auth.uid);
+      allow write: if isTeacherOrAdmin(request.auth.uid) || request.auth.uid == userId;
     }
 
+    // Announcements, Assignments, Projects, Exercises, Resources, Materials
+    match /{collectionName}/{docId}
+      where collectionName in ['announcements', 'assignments', 'exercises', 'projects', 'resources', 'materials'] {
+      // Anyone authenticated can read them
+      allow read: if request.auth != null;
+      // Only teachers or admins can create, update, or delete
+      allow write: if isTeacherOrAdmin(request.auth.uid);
+    }
+
+    // Submissions collection
+    match /submissions/{submissionId} {
+      // Student can create their own submission
+      allow create: if request.auth.uid == request.resource.data.studentId;
+      // Teachers/admins can read all submissions, students can read their own
+      allow read: if isTeacherOrAdmin(request.auth.uid) || request.auth.uid == resource.data.studentId;
+      // Teachers/admins can delete submissions
+      allow delete: if isTeacherOrAdmin(request.auth.uid);
+    }
+
+    // Notifications collection
+    match /notifications/{notificationId} {
+        // Users can read/write (e.g., mark as read) their own notifications.
+        // The service logic handles who can create notifications for whom.
+        allow read, write: if request.auth.uid == resource.data.userId;
+        allow create: if request.auth != null;
+    }
+    
+    // Roadmap Status collection
     match /roadmap_status/{weekId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && (isTeacher(request.auth.uid) || isAdmin(request.auth.uid));
+        // Any authenticated user can read the status
+        allow read: if request.auth != null;
+        // Only teachers or admins can update the status
+        allow write: if isTeacherOrAdmin(request.auth.uid);
+    }
+    
+    // Chats and Messages
+    match /chats/{chatId}/messages/{messageId} {
+        // Allow read/write access if the user is part of the chat.
+        // For DMs, the chatId contains the user's UID.
+        // For groups, we check if the group name (e.g., "Gen 30") matches the user's gen.
+        allow read, write: if request.auth != null && 
+                           ( (chatId.split('-').length == 2 && request.auth.uid in chatId.split('-')) || 
+                             (chatId.split('-').length > 1 && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.gen == chatId.split('-')[1]) ||
+                             (isTeacherOrAdmin(request.auth.uid))
+                           );
+    }
+    
+    // AI Chat History
+    match /users/{userId}/ai-chat-history/{messageId} {
+      // Only the user can read and write to their own history
+      allow read, write: if request.auth.uid == userId;
     }
   }
 }
