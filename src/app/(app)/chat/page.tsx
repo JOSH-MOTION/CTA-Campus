@@ -14,6 +14,7 @@ import {Message, getChatId, sendMessage, onMessages} from '@/services/chat';
 import {Unsubscribe} from 'firebase/firestore';
 import {useToast} from '@/hooks/use-toast';
 import {Badge} from '@/components/ui/badge';
+import { useNotifications } from '@/contexts/NotificationsContext';
 
 type ChatEntityType = 'dm' | 'group';
 type ChatEntity = {id: string; name: string; type: ChatEntityType; avatar?: string; dataAiHint: string};
@@ -23,6 +24,7 @@ export default function ChatPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const {toast} = useToast();
+  const { addNotificationForUser } = useNotifications();
 
   const [allUsers, setAllUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -150,33 +152,58 @@ export default function ChatPage() {
       };
     }, [selectedChat, currentUser]);
 
-
-  const handleSendMessage = async (text: string, replyTo?: Message) => {
-    if (!selectedChat || !text.trim() || !currentUser) return;
-
-    let chatId: string;
-    if (selectedChat.type === 'dm') {
-      chatId = getChatId(currentUser.uid, selectedChat.id);
-    } else {
-      chatId = selectedChat.id;
-    }
-
-    let messagePayload: any = {
-        senderId: currentUser.uid,
-        senderName: currentUser.displayName || 'User',
-        text: text.trim(),
-    };
-
-    if (replyTo) {
-        messagePayload.replyTo = {
-            messageId: replyTo.id,
-            text: replyTo.text,
-            senderName: replyTo.senderName,
-        };
-    }
+    const handleSendMessage = async (text: string, replyTo?: Message) => {
+        if (!selectedChat || !text.trim() || !currentUser) return;
     
-    await sendMessage(chatId, messagePayload);
-  };
+        let chatId: string;
+        let chatName: string;
+        let isGroupChat = selectedChat.type === 'group';
+    
+        if (isGroupChat) {
+          chatId = selectedChat.id;
+          chatName = selectedChat.name;
+        } else {
+          chatId = getChatId(currentUser.uid, selectedChat.id);
+          chatName = `your DM with ${selectedChat.name}`
+        }
+    
+        let messagePayload: any = {
+            senderId: currentUser.uid,
+            senderName: currentUser.displayName || 'User',
+            text: text.trim(),
+        };
+    
+        if (replyTo) {
+            messagePayload.replyTo = {
+                messageId: replyTo.id,
+                text: replyTo.text,
+                senderName: replyTo.senderName,
+            };
+        }
+        
+        await sendMessage(chatId, messagePayload);
+    
+        // Handle @mentions
+        const mentionRegex = /@(\w+)/g;
+        const mentions = text.match(mentionRegex);
+    
+        if (mentions) {
+            const mentionedUsernames = mentions.map(m => m.substring(1).toLowerCase());
+            const usersToNotify = allUsers.filter(u => 
+                mentionedUsernames.includes(u.displayName.toLowerCase()) && u.uid !== currentUser.uid
+            );
+    
+            for (const userToNotify of usersToNotify) {
+                await addNotificationForUser(userToNotify.uid, {
+                    title: `You were mentioned in ${chatName}`,
+                    description: `${currentUser.displayName}: "${text.trim()}"`,
+                    href: selectedChat.type === 'group' 
+                        ? `/chat?group=${selectedChat.id.replace('group-', '')}` 
+                        : `/chat?dm=${currentUser.uid}`
+                });
+            }
+        }
+      };
   
   const handleTabChange = (value: string) => {
       const newTab = value as 'dms' | 'groups';
