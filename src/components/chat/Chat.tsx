@@ -9,7 +9,7 @@ import {ScrollArea} from '@/components/ui/scroll-area';
 import {Send, Reply, Pin, X, Pencil, Trash2, Check, Loader2} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import type {Message} from '@/services/chat';
-import {deleteMessage, updateMessage} from '@/services/chat';
+import {deleteMessage, updateMessage, getChatId} from '@/services/chat';
 import type {User} from 'firebase/auth';
 import {format} from 'date-fns';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
@@ -76,7 +76,7 @@ export function Chat({entity, messages, onSendMessage, currentUser}: ChatProps) 
 
     let chatId: string;
     if (entity.type === 'dm') {
-        chatId = entity.id;
+        chatId = getChatId(currentUser.uid, entity.id);
     } else {
         chatId = entity.id;
     }
@@ -98,7 +98,7 @@ export function Chat({entity, messages, onSendMessage, currentUser}: ChatProps) 
     
     let chatId: string;
     if (entity.type === 'dm') {
-        chatId = entity.id;
+        chatId = getChatId(currentUser.uid, entity.id);
     } else {
         chatId = entity.id;
     }

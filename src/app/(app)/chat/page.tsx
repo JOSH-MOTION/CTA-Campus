@@ -118,6 +118,38 @@ export default function ChatPage() {
   
   
   useEffect(() => {
+    if (!currentUser) return;
+
+    const allChatEntities: ChatEntity[] = [
+      ...otherUsers.map(u => ({ id: getChatId(currentUser.uid, u.uid), name: u.displayName, type: 'dm' as const, avatar: u.photoURL, dataAiHint: 'user portrait' })),
+      ...groupChats.map(g => ({ ...g, type: 'group' as const })),
+    ];
+    
+    // Clear old listeners
+    allChatListeners.current.forEach(unsub => unsub());
+    allChatListeners.current = [];
+
+    allChatEntities.forEach(chat => {
+      const unsub = onMessages(chat.id, (newMessages) => {
+        if (!selectedChat || selectedChat.id !== chat.id) {
+          const lastSeenTimestamp = localStorage.getItem(`lastSeen_${chat.id}`) || '0';
+          const newUnreadCount = newMessages.filter(m => m.timestamp && m.timestamp.toMillis() > parseInt(lastSeenTimestamp, 10)).length;
+          
+          if(newUnreadCount > 0){
+             setUnreadCounts(prev => ({...prev, [chat.id]: newUnreadCount }));
+          }
+        }
+      });
+      allChatListeners.current.push(unsub);
+    });
+
+    return () => {
+      allChatListeners.current.forEach(unsub => unsub());
+    };
+  }, [allUsers, groupChats, currentUser, selectedChat]);
+
+
+  useEffect(() => {
       if (!selectedChat || !currentUser) return;
 
       if (messageUnsubscribeRef.current) {
@@ -133,6 +165,8 @@ export default function ChatPage() {
       
       setMessages([]); // Clear previous messages
       setUnreadCounts(prev => ({...prev, [chatId]: 0}));
+      localStorage.setItem(`lastSeen_${chatId}`, Date.now().toString());
+
       
       const unsubscribe = onMessages(chatId, newMessages => {
         setMessages(newMessages);
@@ -306,7 +340,7 @@ export default function ChatPage() {
         </Tabs>
       </div>
 
-      <div className="flex flex-col md:col-span-2 xl:col-span-3">
+      <div className="flex flex-col md:col-span-2 xl:col-span-3 h-[calc(100vh_-_theme(spacing.16))]">
         {selectedChat ? (
           <Chat
             key={selectedChat.id}
