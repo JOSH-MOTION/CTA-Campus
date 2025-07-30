@@ -28,28 +28,25 @@ export function AIAssistant() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
   const {toast} = useToast();
   const { user } = useAuth();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const historyUnsubscribeRef = useRef<Unsubscribe | null>(null);
-
 
   useEffect(() => {
     if (user) {
       if (historyUnsubscribeRef.current) {
         historyUnsubscribeRef.current();
       }
-      // Set loading to true when starting to listen
-      setIsLoading(true);
+      setIsHistoryLoading(true);
       historyUnsubscribeRef.current = onAiChatHistory(user.uid, (newMessages) => {
         setMessages(newMessages);
-        // Set loading to false once the initial data is loaded
-        setIsLoading(false);
+        setIsHistoryLoading(false);
       });
     } else {
-        // Clear messages and stop loading if user logs out
         setMessages([]);
-        setIsLoading(false);
+        setIsHistoryLoading(false);
     }
     return () => {
       if (historyUnsubscribeRef.current) {
@@ -79,18 +76,14 @@ export function AIAssistant() {
     setIsLoading(true);
     
     try {
-      // 1. Get AI response
       const response = await faqChatbot({query: currentInput});
       const assistantMessageContent = response.answer;
 
-      // 2. Create the final message objects to be saved
       const userMessage: Omit<Message, 'id' | 'timestamp'> = { role: 'user', content: currentInput };
       const assistantMessage: Omit<Message, 'id' | 'timestamp'> = { role: 'assistant', content: assistantMessageContent };
 
-      // 3. Save both to the database
       await addAiChatMessage(user.uid, userMessage);
       await addAiChatMessage(user.uid, assistantMessage);
-      // The onSnapshot listener will automatically update the UI with the real messages.
       
     } catch (error) {
       console.error('Error with chatbot:', error);
@@ -99,20 +92,16 @@ export function AIAssistant() {
         title: 'Error',
         description: "Sorry, I'm having trouble connecting. Please try again later.",
       });
-      // Remove the optimistic user message on error
       setMessages(prev => prev.filter(m => m.id !== optimisticUserMessage.id));
     } finally {
-      // The listener will turn off the loading state when it receives the new messages.
-      // This is more reliable than turning it off here directly.
+      setIsLoading(false);
     }
   };
-
 
   const handleClearHistory = async () => {
       if (!user) return;
       try {
           await clearAiChatHistory(user.uid);
-          // The onSnapshot listener will update the messages to an empty array
           toast({
               title: "History Cleared",
               description: "Your chat history with the assistant has been deleted."
@@ -170,43 +159,48 @@ export function AIAssistant() {
         </SheetHeader>
         <ScrollArea className="flex-1 overflow-hidden" ref={scrollAreaRef}>
           <div className="space-y-4 pr-4 py-4">
-            {messages.length === 0 && !isLoading && (
+             {isHistoryLoading ? (
+               <div className="flex h-full items-center justify-center">
+                 <Loader2 className="h-6 w-6 animate-spin" />
+               </div>
+             ) : messages.length === 0 ? (
               <div className="flex h-full items-center justify-center">
                 <p className="text-center text-muted-foreground">
                   Ask me anything about campus life!
                 </p>
               </div>
-            )}
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={cn('flex items-start gap-3', message.role === 'user' ? 'justify-end' : '')}
-              >
-                {message.role === 'assistant' && (
-                  <Avatar className="h-8 w-8 border">
-                    <AvatarFallback className="bg-primary text-primary-foreground">
-                      <Bot className="h-5 w-5" />
-                    </AvatarFallback>
-                  </Avatar>
-                )}
+            ) : (
+              messages.map((message) => (
                 <div
-                  className={cn(
-                    'max-w-[75%] rounded-lg p-3 text-sm shadow-sm',
-                    message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-card'
-                  )}
+                  key={message.id}
+                  className={cn('flex items-start gap-3', message.role === 'user' ? 'justify-end' : '')}
                 >
-                  {message.content}
+                  {message.role === 'assistant' && (
+                    <Avatar className="h-8 w-8 border">
+                      <AvatarFallback className="bg-primary text-primary-foreground">
+                        <Bot className="h-5 w-5" />
+                      </AvatarFallback>
+                    </Avatar>
+                  )}
+                  <div
+                    className={cn(
+                      'max-w-[75%] rounded-lg p-3 text-sm shadow-sm',
+                      message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-card'
+                    )}
+                  >
+                    {message.content}
+                  </div>
+                  {message.role === 'user' && (
+                    <Avatar className="h-8 w-8 border">
+                      <AvatarFallback>
+                        <User className="h-5 w-5" />
+                      </AvatarFallback>
+                    </Avatar>
+                  )}
                 </div>
-                {message.role === 'user' && (
-                  <Avatar className="h-8 w-8 border">
-                    <AvatarFallback>
-                      <User className="h-5 w-5" />
-                    </AvatarFallback>
-                  </Avatar>
-                )}
-              </div>
-            ))}
-            {isLoading && messages.length > 0 && messages[messages.length-1].role === 'user' && (
+              ))
+            )}
+            {isLoading && (
               <div className="flex items-start gap-3">
                 <Avatar className="h-8 w-8 border">
                   <AvatarFallback className="bg-primary text-primary-foreground">
@@ -227,13 +221,13 @@ export function AIAssistant() {
               onChange={e => setInput(e.target.value)}
               placeholder="Ask about library hours..."
               className="pr-12"
-              disabled={isLoading || !user}
+              disabled={isLoading || isHistoryLoading || !user}
             />
             <Button
               type="submit"
               size="icon"
               className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2"
-              disabled={isLoading || !input.trim() || !user}
+              disabled={isLoading || isHistoryLoading || !input.trim() || !user}
               variant="ghost"
             >
               <CornerDownLeft className="h-4 w-4" />
