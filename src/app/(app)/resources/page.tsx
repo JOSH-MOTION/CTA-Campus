@@ -1,62 +1,76 @@
-import {ResourceCard} from '@/components/resources/ResourceCard';
-import {Button} from '@/components/ui/button';
-import {Input} from '@/components/ui/input';
-import {Upload} from 'lucide-react';
+// src/app/(app)/resources/page.tsx
+'use client';
 
-const resources = [
-  {
-    title: 'CS101 Syllabus',
-    course: 'Intro to Computer Science',
-    type: 'PDF',
-    date: '2023-09-01',
-    content: `This syllabus outlines the course structure for Introduction to Computer Science (CS101). Topics include fundamental programming concepts, algorithms, data structures, and software development principles. The course requires completion of weekly programming assignments and two major exams.`,
-  },
-  {
-    title: 'MA203 Lecture Notes - Week 1',
-    course: 'Linear Algebra',
-    type: 'Document',
-    date: '2023-09-04',
-    content: `This document contains lecture notes for the first week of Linear Algebra (MA203). It covers vectors, vector operations, dot products, and the geometric interpretation of these concepts in 2D and 3D space. Key theorems and proofs are included.`,
-  },
-  {
-    title: 'PHY201 Lab Manual',
-    course: 'Classical Mechanics',
-    type: 'PDF',
-    date: '2023-09-02',
-    content: `The lab manual for Classical Mechanics (PHY201) provides instructions for all experiments to be conducted during the semester. It includes sections on safety procedures, data analysis techniques, and report formatting guidelines. Students must read the relevant sections before each lab session.`,
-  },
-  {
-    title: 'Reading: The Structure of Scientific Revolutions',
-    course: 'History of Science',
-    type: 'Reading',
-    date: '2023-09-05',
-    content: `This reading is an excerpt from Thomas Kuhn's influential book, "The Structure of Scientific Revolutions." It introduces the concept of paradigm shifts and discusses how scientific knowledge progresses through periods of normal science punctuated by revolutionary changes. The text is dense and requires careful reading.`,
-  },
-];
+import { useState, useMemo } from 'react';
+import { ResourceCard } from '@/components/resources/ResourceCard';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Loader2, Search, Upload } from 'lucide-react';
+import { useResources } from '@/contexts/ResourcesContext';
+import { CreateResourceDialog } from '@/components/resources/CreateResourceDialog';
+import { useAuth } from '@/contexts/AuthContext';
+
 
 export default function ResourcesPage() {
+  const { resources, loading } = useResources();
+  const [searchTerm, setSearchTerm] = useState('');
+  const { role } = useAuth();
+  const isTeacherOrAdmin = role === 'teacher' || role === 'admin';
+
+  const filteredResources = useMemo(() => {
+    if (!searchTerm) {
+      return resources;
+    }
+    return resources.filter(resource =>
+      resource.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      resource.description.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [resources, searchTerm]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col items-start gap-4 md:flex-row md:items-center md:justify-between">
         <div className="space-y-1">
           <h1 className="text-3xl font-bold tracking-tight">Resources Library</h1>
-          <p className="text-muted-foreground">Find and share course materials.</p>
+          <p className="text-muted-foreground">Find and share course materials, articles, and useful links.</p>
         </div>
-        <Button>
-          <Upload className="mr-2 h-4 w-4" />
-          Upload Resource
-        </Button>
+        {isTeacherOrAdmin && (
+          <CreateResourceDialog>
+            <Button>
+              <Upload className="mr-2 h-4 w-4" />
+              Upload Resource
+            </Button>
+          </CreateResourceDialog>
+        )}
       </div>
 
       <div className="relative">
-        <Input placeholder="Search for resources..." className="w-full" />
+         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input 
+          placeholder="Search for resources..." 
+          className="w-full pl-9" 
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {resources.map(resource => (
-          <ResourceCard key={resource.title} resource={resource} />
-        ))}
-      </div>
+      {loading ? (
+        <div className="flex justify-center items-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      ) : (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {filteredResources.length > 0 ? (
+            filteredResources.map(resource => (
+              <ResourceCard key={resource.id} resource={resource} />
+            ))
+          ) : (
+             <div className="md:col-span-2 lg:col-span-3 text-center text-muted-foreground py-10">
+                No resources found.
+             </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
