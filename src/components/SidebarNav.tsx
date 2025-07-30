@@ -31,12 +31,11 @@ import {
   History,
   BookCheck,
 } from 'lucide-react';
-import {SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarMenuBadge} from '@/components/ui/sidebar';
+import {SidebarMenu, SidebarMenuItem, SidebarMenuButton} from '@/components/ui/sidebar';
 import Link from 'next/link';
 import {usePathname} from 'next/navigation';
 import {useAuth} from '@/contexts/AuthContext';
 import {useSidebar} from '@/components/ui/sidebar';
-import { useCallback } from 'react';
 
 export const studentNavItems = [
   {href: '/', label: 'Dashboard', icon: LayoutDashboard},
@@ -95,7 +94,7 @@ export const adminNavItems = [
 
 export function SidebarNav() {
   const pathname = usePathname();
-  const {role, totalUnreadChats} = useAuth();
+  const {role} = useAuth();
   const {setOpenMobile} = useSidebar();
 
   let navItems;
@@ -113,28 +112,18 @@ export function SidebarNav() {
       navItems = [];
   }
 
-  const handleLinkClick = useCallback(() => {
-    setOpenMobile(false);
-  }, [setOpenMobile]);
-
   return (
     <SidebarMenu className="mt-8">
       {navItems.map(item => {
         const isActive =
           (pathname === '/' && item.href === '/') ||
           (item.href !== '/' && pathname.startsWith(item.href));
-        
-        const isChat = item.href === '/chat';
-
         return (
           <SidebarMenuItem key={item.label}>
             <SidebarMenuButton asChild isActive={isActive} tooltip={item.label}>
-              <Link href={item.href} onClick={handleLinkClick}>
+              <Link href={item.href} onClick={() => setOpenMobile(false)}>
                 <item.icon />
                 <span>{item.label}</span>
-                {isChat && totalUnreadChats > 0 && (
-                    <SidebarMenuBadge>{totalUnreadChats > 9 ? '9+' : totalUnreadChats}</SidebarMenuBadge>
-                )}
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

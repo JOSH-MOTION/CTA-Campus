@@ -21,13 +21,15 @@ type ChatEntityType = 'dm' | 'group';
 type ChatEntity = {id: string; name: string; type: ChatEntityType; avatar?: string; dataAiHint: string};
 
 export default function ChatPage() {
-  const {user: currentUser, fetchAllUsers, userData, role, allUsers, unreadChatCounts, markChatAsRead} = useAuth();
+  const {user: currentUser, fetchAllUsers, userData, role} = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
   const {toast} = useToast();
   const { addNotificationForUser } = useNotifications();
 
   const [loading, setLoading] = useState(true);
+  const [allUsers, setAllUsers] = useState<UserData[]>([]);
+  const [unreadChatCounts, setUnreadChatCounts] = useState<{ [chatId: string]: number }>({});
 
   const [selectedChat, setSelectedChat] = useState<ChatEntity | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -35,10 +37,14 @@ export default function ChatPage() {
   const messageUnsubscribeRef = useRef<Unsubscribe | null>(null);
 
   useEffect(() => {
-    if (allUsers.length > 0) {
-      setLoading(false);
+    const loadUsers = async () => {
+        setLoading(true);
+        const users = await fetchAllUsers();
+        setAllUsers(users);
+        setLoading(false);
     }
-  }, [allUsers]);
+    loadUsers();
+  }, [fetchAllUsers]);
 
   const otherUsers = useMemo(() => {
     if (!currentUser || !role) return [];
@@ -74,6 +80,11 @@ export default function ChatPage() {
     }
     return groups.sort((a, b) => a.name.localeCompare(b.name));
   }, [role, userData, allUsers]);
+
+  const markChatAsRead = useCallback((chatId: string) => {
+    setUnreadChatCounts(prev => ({ ...prev, [chatId]: 0 }));
+    localStorage.setItem(`lastSeen_${chatId}`, Date.now().toString());
+  }, []);
 
   const handleSelectChat = useCallback((entity: ChatEntity) => {
     setSelectedChat(entity);
@@ -153,6 +164,59 @@ export default function ChatPage() {
         }
       };
     }, [selectedChat, currentUser, markChatAsRead]);
+
+    // Listener for unread messages
+  useEffect(() => {
+    if (!currentUser || !userData || allUsers.length === 0) {
+      setUnreadChatCounts({});
+      return;
+    }
+
+    const allChatPartners = allUsers.filter(u => u.uid !== currentUser.uid);
+    const userGroupChats: {id: string}[] = [];
+    if(userData.role === 'teacher' || userData.role === 'admin') {
+      const allGens = new Set(allUsers.filter(u => u.role === 'student' && u.gen).map(u => u.gen));
+      allGens.forEach(gen => {
+        if(gen) userGroupChats.push({ id: `group-${gen}`})
+      });
+    } else if (userData.role === 'student' && userData.gen) {
+      userGroupChats.push({id: `group-${userData.gen}`});
+    }
+
+    const allChatIds = [
+      ...allChatPartners.map(u => getChatId(currentUser.uid, u.uid)),
+      ...userGroupChats.map(g => g.id),
+    ];
+    
+    const listeners: Unsubscribe[] = [];
+
+    allChatIds.forEach(chatId => {
+      const unsub = onMessages(chatId, (messages) => {
+        const lastSeenTimestamp = parseInt(localStorage.getItem(`lastSeen_${chatId}`) || '0', 10);
+        const newUnreadCount = messages.filter(m => 
+          m.timestamp && m.timestamp.toMillis() > lastSeenTimestamp && m.senderId !== currentUser.uid
+        ).length;
+
+        if (newUnreadCount > 0) {
+          setUnreadChatCounts(prev => ({ ...prev, [chatId]: newUnreadCount }));
+        }
+      });
+      listeners.push(unsub);
+    });
+    
+    // Initial check
+    allChatIds.forEach(chatId => {
+        const lastSeen = localStorage.getItem(`lastSeen_${chatId}`);
+        if(!lastSeen) {
+             localStorage.setItem(`lastSeen_${chatId}`, '0');
+        }
+    });
+
+
+    return () => {
+      listeners.forEach(unsub => unsub());
+    };
+  }, [currentUser, userData, allUsers]);
 
     const handleSendMessage = async (text: string, replyTo?: Message) => {
         if (!selectedChat || !text.trim() || !currentUser) return;
