@@ -302,73 +302,75 @@ export default function ChatPage() {
               <Users className="mr-2" /> Groups
             </TabsTrigger>
           </TabsList>
-          <ScrollArea className="flex-1">
-            <TabsContent value="dms" className="m-0">
-              {loading ? (
-                <div className="flex justify-center items-center p-4">
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                </div>
-              ) : (
-                <div className="space-y-1 p-2">
-                  {otherUsers.map(user => {
-                    const chatId = getChatId(currentUser!.uid, user.uid);
-                    const unreadCount = unreadChatCounts[chatId] || 0;
-                    return (
-                        <Button
-                        key={user.uid}
-                        variant={selectedChat?.id === user.uid && selectedChat.type === 'dm' ? 'secondary' : 'ghost'}
-                        className="h-auto w-full justify-start p-3 relative"
-                        onClick={() => handleSelectChat({id: user.uid, name: user.displayName, type: 'dm', avatar: user.photoURL, dataAiHint: 'student portrait'})}
-                        >
-                        <Avatar className="mr-3 h-10 w-10">
-                            <AvatarImage src={user.photoURL} alt={user.displayName} />
-                            <AvatarFallback>{user.displayName.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        <div className="text-left">
-                            <p className="font-semibold">{user.displayName}</p>
-                            <p className="text-xs text-muted-foreground capitalize">{user.role}</p>
-                        </div>
-                        {unreadCount > 0 && (
-                            <Badge className="absolute right-3 top-1/2 -translate-y-1/2">{unreadCount}</Badge>
-                        )}
-                        </Button>
-                    )
-                  })}
-                </div>
-              )}
-            </TabsContent>
-            <TabsContent value="groups" className="m-0">
-              {loading ? (
-                <div className="flex justify-center items-center p-4">
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                </div>
-              ) : (
-                <div className="space-y-1 p-2">
-                  {groupChats.map(group => {
-                     const unreadCount = unreadChatCounts[group.id] || 0;
-                     return (
-                        <Button
-                        key={group.id}
-                        variant={selectedChat?.id === group.id ? 'secondary' : 'ghost'}
-                        className="h-auto w-full justify-start p-3 relative"
-                        onClick={() => handleSelectChat({...group, type: 'group'})}
-                        >
-                        <Avatar className="mr-3 h-10 w-10">
-                            <AvatarFallback>G</AvatarFallback>
-                        </Avatar>
-                        <div className="text-left">
-                            <p className="font-semibold">{group.name}</p>
-                        </div>
-                         {unreadCount > 0 && (
-                            <Badge className="absolute right-3 top-1/2 -translate-y-1/2">{unreadCount}</Badge>
-                        )}
-                        </Button>
-                     )
-                  })}
-                </div>
-              )}
-            </TabsContent>
-          </ScrollArea>
+          <div className="flex-1 relative">
+            <ScrollArea className="absolute h-full w-full">
+                <TabsContent value="dms" className="m-0">
+                {loading ? (
+                    <div className="flex justify-center items-center p-4">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                    </div>
+                ) : (
+                    <div className="space-y-1 p-2">
+                    {otherUsers.map(user => {
+                        const chatId = getChatId(currentUser!.uid, user.uid);
+                        const unreadCount = unreadChatCounts[chatId] || 0;
+                        return (
+                            <Button
+                            key={user.uid}
+                            variant={selectedChat?.id === user.uid && selectedChat.type === 'dm' ? 'secondary' : 'ghost'}
+                            className="h-auto w-full justify-start p-3 relative"
+                            onClick={() => handleSelectChat({id: user.uid, name: user.displayName, type: 'dm', avatar: user.photoURL, dataAiHint: 'student portrait'})}
+                            >
+                            <Avatar className="mr-3 h-10 w-10">
+                                <AvatarImage src={user.photoURL} alt={user.displayName} />
+                                <AvatarFallback>{user.displayName.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            <div className="text-left">
+                                <p className="font-semibold">{user.displayName}</p>
+                                <p className="text-xs text-muted-foreground capitalize">{user.role}</p>
+                            </div>
+                            {unreadCount > 0 && (
+                                <Badge className="absolute right-3 top-1/2 -translate-y-1/2">{unreadCount}</Badge>
+                            )}
+                            </Button>
+                        )
+                    })}
+                    </div>
+                )}
+                </TabsContent>
+                <TabsContent value="groups" className="m-0">
+                {loading ? (
+                    <div className="flex justify-center items-center p-4">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                    </div>
+                ) : (
+                    <div className="space-y-1 p-2">
+                    {groupChats.map(group => {
+                        const unreadCount = unreadChatCounts[group.id] || 0;
+                        return (
+                            <Button
+                            key={group.id}
+                            variant={selectedChat?.id === group.id ? 'secondary' : 'ghost'}
+                            className="h-auto w-full justify-start p-3 relative"
+                            onClick={() => handleSelectChat({...group, type: 'group'})}
+                            >
+                            <Avatar className="mr-3 h-10 w-10">
+                                <AvatarFallback>G</AvatarFallback>
+                            </Avatar>
+                            <div className="text-left">
+                                <p className="font-semibold">{group.name}</p>
+                            </div>
+                            {unreadCount > 0 && (
+                                <Badge className="absolute right-3 top-1/2 -translate-y-1/2">{unreadCount}</Badge>
+                            )}
+                            </Button>
+                        )
+                    })}
+                    </div>
+                )}
+                </TabsContent>
+            </ScrollArea>
+          </div>
         </Tabs>
       </div>
 
