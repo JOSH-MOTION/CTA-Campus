@@ -34,10 +34,10 @@ const materialSchema = z.object({
 type MaterialFormValues = z.infer<typeof materialSchema>;
 
 export default function MaterialsPage() {
-  const { roadmapData } = useRoadmap();
+  const { roadmapData, completedWeeks } = useRoadmap();
   const { toast } = useToast();
   const { role } = useAuth();
-  const isTeacher = role === 'teacher' || role === 'admin';
+  const isTeacherOrAdmin = role === 'teacher' || role === 'admin';
   const [materials, setMaterials] = useState<Material[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -63,6 +63,40 @@ export default function MaterialsPage() {
 
     return () => unsubscribe();
   }, [toast]);
+  
+  const unlockedWeekIds = useMemo(() => {
+    if (isTeacherOrAdmin) return null;
+
+    const unlocked = new Set<string>();
+
+    roadmapData.forEach(subject => {
+        let lastCompletedWeekIndex = -1;
+        subject.weeks.forEach((week, index) => {
+            const weekId = `${subject.title}-${week.title}`;
+            if (completedWeeks.has(weekId)) {
+                unlocked.add(weekId);
+                lastCompletedWeekIndex = index;
+            }
+        });
+        
+        // Unlock the next week if there is one
+        if (lastCompletedWeekIndex !== -1 && lastCompletedWeekIndex + 1 < subject.weeks.length) {
+            const nextWeek = subject.weeks[lastCompletedWeekIndex + 1];
+            unlocked.add(`${subject.title}-${nextWeek.title}`);
+        }
+    });
+
+    return unlocked;
+  }, [isTeacherOrAdmin, completedWeeks, roadmapData]);
+  
+  const filteredMaterials = useMemo(() => {
+    if (isTeacherOrAdmin) return materials;
+    return materials.filter(material => {
+      const materialWeekId = `${material.subject}-${material.week}`;
+      return unlockedWeekIds?.has(materialWeekId);
+    });
+  }, [materials, isTeacherOrAdmin, unlockedWeekIds]);
+
 
   const form = useForm<MaterialFormValues>({
     resolver: zodResolver(materialSchema),
@@ -106,7 +140,7 @@ export default function MaterialsPage() {
         <p className="text-muted-foreground">Add and manage learning resources for each topic.</p>
       </div>
 
-      {isTeacher && (
+      {isTeacherOrAdmin && (
         <Card>
           <CardHeader>
             <CardTitle>Add New Material</CardTitle>
@@ -215,11 +249,13 @@ export default function MaterialsPage() {
           <div className="flex justify-center items-center h-48">
             <Loader2 className="h-8 w-8 animate-spin" />
           </div>
-        ) : materials.length === 0 ? (
-          <div className="text-center text-muted-foreground py-10">No materials have been added yet.</div>
+        ) : filteredMaterials.length === 0 ? (
+          <div className="text-center text-muted-foreground py-10">
+            {isTeacherOrAdmin ? "No materials have been added yet." : "No materials available yet. Complete previous weeks to unlock them."}
+          </div>
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {materials.map(material => (
+            {filteredMaterials.map(material => (
               <Card key={material.id}>
                 <CardHeader>
                   <div className="flex justify-between items-start">
@@ -229,7 +265,7 @@ export default function MaterialsPage() {
                             {material.subject} - {material.week}
                         </CardDescription>
                     </div>
-                    {isTeacher && <MaterialActions material={material} />}
+                    {isTeacherOrAdmin && <MaterialActions material={material} />}
                   </div>
                 </CardHeader>
                 <CardFooter className="flex flex-col gap-2 items-stretch">
