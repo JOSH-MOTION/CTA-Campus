@@ -49,10 +49,22 @@ export const AnnouncementsProvider: FC<{children: ReactNode}> = ({children}) => 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const fetchedAnnouncements = querySnapshot.docs.map(doc => {
         const data = doc.data();
+        let dateString: string;
+        if (data.date && typeof data.date.toDate === 'function') {
+            // It's a Firestore Timestamp
+            dateString = data.date.toDate().toISOString();
+        } else if (typeof data.date === 'string') {
+            // It's already a string
+            dateString = data.date;
+        } else {
+            // Fallback for any other case
+            dateString = new Date().toISOString();
+        }
+
         return {
           id: doc.id,
           ...data,
-          date: (data.date as Timestamp)?.toDate().toISOString() || new Date().toISOString(),
+          date: dateString,
         } as Announcement;
       });
       setAnnouncements(fetchedAnnouncements);
