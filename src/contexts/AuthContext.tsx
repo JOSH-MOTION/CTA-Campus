@@ -37,6 +37,7 @@ interface AuthContextType {
   loading: boolean;
   setRole: (role: UserRole) => void;
   fetchAllUsers: () => Promise<UserData[]>;
+  allUsers: UserData[];
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -47,6 +48,7 @@ const AuthContext = createContext<AuthContextType>({
     loading: true,
     setRole: () => {},
     fetchAllUsers: async () => [],
+    allUsers: [],
 });
 
 export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
@@ -54,6 +56,15 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [role, setRole] = useState<UserRole | null>(null);
   const [loading, setLoading] = useState(true);
+  const [allUsers, setAllUsers] = useState<UserData[]>([]);
+
+  const fetchAllUsers = useCallback(async (): Promise<UserData[]> => {
+    const usersCollection = collection(db, 'users');
+    const usersSnapshot = await getDocs(usersCollection);
+    const usersList = usersSnapshot.docs.map(doc => doc.data() as UserData);
+    setAllUsers(usersList);
+    return usersList;
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -67,6 +78,7 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
           setUserData(data);
           setRole(data.role);
           localStorage.setItem('userRole', data.role);
+          await fetchAllUsers(); // Fetch all users after getting current user data
         } else {
             // Case for newly signed up user where doc might not be available
              const storedRole = localStorage.getItem('userRole') as UserRole;
@@ -77,11 +89,12 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
         setUserData(null);
         setRole(null);
         localStorage.removeItem('userRole');
+        setAllUsers([]);
       }
       setLoading(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, [fetchAllUsers]);
 
   const handleSetRole = async (newRole: UserRole) => {
     setRole(newRole);
@@ -99,16 +112,9 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
       }
     }
   };
-  
-  const fetchAllUsers = useCallback(async (): Promise<UserData[]> => {
-    const usersCollection = collection(db, 'users');
-    const usersSnapshot = await getDocs(usersCollection);
-    const usersList = usersSnapshot.docs.map(doc => doc.data() as UserData);
-    return usersList;
-  }, []);
 
   return (
-    <AuthContext.Provider value={{user, userData, setUserData, role, loading, setRole: handleSetRole, fetchAllUsers}}>
+    <AuthContext.Provider value={{user, userData, setUserData, role, loading, setRole: handleSetRole, fetchAllUsers, allUsers}}>
       {children}
     </AuthContext.Provider>
   );

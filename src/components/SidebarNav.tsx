@@ -67,7 +67,6 @@ export const teacherNavItems = [
   {href: '/projects', label: 'Projects', icon: BookMarked},
   {href: '/submissions', label: 'Submissions', icon: BookCheck},
   {href: '/materials', label: 'Class Materials', icon: BookCopy},
-  {href: '/attendance', label: 'Attendance', icon: UserCheck},
   {href: '/roadmap', label: 'Roadmap', icon: Map},
   {href: '/directory', label: 'Directory', icon: Contact},
   {href: '/availability', label: 'Manage Availability', icon: CalendarClock},

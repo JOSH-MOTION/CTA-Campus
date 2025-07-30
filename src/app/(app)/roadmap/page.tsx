@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Accordion,
   AccordionContent,
@@ -18,29 +18,29 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 
 export default function RoadmapPage() {
   const {roadmapData, completedWeeks, completionMap, toggleWeekCompletion, loading} = useRoadmap();
-  const {role, userData} = useAuth();
+  const {role, userData, allUsers} = useAuth();
   const isTeacherOrAdmin = role === 'teacher' || role === 'admin';
   
-  // For teachers, determine which generations they can manage
   const manageableGens = useMemo(() => {
-    if (!userData || !isTeacherOrAdmin) return [];
+    if (!isTeacherOrAdmin) return [];
+    
+    // For admins, show all generations present in the user base.
     if (role === 'admin') {
       const allGens = new Set<string>();
-      Object.values(completionMap).forEach(genMap => {
-        Object.keys(genMap).forEach(gen => allGens.add(gen));
+      allUsers.forEach(u => {
+        if(u.role === 'student' && u.gen) {
+          allGens.add(u.gen);
+        }
       });
-      // A bit of a hack to discover all gens, ideally this comes from a central list
-      // For now, let's assume userData.gensTaught is a good starting point for admins too.
-      const taughtGens = userData?.gensTaught?.split(',').map(g => g.trim()).filter(Boolean) || [];
-      taughtGens.forEach(g => allGens.add(g));
       return Array.from(allGens).sort();
     }
-    return userData.gensTaught?.split(',').map(g => g.trim()).filter(Boolean) || [];
-  }, [userData, isTeacherOrAdmin, role, completionMap]);
+    
+    // For teachers, show only the generations they teach.
+    return userData?.gensTaught?.split(',').map(g => g.trim()).filter(Boolean) || [];
+  }, [userData, isTeacherOrAdmin, role, allUsers]);
 
   const [selectedGen, setSelectedGen] = useState(manageableGens[0] || '');
-
-  // Select the first available generation by default for teachers
+  
   useEffect(() => {
     if (isTeacherOrAdmin && manageableGens.length > 0 && !selectedGen) {
       setSelectedGen(manageableGens[0]);
