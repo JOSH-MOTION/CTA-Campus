@@ -1,73 +1,53 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isUserAuthenticated() {
-      return request.auth != null;
+    // Helper function to check if a user has a specific role.
+    // It's important that any user checking another's role has read access to the /users/{userId} document.
+    function getUserRole(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data.role;
     }
 
-    function isTeacherOrAdmin() {
-      // This function relies on the user's custom claim or a read to their user doc.
-      // Ensure the rules for /users/{userId} allow this read.
-      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['teacher', 'admin'];
-    }
-    
-    function isOwner(resource) {
-        return request.auth.uid == resource.data.authorId;
-    }
-
+    // Rules for the 'users' collection
     match /users/{userId} {
-      allow read, update: if request.auth.uid == userId;
-      allow get: if isUserAuthenticated();
-      allow list: if isTeacherOrAdmin();
-      allow create: if isUserAuthenticated();
-      allow delete: if isTeacherOrAdmin();
+      // Any authenticated user can read public user profiles (needed for directory, chat, etc.)
+      allow read: if request.auth != null;
+      // Only the user themselves can write to their own document.
+      allow write: if request.auth.uid == userId;
     }
 
-    match /{collection}/{docId} 
-        where collection in ['announcements', 'assignments', 'exercises', 'projects', 'resources', 'materials'] {
-      allow read: if isUserAuthenticated();
-      allow create, update, delete: if isTeacherOrAdmin();
-    }
-    
-    match /roadmap_status/{weekId} {
-      allow read: if isUserAuthenticated();
-      allow write: if isTeacherOrAdmin();
+    // Rules for collections where teachers/admins create content for all to read.
+    match /(announcements|assignments|exercises|projects|resources|roadmap_status)/{docId} {
+      // Any authenticated user can read.
+      allow read: if request.auth != null;
+      // Only teachers or admins can write.
+      allow write: if getUserRole(request.auth.uid) in ['teacher', 'admin'];
     }
 
+    // Rules for 'submissions'
     match /submissions/{submissionId} {
-      allow create: if request.auth.uid == request.resource.data.studentId;
-      allow read, delete: if isTeacherOrAdmin();
+      // Allow read/delete only by teachers/admins.
+      allow read, delete: if getUserRole(request.auth.uid) in ['teacher', 'admin'];
+      // Allow students to create submissions only for themselves.
+      allow create: if request.resource.data.studentId == request.auth.uid;
     }
     
-    match /users/{userId}/points/{pointId} {
-      allow read, create, delete: if request.auth.uid == userId || isTeacherOrAdmin();
+    // Rules for 'chats'
+    match /chats/{chatId}/messages/{messageId} {
+        // Allow read/write if the user is part of the chat.
+        // For group chats, the chatId is 'group-GEN'.
+        // For DMs, the chatId is 'userId1-userId2'.
+        allow read, write: if request.auth != null && (
+                            (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.gen in chatId) || (request.auth.uid in chatId.split('-'))
+                           );
     }
 
-    match /notifications/{notificationId} {
-        match /users/{userId}/notifications/{notificationId} {
-          allow read, update: if request.auth.uid == userId;
-          allow create, delete: if isUserAuthenticated(); // Allow server-side processes or admins to create
-        }
-    }
-    
-    // For collection group queries
-    match /{path=**}/notifications/{notificationId} {
-       allow read, write: if isUserAuthenticated();
-    }
-    
-    match /{path=**}/points/{pointId} {
-       allow read: if isUserAuthenticated();
-    }
-
-    match /chats/{chatId} {
-        allow read, write: if isUserAuthenticated(); // More granular rules below
-        
-        match /messages/{messageId} {
-            allow read, create: if isUserAuthenticated();
-            allow update, delete: if isUserAuthenticated() && request.auth.uid == resource.data.senderId;
-        }
+    // Rules for user-specific subcollections like 'points' and 'notifications'
+    match /users/{userId}/{subcollection}/{docId} {
+      // Allow a user to access only their own subcollections.
+      allow read, write, delete: if request.auth.uid == userId;
     }
   }
 }
