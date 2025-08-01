@@ -30,7 +30,7 @@ interface ChatProps {
 export function Chat({entity, messages, onSendMessage, currentUser, onToggleContacts, loading}: ChatProps) {
   const [text, setText] = useState('');
   const [replyTo, setReplyTo] = useState<Message | undefined>(undefined);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
@@ -40,8 +40,10 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
   const { toast } = useToast();
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
-  }, [entity.id, messages]);
+    if (scrollAreaRef.current) {
+      scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'auto' });
+    }
+  }, [entity.id, messages.length]);
   
   useEffect(() => {
       setReplyTo(undefined);
@@ -119,7 +121,7 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
     const messageTime = msg.timestamp ? format(msg.timestamp.toDate(), 'HH:mm') : '';
 
     return (
-        <div className={cn("flex items-start gap-3 w-full", isSender ? 'flex-row-reverse' : 'justify-start')}>
+        <div className={cn("flex w-full items-start gap-3", isSender ? 'flex-row-reverse' : 'justify-start')}>
              {!isSender && (
                 <Avatar className="h-8 w-8">
                     <AvatarImage src={`https://placehold.co/100x100.png?text=${msg.senderName.charAt(0)}`} alt={msg.senderName} />
@@ -127,13 +129,13 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
                 </Avatar>
              )}
             <div className={cn("max-w-[75%]", isSender ? 'flex flex-col items-end' : 'flex flex-col items-start')}>
-                 <div className={cn("flex items-baseline gap-2 mb-1", isSender ? 'flex-row-reverse' : 'justify-start')}>
+                 <div className={cn("mb-1 flex items-baseline gap-2", isSender ? 'flex-row-reverse' : 'justify-start')}>
                      <p className="text-xs">{isSender ? "You" : msg.senderName}</p>
                      <p className="text-xs text-gray-500">{messageTime}</p>
                 </div>
                 <div
                     className={cn(
-                      'rounded-lg p-3 text-sm shadow-sm relative w-fit',
+                      'relative w-fit rounded-lg p-3 text-sm shadow-sm',
                       isSender ? 'bg-gray-200 dark:bg-gray-700' : 'bg-white dark:bg-gray-800'
                     )}
                 >
@@ -156,8 +158,8 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
     }
 
     return (
-        <div className="flex justify-center my-4">
-            <span className="bg-gray-200 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs px-3 py-1 rounded-full">
+        <div className="my-4 flex justify-center">
+            <span className="rounded-full bg-gray-200 px-3 py-1 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400">
                 {label}
             </span>
         </div>
@@ -167,7 +169,7 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
   return (
     <>
     <div className="flex h-full flex-col bg-gray-100 dark:bg-gray-900">
-      <header className="flex h-[60px] flex-shrink-0 items-center gap-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-3">
+      <header className="flex h-[60px] flex-shrink-0 items-center gap-4 border-b border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
         <Button variant="ghost" size="icon" onClick={onToggleContacts} className="md:hidden">
             <ArrowLeft className="h-5 w-5" />
             <span className="sr-only">Back</span>
@@ -180,10 +182,10 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
             <AvatarImage src={entity.avatar} alt={entity.name} />
             <AvatarFallback>{entity.name.charAt(0)}</AvatarFallback>
         </Avatar>
-        <h2 className="text-lg font-semibold flex-1">{entity.name}</h2>
+        <h2 className="flex-1 text-lg font-semibold">{entity.name}</h2>
       </header>
 
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1" viewportRef={scrollAreaRef}>
         <div className="space-y-6 p-4 md:p-10">
           {messages.map((msg, index) => {
              const prevMessage = messages[index - 1];
@@ -195,20 +197,19 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
                 </React.Fragment>
             )
           })}
-          <div ref={messagesEndRef} />
         </div>
       </ScrollArea>
 
-      <footer className="bg-white dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800 p-4 shrink-0">
+      <footer className="shrink-0 border-t border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-950">
         <form onSubmit={handleSubmit} className="relative flex-1">
           <Input
               value={text || ''}
               onChange={e => setText(e.target.value)}
               placeholder="Write your message..."
-              className="bg-gray-100 dark:bg-gray-800 border-none rounded-lg h-12 focus:ring-0 pr-12 w-full"
+              className="h-12 w-full rounded-lg border-none bg-gray-100 pr-12 focus:ring-0 dark:bg-gray-800"
               disabled={editingMessageId !== null}
           />
-          <Button type="submit" size="icon" className="absolute right-2 top-1/2 -translate-y-1/2 h-9 w-9 bg-primary/20 hover:bg-primary/30 text-primary rounded-lg">
+          <Button type="submit" size="icon" className="absolute right-2 top-1/2 h-9 w-9 -translate-y-1/2 rounded-lg bg-primary/20 text-primary hover:bg-primary/30">
               <Send className="h-5 w-5" />
           </Button>
         </form>
