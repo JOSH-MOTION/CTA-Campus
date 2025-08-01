@@ -320,6 +320,7 @@ export default function ChatPage() {
             onSendMessage={handleSendMessage}
             currentUser={currentUser}
             onToggleContacts={() => setIsContactListOpen(prev => !prev)}
+            loading={loading}
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-gray-100 dark:bg-gray-900">

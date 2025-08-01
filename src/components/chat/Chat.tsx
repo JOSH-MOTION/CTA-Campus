@@ -24,9 +24,10 @@ interface ChatProps {
   onSendMessage: (text: string, replyTo?: Message) => void;
   currentUser: User | null;
   onToggleContacts: () => void;
+  loading: boolean;
 }
 
-export function Chat({entity, messages, onSendMessage, currentUser, onToggleContacts}: ChatProps) {
+export function Chat({entity, messages, onSendMessage, currentUser, onToggleContacts, loading}: ChatProps) {
   const [text, setText] = useState('');
   const [replyTo, setReplyTo] = useState<Message | undefined>(undefined);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -42,7 +43,7 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
     if (viewportRef.current) {
         viewportRef.current.scrollTop = viewportRef.current.scrollHeight;
     }
-  }, [messages, entity]);
+  }, [messages, entity, loading]);
   
   useEffect(() => {
       setReplyTo(undefined);
@@ -147,6 +148,7 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
 
   const DateSeparator = ({ date }: { date: Date }) => {
     let label;
+    if (!date) return null;
     if (isToday(date)) {
         label = 'Today';
     } else if (isYesterday(date)) {
@@ -168,11 +170,11 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
     <>
     <div className="flex h-full w-full flex-col bg-gray-100 dark:bg-gray-900">
       <header className="flex h-[60px] flex-shrink-0 items-center gap-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-3">
-        <Button variant="ghost" size="icon" onClick={() => router.back()} className="md:hidden">
+        <Button variant="ghost" size="icon" onClick={onToggleContacts} className="md:hidden">
             <ArrowLeft className="h-5 w-5" />
             <span className="sr-only">Back</span>
         </Button>
-        <Button variant="ghost" size="icon" onClick={onToggleContacts}>
+        <Button variant="ghost" size="icon" onClick={onToggleContacts} className="hidden md:flex">
             <Users className="h-5 w-5" />
             <span className="sr-only">Toggle Contacts</span>
         </Button>
