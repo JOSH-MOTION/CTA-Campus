@@ -59,7 +59,10 @@ export default function PerformanceHub({ studentId }: { studentId?: string }) {
       return;
     }
 
+    // Reset state and set loading to true when targetUserId changes
+    setGradingData(initialGradingData.map(item => ({...item, current: 0})));
     setLoading(true);
+
     const pointsCol = collection(db, 'users', targetUserId, 'points');
     const q = query(pointsCol);
 
