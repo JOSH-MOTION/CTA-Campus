@@ -234,7 +234,7 @@ export default function ChatPage() {
 
   const ContactList = () => (
     <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-950">
-        <SheetHeader className="p-4 border-b border-gray-200 dark:border-gray-800">
+        <SheetHeader className="p-4 border-b border-gray-200 dark:border-gray-800 shrink-0">
             <SheetTitle>Contacts</SheetTitle>
         </SheetHeader>
         <div className="p-3 shrink-0">
@@ -306,7 +306,7 @@ export default function ChatPage() {
   );
 
   return (
-    <div className="flex h-full max-h-full overflow-hidden bg-white dark:bg-gray-900">
+    <div className="h-full w-full overflow-hidden">
         <Sheet open={isContactListOpen} onOpenChange={setIsContactListOpen}>
             <SheetContent side="left" className="p-0 w-[350px]">
                 <ContactList />
