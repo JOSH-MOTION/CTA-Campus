@@ -12,8 +12,7 @@ import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Cell } from 
 import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 import { getPointsForStudent } from '@/services/points';
 
-interface StudentRank extends UserData {
-  rank: number;
+interface StudentDetail extends UserData {
   totalPoints: number;
 }
 
@@ -21,8 +20,7 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
 export default function RankingsPage() {
   const { fetchAllStudents } = useAuth();
-  const [allStudents, setAllStudents] = useState<UserData[]>([]);
-  const [studentPoints, setStudentPoints] = useState<{[key: string]: number}>({});
+  const [studentDetails, setStudentDetails] = useState<StudentDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGen, setSelectedGen] = useState('all');
@@ -30,47 +28,41 @@ export default function RankingsPage() {
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      const students = await fetchAllStudents();
-      setAllStudents(students);
-      
-      const pointsPromises = students.map(student => getPointsForStudent(student.uid));
-      const pointsResults = await Promise.all(pointsPromises);
-
-      const pointsMap: {[key: string]: number} = {};
-      students.forEach((student, index) => {
-        pointsMap[student.uid] = pointsResults[index];
-      });
-
-      setStudentPoints(pointsMap);
-      setLoading(false);
+      try {
+        const students = await fetchAllStudents();
+        const pointsPromises = students.map(student => 
+          getPointsForStudent(student.uid).then(points => ({ ...student, totalPoints: points }))
+        );
+        const details = await Promise.all(pointsPromises);
+        setStudentDetails(details);
+      } catch (error) {
+        console.error("Failed to load rankings data:", error);
+      } finally {
+        setLoading(false);
+      }
     };
     loadData();
   }, [fetchAllStudents]);
 
   const availableGens = useMemo(() => {
-    const gens = new Set(allStudents.map(student => student.gen).filter(Boolean));
+    const gens = new Set(studentDetails.map(student => student.gen).filter(Boolean));
     return ['all', ...Array.from(gens).sort()];
-  }, [allStudents]);
+  }, [studentDetails]);
 
   const rankedStudents = useMemo(() => {
-    const filtered = allStudents.filter(student => {
+    const filtered = studentDetails.filter(student => {
       const matchesSearch = student.displayName.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesGen = selectedGen === 'all' || student.gen === selectedGen;
       return matchesSearch && matchesGen;
     });
 
-    const studentsWithPoints = filtered.map(student => ({
-        ...student,
-        totalPoints: studentPoints[student.uid] || 0,
-    }));
-
-    return studentsWithPoints
+    return filtered
         .sort((a, b) => b.totalPoints - a.totalPoints)
         .map((student, index) => ({
             ...student,
             rank: index + 1,
         }));
-  }, [allStudents, studentPoints, searchTerm, selectedGen]);
+  }, [studentDetails, searchTerm, selectedGen]);
   
   const chartData = useMemo(() => rankedStudents.slice(0, 15).reverse(), [rankedStudents]);
 
