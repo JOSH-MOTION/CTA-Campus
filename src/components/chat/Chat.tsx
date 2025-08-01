@@ -9,7 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Send, Users, Loader2, ArrowLeft, ArrowDownCircle, Reply, Pin, Trash2, Edit, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Message } from '@/services/chat';
-import { updateMessage, getChatId } from '@/services/chat';
+import { updateMessage, getChatId, deleteMessage } from '@/services/chat';
 import type { User } from 'firebase/auth';
 import { format, isToday, isYesterday } from 'date-fns';
 import {
@@ -25,13 +25,16 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { UserData } from '@/contexts/AuthContext';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
+
 
 type ChatEntity = { id: string; name: string; avatar?: string; dataAiHint: string; type: 'dm' | 'group' };
 
 interface ChatProps {
   entity: ChatEntity;
   messages: Message[];
-  onSendMessage: (text: string, replyTo?: Message) => void;
+  onSendMessage: (text: string, replyTo?: Message, mentions?: UserData[]) => void;
   currentUser: User | null;
   onToggleContacts: () => void;
   loading: boolean;
@@ -77,12 +80,12 @@ const MessageBubble = React.memo(({
         <div
           className={cn(
             'relative w-fit rounded-lg p-3 text-sm shadow-sm',
-            isSender ? 'bg-gray-200 dark:bg-gray-700' : 'bg-white dark:bg-gray-800',
+            isSender ? 'bg-primary/20 dark:bg-primary/30' : 'bg-white dark:bg-gray-800',
             msg.isPinned && 'border-2 border-primary'
           )}
         >
           {msg.isPinned && <Pin className="absolute -top-2 -left-2 h-4 w-4 rotate-45 text-primary" />}
-          <p className='whitespace-pre-wrap'>{msg.text}</p>
+          <p className='whitespace-pre-wrap' dangerouslySetInnerHTML={{ __html: msg.text.replace(/@\[([^\]]+)\]\(([^)]+)\)/g, '<strong class="text-primary font-semibold">@$1</strong>') }}></p>
            {msg.edited && <span className="text-xs text-gray-500 ml-2">(edited)</span>}
         </div>
       </div>
@@ -278,9 +281,8 @@ export const Chat = React.memo(function Chat({
 
     setIsProcessing(true);
     try {
-      // This is incorrect. The deleteMessage function must be called here.
-      // Not implemented for now.
-      toast({ title: 'Message deleted (Not Implemented)' });
+      await deleteMessage(chatId, deletingMessage.id);
+      toast({ title: 'Message deleted' });
     } catch (error) {
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete message.' });
     } finally {
@@ -306,6 +308,16 @@ export const Chat = React.memo(function Chat({
             <AvatarFallback>{entity.name.charAt(0)}</AvatarFallback>
           </Avatar>
           <h2 className='flex-1 text-lg font-semibold'>{entity.name}</h2>
+          {showScrollToBottom && (
+            <Button 
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 rounded-full"
+                onClick={() => scrollToBottom('smooth')}
+            >
+                <ArrowDownCircle className="h-6 w-6" />
+            </Button>
+          )}
         </header>
 
         {pinnedMessage && (
@@ -327,36 +339,55 @@ export const Chat = React.memo(function Chat({
             <ScrollArea className='h-full' viewportRef={viewportRef} onScroll={handleScroll}>
               <div className='space-y-6 p-4 md:p-10'>{messageList}</div>
             </ScrollArea>
-            {showScrollToBottom && (
-                <Button 
-                    variant="secondary"
-                    size="icon"
-                    className="absolute bottom-4 right-4 h-10 w-10 rounded-full shadow-lg"
-                    onClick={() => scrollToBottom('smooth')}
-                >
-                    <ArrowDownCircle className="h-6 w-6" />
-                </Button>
-            )}
         </div>
 
 
         <footer className='shrink-0 border-t border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-950'>
-          <form onSubmit={handleSubmit} className='relative flex-1'>
-              <Input
-              value={text || ''}
-              onChange={(e) => setText(e.target.value)}
-              placeholder='Write your message...'
-              className='h-12 w-full rounded-lg border-none bg-gray-100 pr-12 focus:ring-0 dark:bg-gray-800'
-              disabled={editingMessageId !== null}
-              />
-              <Button
-              type='submit'
-              size='icon'
-              className='absolute right-2 top-1/2 h-9 w-9 -translate-y-1/2 rounded-lg bg-primary/20 text-primary hover:bg-primary/30'
-              >
-              <Send className='h-5 w-5' />
-              </Button>
-          </form>
+          {editingMessageId ? (
+             <div className="flex items-center gap-2">
+                <Input
+                    value={editingText}
+                    onChange={(e) => setEditingText(e.target.value)}
+                    placeholder="Editing message..."
+                    className="h-12 w-full rounded-lg border-none bg-gray-100 pr-12 focus:ring-0 dark:bg-gray-800"
+                />
+                <Button onClick={handleSaveEdit} disabled={isProcessing}>
+                    {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Save
+                </Button>
+                <Button variant="ghost" onClick={handleCancelEdit}>Cancel</Button>
+             </div>
+          ) : (
+            <>
+            {replyTo && (
+              <div className="mb-2 p-2 bg-gray-100 dark:bg-gray-800 rounded-md text-sm text-gray-600 dark:text-gray-400 flex justify-between items-center">
+                <div>
+                  <p className="font-semibold">Replying to {replyTo.senderName}</p>
+                  <p className="italic truncate">"{replyTo.text}"</p>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setReplyTo(undefined)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+            <form onSubmit={handleSubmit} className='relative flex-1'>
+                <Input
+                value={text || ''}
+                onChange={(e) => setText(e.target.value)}
+                placeholder='Write your message...'
+                className='h-12 w-full rounded-lg border-none bg-gray-100 pr-12 focus:ring-0 dark:bg-gray-800'
+                disabled={editingMessageId !== null}
+                />
+                <Button
+                type='submit'
+                size='icon'
+                className='absolute right-2 top-1/2 h-9 w-9 -translate-y-1/2 rounded-lg bg-primary/20 text-primary hover:bg-primary/30'
+                >
+                <Send className='h-5 w-5' />
+                </Button>
+            </form>
+            </>
+          )}
         </footer>
       </div>
       <AlertDialog open={!!deletingMessage} onOpenChange={(open) => !open && setDeletingMessage(null)}>
