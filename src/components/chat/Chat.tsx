@@ -25,8 +25,6 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { UserData } from '@/contexts/AuthContext';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 
 
 type ChatEntity = { id: string; name: string; avatar?: string; dataAiHint: string; type: 'dm' | 'group' };
@@ -85,7 +83,7 @@ const MessageBubble = React.memo(({
           )}
         >
           {msg.isPinned && <Pin className="absolute -top-2 -left-2 h-4 w-4 rotate-45 text-primary" />}
-          <p className='whitespace-pre-wrap' dangerouslySetInnerHTML={{ __html: msg.text.replace(/@\[([^\]]+)\]\(([^)]+)\)/g, '<strong class="text-primary font-semibold">@$1</strong>') }}></p>
+          <p className='whitespace-pre-wrap'>{msg.text}</p>
            {msg.edited && <span className="text-xs text-gray-500 ml-2">(edited)</span>}
         </div>
       </div>
@@ -192,7 +190,7 @@ export const Chat = React.memo(function Chat({
     }
   }, [messages]);
 
-  const handleScroll = () => {
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     if (viewportRef.current) {
         const { scrollTop, scrollHeight, clientHeight } = viewportRef.current;
         const isScrolledUp = scrollHeight - scrollTop > clientHeight + 100;
