@@ -1,11 +1,12 @@
+
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Users, Loader2, ArrowLeft } from 'lucide-react';
+import { Send, Users, Loader2, ArrowLeft, ArrowDownCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Message } from '@/services/chat';
 import { deleteMessage, updateMessage, getChatId } from '@/services/chat';
@@ -103,11 +104,38 @@ export const Chat = React.memo(function Chat({
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
 
   useEffect(() => {
     setReplyTo(undefined);
     setEditingMessageId(null);
   }, [entity.id]);
+
+  const scrollToBottom = (behavior: 'smooth' | 'auto' = 'auto') => {
+    if (viewportRef.current) {
+        viewportRef.current.scrollTo({ top: viewportRef.current.scrollHeight, behavior });
+    }
+  };
+
+  useEffect(() => {
+    if (!viewportRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = viewportRef.current;
+    
+    // Auto-scroll only if user is near the bottom
+    if (scrollHeight - scrollTop < clientHeight + 200) {
+        scrollToBottom();
+    }
+  }, [messages]);
+
+  const handleScroll = () => {
+    if (viewportRef.current) {
+        const { scrollTop, scrollHeight, clientHeight } = viewportRef.current;
+        // Show button if user has scrolled up more than a certain amount
+        const isScrolledUp = scrollHeight - scrollTop > clientHeight + 100;
+        setShowScrollToBottom(isScrolledUp);
+    }
+  };
 
   const messageList = useMemo(() => {
     return messages.map((msg, index) => {
@@ -212,9 +240,22 @@ export const Chat = React.memo(function Chat({
           <h2 className='flex-1 text-lg font-semibold'>{entity.name}</h2>
         </header>
 
-        <ScrollArea className='flex-1'>
-          <div className='space-y-6 p-4 md:p-10'>{messageList}</div>
-        </ScrollArea>
+        <div className="flex-1 relative">
+            <ScrollArea className='h-full' viewportRef={viewportRef} onScroll={handleScroll}>
+              <div className='space-y-6 p-4 md:p-10'>{messageList}</div>
+            </ScrollArea>
+            {showScrollToBottom && (
+                <Button 
+                    variant="secondary"
+                    size="icon"
+                    className="absolute bottom-4 right-4 h-10 w-10 rounded-full shadow-lg"
+                    onClick={() => scrollToBottom('smooth')}
+                >
+                    <ArrowDownCircle className="h-6 w-6" />
+                </Button>
+            )}
+        </div>
+
 
         <footer className='shrink-0 border-t border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-950'>
           <form onSubmit={handleSubmit} className='relative flex-1'>
