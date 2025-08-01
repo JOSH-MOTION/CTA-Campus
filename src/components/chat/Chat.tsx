@@ -31,17 +31,12 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
   const [text, setText] = useState('');
   const [replyTo, setReplyTo] = useState<Message | undefined>(undefined);
   const router = useRouter();
-  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
   const [deletingMessage, setDeletingMessage] = useState<Message | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length, entity.id]);
   
   useEffect(() => {
       setReplyTo(undefined);
@@ -195,7 +190,6 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
                 </React.Fragment>
             )
           })}
-          <div ref={messagesEndRef} />
         </div>
       </ScrollArea>
 
