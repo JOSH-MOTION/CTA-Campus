@@ -197,7 +197,7 @@ export function StudentCard({ student }: StudentCardProps) {
                         </Card>
                     </TabsContent>
                     <TabsContent value="performance">
-                        <PerformanceHub studentId={student.uid} />
+                        <PerformanceHub key={student.uid} studentId={student.uid} />
                     </TabsContent>
                      <TabsContent value="submissions">
                         <StudentSubmissions studentId={student.uid} />
