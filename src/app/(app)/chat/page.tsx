@@ -85,60 +85,54 @@ export default function ChatPage() {
   }, []);
 
   const handleSelectChat = useCallback((entity: ChatEntity) => {
-    setSelectedChat(entity);
     const newPath = entity.type === 'group' ? `/chat?group=${entity.id.replace('group-', '')}` : `/chat?dm=${entity.id}`;
     router.push(newPath, {scroll: false});
-    
-    let chatId: string;
-    if (entity.type === 'dm' && currentUser) {
-        chatId = getChatId(currentUser.uid, entity.id);
-    } else {
-        chatId = entity.id;
-    }
-    markChatAsRead(chatId);
     setIsContactListOpen(false); // Close drawer on selection
-  }, [router, currentUser, markChatAsRead]);
+  }, [router]);
+
 
   useEffect(() => {
     if (loading || !currentUser) return;
-
+  
     const directMessageUserId = searchParams.get('dm');
     const groupChatId = searchParams.get('group');
-
-    // Prevent re-selection if a chat is already selected
-    if (selectedChat) {
-      if (directMessageUserId && selectedChat.id === directMessageUserId) return;
-      if (groupChatId && selectedChat.id === `group-${groupChatId}`) return;
-    }
-
+  
+    let targetEntity: ChatEntity | null = null;
+  
     if (groupChatId) {
-        const groupToSelect = groupChats.find(g => g.id === `group-${groupChatId}`);
-        if (groupToSelect) {
-            handleSelectChat({...groupToSelect, type: 'group'});
-        }
+      const groupToSelect = groupChats.find(g => g.id === `group-${groupChatId}`);
+      if (groupToSelect) {
+        targetEntity = { ...groupToSelect, type: 'group' };
+      }
     } else if (directMessageUserId) {
-        const userToDm = allUsers.find(u => u.uid === directMessageUserId);
-        if (userToDm) {
-            handleSelectChat({
-              id: userToDm.uid,
-              name: userToDm.displayName,
-              type: 'dm',
-              avatar: userToDm.photoURL,
-              dataAiHint: 'user portrait',
-            });
-        }
+      const userToDm = allUsers.find(u => u.uid === directMessageUserId);
+      if (userToDm) {
+        targetEntity = {
+          id: userToDm.uid,
+          name: userToDm.displayName,
+          type: 'dm',
+          avatar: userToDm.photoURL,
+          dataAiHint: 'user portrait',
+        };
+      }
     } else if (otherUsers.length > 0 && !selectedChat) {
-        // Only autoselect if no chat is currently selected
-        const firstUser = otherUsers[0];
-        handleSelectChat({
+      // Auto-select the first user only if no chat is selected and no params are in URL
+      const firstUser = otherUsers[0];
+       handleSelectChat({
             id: firstUser.uid,
             name: firstUser.displayName,
             type: 'dm',
             avatar: firstUser.photoURL,
             dataAiHint: 'student portrait',
         });
+        return;
     }
-  }, [loading, currentUser, allUsers, otherUsers, groupChats, searchParams, selectedChat, handleSelectChat]);
+    
+    if (targetEntity) {
+        setSelectedChat(targetEntity);
+    }
+
+  }, [loading, currentUser, allUsers, otherUsers, groupChats, searchParams, handleSelectChat, selectedChat]);
   
 
   useEffect(() => {
