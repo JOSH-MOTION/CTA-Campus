@@ -64,7 +64,13 @@ export default function RankingsPage() {
         }));
   }, [studentDetails, searchTerm, selectedGen]);
   
-  const chartData = useMemo(() => rankedStudents.slice(0, 15).reverse(), [rankedStudents]);
+  const chartData = useMemo(() => {
+      return rankedStudents.map(student => ({
+          name: student.displayName,
+          value: student.totalPoints,
+      })).slice(0, 15).reverse();
+  }, [rankedStudents]);
+
 
   return (
     <div className="space-y-6">
@@ -119,7 +125,7 @@ export default function RankingsPage() {
                             >
                                 <XAxis type="number" hide />
                                 <YAxis
-                                    dataKey="displayName"
+                                    dataKey="name"
                                     type="category"
                                     tickLine={false}
                                     axisLine={false}
@@ -138,7 +144,7 @@ export default function RankingsPage() {
                                                                 Student
                                                             </span>
                                                             <span className="font-bold text-muted-foreground">
-                                                                {payload[0].payload.displayName}
+                                                                {payload[0].payload.name}
                                                             </span>
                                                         </div>
                                                         <div className="flex flex-col">
@@ -156,7 +162,7 @@ export default function RankingsPage() {
                                         return null;
                                     }}
                                 />
-                                <Bar dataKey="totalPoints" background={{ fill: 'hsl(var(--muted) / 0.5)' }} radius={4}>
+                                <Bar dataKey="value" background={{ fill: 'hsl(var(--muted) / 0.5)' }} radius={4}>
                                     {chartData.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                     ))}
