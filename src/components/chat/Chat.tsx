@@ -40,10 +40,8 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!loading && messages.length > 0) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [loading, messages.length]);
+    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+  }, [entity.id, messages]);
   
   useEffect(() => {
       setReplyTo(undefined);
@@ -129,7 +127,7 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
                 </Avatar>
              )}
             <div className={cn("max-w-[75%]", isSender ? 'flex flex-col items-end' : 'flex flex-col items-start')}>
-                 <div className={cn("flex items-baseline gap-2 mb-1", isSender && "flex-row-reverse")}>
+                 <div className={cn("flex items-baseline gap-2 mb-1", isSender ? 'flex-row-reverse' : 'justify-start')}>
                      <p className="text-xs">{isSender ? "You" : msg.senderName}</p>
                      <p className="text-xs text-gray-500">{messageTime}</p>
                 </div>
