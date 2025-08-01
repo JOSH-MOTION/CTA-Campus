@@ -187,8 +187,11 @@ export const Chat = React.memo(function Chat({
   };
   
   const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
-    checkMentionState(e.target.value);
-  }
+    // Only check for mention if the last character is @
+    if (e.target.value.endsWith('@')) {
+      checkMentionState(e.target.value);
+    }
+  };
 
   const handleSelectMention = (user: UserData) => {
     const newText = text.replace(/@\w*$/, `@${user.displayName} `);
@@ -460,3 +463,4 @@ export const Chat = React.memo(function Chat({
     </>
   );
 });
+
