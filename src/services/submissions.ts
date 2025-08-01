@@ -39,14 +39,21 @@ import {
   export const addSubmission = async (submissionData: NewSubmissionData): Promise<{ id: string }> => {
     const { pointsToAward, ...restOfSubmissionData } = submissionData;
     
-    // Use assignmentTitle for duplicate check, as it will be unique for each day's 100-days-of-code post
-    const q = query(
-        collection(db, 'submissions'),
-        where('studentId', '==', submissionData.studentId),
-        where('assignmentTitle', '==', submissionData.assignmentTitle)
-    );
+    // For "100 Days of Code", check by title. For others, check by assignment ID.
+    const is100Days = submissionData.assignmentId === '100-days-of-code';
+    const duplicateCheckQuery = is100Days
+      ? query(
+          collection(db, 'submissions'),
+          where('studentId', '==', submissionData.studentId),
+          where('assignmentTitle', '==', submissionData.assignmentTitle)
+        )
+      : query(
+          collection(db, 'submissions'),
+          where('studentId', '==', submissionData.studentId),
+          where('assignmentId', '==', submissionData.assignmentId)
+        );
       
-    const querySnapshot = await getDocs(q);
+    const querySnapshot = await getDocs(duplicateCheckQuery);
     if (!querySnapshot.empty) {
         throw new Error('duplicate');
     }
