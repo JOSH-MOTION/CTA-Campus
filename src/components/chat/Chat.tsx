@@ -6,7 +6,7 @@ import {Avatar, AvatarFallback, AvatarImage} from '@/components/ui/avatar';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {ScrollArea} from '@/components/ui/scroll-area';
-import {Send, Reply, Pin, X, Pencil, Trash2, Check, Loader2} from 'lucide-react';
+import {Send, Reply, Pin, X, Pencil, Trash2, Check, Loader2, Paperclip, Smile, Mic, Video, Phone, Search, CheckCheck, MoreVertical} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import type {Message} from '@/services/chat';
 import {deleteMessage, updateMessage, getChatId} from '@/services/chat';
@@ -115,123 +115,145 @@ export function Chat({entity, messages, onSendMessage, currentUser}: ChatProps) 
     }
   }
 
+  const MessageBubble = ({msg}: {msg: Message}) => {
+    const isSender = msg.senderId === currentUser?.uid;
+    const isEdited = msg.edited;
+    const messageTime = msg.timestamp ? format(msg.timestamp.toDate(), 'p') : '';
+    const readStatus = msg.read ? <CheckCheck className="h-4 w-4 text-sky-400" /> : <Check className="h-4 w-4" />;
+
+    return (
+        <div className={cn("flex items-end gap-3 group w-full", isSender ? 'justify-end' : 'justify-start')}>
+            <div
+                className={cn(
+                  'max-w-[65%] rounded-lg p-2 text-sm shadow-sm relative text-white',
+                  isSender ? 'bg-[#005c4b]' : 'bg-[#202c33]'
+                )}
+              >
+              {isSender && (
+                  <div className="absolute top-0 -right-[8px] h-0 w-0 border-x-[8px] border-x-transparent border-t-[8px] border-t-[#005c4b]" />
+              )}
+               {!isSender && (
+                  <div className="absolute top-0 -left-[8px] h-0 w-0 border-x-[8px] border-x-transparent border-t-[8px] border-t-[#202c33]" />
+              )}
+
+              {!isSender && entity.type === 'group' && (
+                <p className="font-semibold text-xs text-primary mb-1">{msg.senderName}</p>
+              )}
+
+              {msg.replyTo && (
+                  <div className="mb-2 rounded-md bg-black/20 p-2 border-l-2 border-primary">
+                      <p className="font-bold text-xs">{msg.replyTo.senderName}</p>
+                      <p className="text-xs truncate opacity-80">{msg.replyTo.text}</p>
+                  </div>
+              )}
+              
+              {editingMessageId === msg.id ? (
+                  <div className="space-y-2 mt-2">
+                      <Input 
+                          value={editingText}
+                          onChange={(e) => setEditingText(e.target.value)}
+                          className="bg-white/10 text-white h-9"
+                          onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSaveEdit()}
+                      />
+                      <div className="flex gap-2 justify-end">
+                          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={handleSaveEdit} disabled={isProcessing}>
+                              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin"/> : <Check className="h-4 w-4"/>}
+                          </Button>
+                          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={handleCancelEdit}>
+                              <X className="h-4 w-4"/>
+                          </Button>
+                      </div>
+                  </div>
+              ) : (
+                  <p className="whitespace-pre-wrap">{msg.text}</p>
+              )}
+               <div className="flex items-center justify-end gap-1 mt-1">
+                 {isEdited && <p className="text-xs opacity-70">Edited</p>}
+                 <p className="text-xs opacity-70">{messageTime}</p>
+                 {isSender && readStatus}
+               </div>
+            </div>
+        </div>
+    )
+  }
+
+  const DateSeparator = ({ date }: { date: Date }) => {
+    let label;
+    if (isToday(date)) {
+        label = 'Today';
+    } else if (isYesterday(date)) {
+        label = 'Yesterday';
+    } else {
+        label = format(date, 'MMMM d, yyyy');
+    }
+
+    return (
+        <div className="flex justify-center my-4">
+            <span className="bg-[#111b21] text-gray-400 text-xs px-3 py-1 rounded-full">
+                {label}
+            </span>
+        </div>
+    );
+};
 
   return (
     <>
-    <div className="flex h-full flex-col">
-      <header className="flex items-center gap-4 border-b bg-card p-4">
+    <div className="flex h-full flex-col bg-[#0b141a]">
+      <header className="flex h-[60px] items-center gap-4 border-b border-white/10 bg-[#202c33] p-3">
         <Avatar className="h-10 w-10">
           <AvatarImage src={entity.avatar} alt={entity.name} data-ai-hint={entity.dataAiHint} />
           <AvatarFallback>{entity.name.charAt(0)}</AvatarFallback>
         </Avatar>
-        <h2 className="text-xl font-bold">{entity.name}</h2>
+        <h2 className="text-lg font-medium text-gray-100 flex-1">{entity.name}</h2>
+        <div className="flex items-center gap-2 text-gray-300">
+            <Button variant="ghost" size="icon" className="hover:bg-white/10"><Video className="h-5 w-5"/></Button>
+            <Button variant="ghost" size="icon" className="hover:bg-white/10"><Phone className="h-5 w-5"/></Button>
+            <Button variant="ghost" size="icon" className="hover:bg-white/10"><Search className="h-5 w-5"/></Button>
+            <Button variant="ghost" size="icon" className="hover:bg-white/10"><MoreVertical className="h-5 w-5"/></Button>
+        </div>
       </header>
 
-      <ScrollArea className="flex-1 bg-background/50" ref={scrollAreaRef}>
-        <div className="space-y-6 p-4">
-          {messages.map(msg => (
-            <div
-              key={msg.id}
-              className={cn('flex items-end gap-3 group', msg.senderId === currentUser?.uid ? 'flex-row-reverse' : 'flex-row')}
-            >
-              {msg.senderId !== currentUser?.uid && (
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback>{msg.senderName.charAt(0)}</AvatarFallback>
-                </Avatar>
-              )}
-              <div
-                className={cn(
-                  'max-w-[70%] rounded-lg p-3 text-sm shadow-sm relative',
-                  msg.senderId === currentUser?.uid
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-card'
-                )}
-              >
-                <div className={cn("absolute top-1/2 -translate-y-1/2 flex bg-card border rounded-md shadow-sm opacity-0 group-hover:opacity-100 transition-opacity",  msg.senderId === currentUser?.uid ? '-left-28' : '-right-28')}>
-                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleReplyTo(msg)}>
-                       <Reply className="h-4 w-4" />
-                   </Button>
-                   <Button variant="ghost" size="icon" className="h-7 w-7">
-                       <Pin className="h-4 w-4" />
-                   </Button>
-                   {msg.senderId === currentUser?.uid && (
-                       <>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditClick(msg)}>
-                            <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 hover:text-destructive" onClick={() => setDeletingMessage(msg)}>
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
-                       </>
-                   )}
-                </div>
-
-                {msg.replyTo && (
-                    <div className="mb-2 rounded-md bg-black/10 p-2">
-                        <p className="font-bold text-xs">{msg.replyTo.senderName}</p>
-                        <p className="text-xs truncate">{msg.replyTo.text}</p>
-                    </div>
-                )}
-                
-                <p className="font-semibold">{msg.senderName}</p>
-                {editingMessageId === msg.id ? (
-                    <div className="space-y-2 mt-2">
-                        <Input 
-                            value={editingText}
-                            onChange={(e) => setEditingText(e.target.value)}
-                            className="bg-background text-foreground h-9"
-                            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSaveEdit()}
-                        />
-                        <div className="flex gap-2">
-                            <Button size="sm" onClick={handleSaveEdit} disabled={isProcessing}>
-                                {isProcessing ? <Loader2 className="h-4 w-4 animate-spin"/> : <Check className="h-4 w-4"/>}
-                                Save
-                            </Button>
-                            <Button size="sm" variant="ghost" onClick={handleCancelEdit}>
-                                <X className="h-4 w-4"/>
-                                Cancel
-                            </Button>
-                        </div>
-                    </div>
-                ) : (
-                    <p>{msg.text}</p>
-                )}
-                <p className="mt-1 text-xs opacity-70">
-                   {msg.timestamp ? format(msg.timestamp.toDate(), 'p') : '...'}
-                </p>
-              </div>
-               {msg.senderId === currentUser?.uid && (
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback>{currentUser?.displayName?.charAt(0) || 'U'}</AvatarFallback>
-                </Avatar>
-              )}
-            </div>
-          ))}
+      <ScrollArea className="flex-1 bg-transparent" ref={scrollAreaRef}>
+        <div className="space-y-2 p-4 md:p-10">
+          {messages.map((msg, index) => {
+             const prevMessage = messages[index - 1];
+             const showDateSeparator = !prevMessage || format(prevMessage.timestamp.toDate(), 'yyyy-MM-dd') !== format(msg.timestamp.toDate(), 'yyyy-MM-dd');
+            return (
+                <React.Fragment key={msg.id}>
+                    {showDateSeparator && <DateSeparator date={msg.timestamp.toDate()} />}
+                    <MessageBubble msg={msg} />
+                </React.Fragment>
+            )
+          })}
         </div>
       </ScrollArea>
 
-      <footer className="border-t bg-card p-4">
+      <footer className="bg-[#202c33] p-3">
         {replyTo && (
-            <div className="mb-2 p-2 rounded-md bg-muted text-sm relative">
-                <p className="text-muted-foreground text-xs">Replying to <span className="font-semibold">{replyTo.senderName}</span></p>
-                <p className="truncate">{replyTo.text}</p>
-                <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6" onClick={() => setReplyTo(undefined)}>
+            <div className="mb-2 p-2 rounded-t-lg bg-[#2a3942] text-sm relative">
+                <p className="text-primary text-xs font-semibold">Replying to {replyTo.senderName}</p>
+                <p className="truncate text-gray-300">{replyTo.text}</p>
+                <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 text-gray-300" onClick={() => setReplyTo(undefined)}>
                     <X className="h-4 w-4"/>
                 </Button>
             </div>
         )}
-        <form onSubmit={handleSubmit} className="relative">
-          <Input
-            value={text}
-            onChange={e => setText(e.target.value)}
-            placeholder="Type your message..."
-            className="pr-14"
-            disabled={editingMessageId !== null}
-          />
-          <Button type="submit" size="icon" className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2" disabled={!text.trim() || editingMessageId !== null}>
-            <Send className="h-4 w-4" />
-          </Button>
-        </form>
+        <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" className="text-gray-300 hover:bg-white/10"><Smile className="h-6 w-6"/></Button>
+            <Button variant="ghost" size="icon" className="text-gray-300 hover:bg-white/10"><Paperclip className="h-6 w-6"/></Button>
+            <form onSubmit={handleSubmit} className="relative flex-1">
+            <Input
+                value={text}
+                onChange={e => setText(e.target.value)}
+                placeholder="Type a message"
+                className="bg-[#2a3942] border-none text-gray-200 rounded-lg h-12 focus:ring-0 pr-12"
+                disabled={editingMessageId !== null}
+            />
+            </form>
+            <Button variant="ghost" size="icon" className="text-gray-300 hover:bg-white/10">
+                {text ? <Send className="h-6 w-6" onClick={handleSubmit} /> : <Mic className="h-6 w-6" />}
+            </Button>
+        </div>
       </footer>
     </div>
     <AlertDialog open={!!deletingMessage} onOpenChange={(open) => !open && setDeletingMessage(null)}>
