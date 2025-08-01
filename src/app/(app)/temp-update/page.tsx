@@ -65,6 +65,11 @@ export default function TempUpdatePage() {
   
   const form = useForm<TempUpdateFormValues>({
     resolver: zodResolver(tempUpdateSchema),
+    defaultValues: {
+      studentId: '',
+      activityTitle: '',
+      points: 0,
+    },
   });
 
   const onSubmit = async (data: TempUpdateFormValues) => {
