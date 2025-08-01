@@ -220,7 +220,29 @@ export const Chat = React.memo(function Chat({
         setShowScrollToBottom(isScrolledUp);
     }
   };
+  
+  const handlePin = async (message: Message) => {
+    if (!currentUser) return;
+     let chatId: string;
+    if (entity.type === 'dm') {
+      chatId = getChatId(currentUser.uid, entity.id);
+    } else {
+      chatId = entity.id;
+    }
+    
+    try {
+        await updateMessage(chatId, message.id, { isPinned: !message.isPinned });
+        toast({ title: message.isPinned ? 'Message Unpinned' : 'Message Pinned!' });
+    } catch (error) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not pin message.' });
+    }
+  };
 
+  const handleEditClick = (message: Message) => {
+    setEditingMessageId(message.id);
+    setEditingText(message.text);
+  };
+  
   const messageList = useMemo(() => {
     return messages.map((msg, index) => {
       const prevMessage = messages[index - 1];
@@ -244,7 +266,7 @@ export const Chat = React.memo(function Chat({
         </React.Fragment>
       );
     });
-  }, [messages, currentUser]);
+  }, [messages, currentUser, handlePin, handleEditClick]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -252,11 +274,6 @@ export const Chat = React.memo(function Chat({
     onSendMessage(text, replyTo);
     setText('');
     setReplyTo(undefined);
-  };
-
-  const handleEditClick = (message: Message) => {
-    setEditingMessageId(message.id);
-    setEditingText(message.text);
   };
 
   const handleCancelEdit = () => {
@@ -308,24 +325,6 @@ export const Chat = React.memo(function Chat({
       setDeletingMessage(null);
     }
   };
-
-  const handlePin = async (message: Message) => {
-    if (!currentUser) return;
-     let chatId: string;
-    if (entity.type === 'dm') {
-      chatId = getChatId(currentUser.uid, entity.id);
-    } else {
-      chatId = entity.id;
-    }
-    
-    try {
-        await updateMessage(chatId, message.id, { isPinned: !message.isPinned });
-        toast({ title: message.isPinned ? 'Message Unpinned' : 'Message Pinned!' });
-    } catch (error) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not pin message.' });
-    }
-  };
-
 
   return (
     <>
