@@ -13,7 +13,7 @@ import { z } from 'genkit';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 
-export const AwardPointsFlowInputSchema = z.object({
+const AwardPointsFlowInputSchema = z.object({
     studentId: z.string().describe("The UID of the student to award points to."),
     points: z.number().describe("The number of points to award. Can be negative to revoke."),
     reason: z.string().describe("A short description of why the points are being awarded."),
@@ -22,7 +22,7 @@ export const AwardPointsFlowInputSchema = z.object({
 });
 export type AwardPointsFlowInput = z.infer<typeof AwardPointsFlowInputSchema>;
 
-export const AwardPointsFlowOutputSchema = z.object({
+const AwardPointsFlowOutputSchema = z.object({
   success: z.boolean(),
   message: z.string(),
 });
