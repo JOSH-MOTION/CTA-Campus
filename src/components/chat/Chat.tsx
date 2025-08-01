@@ -30,7 +30,7 @@ interface ChatProps {
 export function Chat({entity, messages, onSendMessage, currentUser, onToggleContacts, loading}: ChatProps) {
   const [text, setText] = useState('');
   const [replyTo, setReplyTo] = useState<Message | undefined>(undefined);
-  const viewportRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
@@ -40,10 +40,10 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
   const { toast } = useToast();
 
   useEffect(() => {
-    if (viewportRef.current) {
-        viewportRef.current.scrollTop = viewportRef.current.scrollHeight;
+    if (scrollRef.current) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, entity, loading]);
+  }, [messages, entity]);
   
   useEffect(() => {
       setReplyTo(undefined);
@@ -121,7 +121,7 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
     const messageTime = msg.timestamp ? format(msg.timestamp.toDate(), 'HH:mm') : '';
 
     return (
-        <div className={cn("flex items-start gap-3 w-full", isSender ? 'justify-end' : 'justify-start')}>
+        <div className={cn("flex items-start gap-3 w-full", isSender ? 'flex-row-reverse' : 'justify-start')}>
              {!isSender && (
                 <Avatar className="h-8 w-8">
                     <AvatarImage src={`https://placehold.co/100x100.png?text=${msg.senderName.charAt(0)}`} alt={msg.senderName} />
@@ -129,7 +129,7 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
                 </Avatar>
              )}
             <div className={cn("max-w-[75%]", isSender ? 'flex flex-col items-end' : 'flex flex-col items-start')}>
-                 <div className={cn("flex items-baseline gap-2 mb-1", isSender && "text-right")}>
+                 <div className={cn("flex items-baseline gap-2 mb-1", isSender && "flex-row-reverse")}>
                      <p className="text-xs">{isSender ? "You" : msg.senderName}</p>
                      <p className="text-xs text-gray-500">{messageTime}</p>
                 </div>
@@ -185,7 +185,7 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
         <h2 className="text-lg font-semibold flex-1">{entity.name}</h2>
       </header>
 
-      <ScrollArea className="flex-1" viewportRef={viewportRef}>
+      <ScrollArea className="flex-1" viewportRef={scrollRef}>
         <div className="space-y-6 p-4 md:p-10">
           {messages.map((msg, index) => {
              const prevMessage = messages[index - 1];
