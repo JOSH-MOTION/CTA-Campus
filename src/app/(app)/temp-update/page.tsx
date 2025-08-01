@@ -2,7 +2,7 @@
 // src/app/(app)/temp-update/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Award, CheckCircle, Code, Edit, Film, GitBranch, Handshake, Loader2, PlusCircle, Presentation, Projector, Star } from 'lucide-react';
+import { Award, CheckCircle, Code, Edit, Film, GitBranch, Handshake, Loader2, PlusCircle, Presentation, Projector, Search, Star } from 'lucide-react';
 import { useAuth, UserData } from '@/contexts/AuthContext';
 import { awardPoint } from '@/services/points';
 import { v4 as uuidv4 } from 'uuid';
@@ -44,6 +44,7 @@ export default function TempUpdatePage() {
   const [students, setStudents] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     const loadStudents = async () => {
@@ -55,6 +56,12 @@ export default function TempUpdatePage() {
     };
     loadStudents();
   }, [fetchAllUsers]);
+
+  const filteredStudents = useMemo(() => {
+    return students.filter(student =>
+        student.displayName.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [students, searchTerm]);
   
   const form = useForm<TempUpdateFormValues>({
     resolver: zodResolver(tempUpdateSchema),
@@ -74,6 +81,7 @@ export default function TempUpdatePage() {
         description: `${data.points} points awarded to ${selectedStudent?.displayName} for "${data.activityTitle}".`,
       });
       form.reset();
+      setSearchTerm('');
     } catch (error: any) {
       toast({
         variant: 'destructive',
@@ -100,13 +108,27 @@ export default function TempUpdatePage() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+               <div className="space-y-2">
+                 <Label htmlFor="search-student">Search Student</Label>
+                 <div className="relative">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                        id="search-student"
+                        placeholder="Start typing a name..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-9"
+                    />
+                 </div>
+               </div>
+
               <FormField
                 control={form.control}
                 name="studentId"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Student</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loading}>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={loading}>
                       <FormControl>
                         <SelectTrigger>
                            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -114,9 +136,13 @@ export default function TempUpdatePage() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {students.map(member => (
+                        {filteredStudents.length > 0 ? filteredStudents.map(member => (
                           <SelectItem key={member.uid} value={member.uid}>{member.displayName} ({member.gen})</SelectItem>
-                        ))}
+                        )) : (
+                            <div className="p-4 text-center text-sm text-muted-foreground">
+                                No students found.
+                            </div>
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
