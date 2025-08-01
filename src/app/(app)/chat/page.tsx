@@ -306,7 +306,7 @@ export default function ChatPage() {
   );
 
   return (
-    <div className="h-full w-full overflow-hidden">
+    <div className="h-screen w-full overflow-hidden">
         <Sheet open={isContactListOpen} onOpenChange={setIsContactListOpen}>
             <SheetContent side="left" className="p-0 w-[350px]">
                 <ContactList />
