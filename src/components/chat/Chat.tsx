@@ -40,7 +40,7 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
   const { toast } = useToast();
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length, entity.id]);
   
   useEffect(() => {
