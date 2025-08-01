@@ -70,22 +70,6 @@ export const removePointByActivityId = async (userId: string, activityId: string
 };
 
 /**
- * Deletes a specific point entry by its document ID.
- * @param userId The user's ID
- * @param pointId The unique ID of the point document to delete
- */
-export const deletePointEntry = async (userId: string, pointId: string): Promise<void> => {
-    const pointDocRef = doc(db, 'users', userId, 'points', pointId);
-    try {
-        await deleteDoc(pointDocRef);
-    } catch (error) {
-        console.error("Error deleting point entry:", error);
-        throw error;
-    }
-};
-
-
-/**
  * Checks if a point has already been awarded for a specific activity.
  * @param userId The user's ID
  * @param activityId The unique ID of the activity
@@ -113,30 +97,4 @@ export const getPointsForStudent = async (userId: string): Promise<number> => {
   });
 
   return totalPoints;
-};
-
-/**
- * Sets up a real-time listener for all point entries for a specific student.
- * @param studentId The UID of the student.
- * @param callback The function to call with the new array of point entries.
- * @returns An unsubscribe function to stop the listener.
- */
-export const onPointsForStudent = (studentId: string, callback: (points: PointEntry[]) => void) => {
-    const pointsCol = collection(db, 'users', studentId, 'points');
-    const q = query(pointsCol, orderBy('awardedAt', 'desc'));
-
-    const unsubscribe = onSnapshot(
-        q,
-        (querySnapshot) => {
-            const points: PointEntry[] = querySnapshot.docs.map((doc) => {
-                return { id: doc.id, ...doc.data() } as PointEntry;
-            });
-            callback(points);
-        },
-        (error) => {
-            console.error(`Error listening to points for student ${studentId}:`, error);
-        }
-    );
-
-    return unsubscribe;
 };
