@@ -48,7 +48,7 @@ const COLORS = [
 export default function PerformanceHub({ studentId }: { studentId?: string }) {
   const { user } = useAuth();
   const [chartType, setChartType] = useState<'bar' | 'pie'>('bar');
-  const [gradingData, setGradingData] = useState(initialGradingData);
+  const [gradingData, setGradingData] = useState(initialGradingData.map(item => ({...item, current: 0})));
   const [loading, setLoading] = useState(true);
 
   const targetUserId = studentId || user?.uid;
