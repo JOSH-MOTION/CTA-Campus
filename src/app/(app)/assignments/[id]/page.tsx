@@ -12,9 +12,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
-import { ArrowLeft, ExternalLink, Loader2, CheckCircle, Trash2 } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Loader2, CheckCircle, Trash2, XCircle } from 'lucide-react';
 import Link from 'next/link';
-import { awardPoint, hasPointBeenAwarded, removePoint } from '@/services/points';
+import { awardPoint, hasPointBeenAwarded, removePointByActivityId } from '@/services/points';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useNotifications } from '@/contexts/NotificationsContext';
@@ -91,12 +91,33 @@ export default function AssignmentSubmissionsPage() {
     }
   };
 
+  const unGrade = async (submission: Submission) => {
+    setGradingState(prev => ({ ...prev, [submission.id]: 'loading' }));
+    const activityId = `graded-submission-${submission.id}`;
+    try {
+      await removePointByActivityId(submission.studentId, activityId);
+      setGradingState(prev => ({ ...prev, [submission.id]: 'idle' }));
+      toast({
+        title: 'Points Revoked',
+        description: `Points for ${submission.studentName} have been revoked.`,
+      });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Could not revoke points.',
+      });
+      setGradingState(prev => ({ ...prev, [submission.id]: 'graded' }));
+    }
+  };
+
+
   const handleDeleteSubmission = async () => {
     if (!submissionToDelete) return;
     try {
         const activityId = `graded-submission-${submissionToDelete.id}`;
         await deleteSubmission(submissionToDelete.id);
-        await removePoint(submissionToDelete.studentId, activityId);
+        await removePointByActivityId(submissionToDelete.studentId, activityId);
         toast({
             title: 'Submission Deleted',
             description: `The submission from ${submissionToDelete?.studentName} has been removed and points have been revoked.`,
@@ -169,16 +190,16 @@ export default function AssignmentSubmissionsPage() {
                                         </Button>
                                     </TableCell>
                                     <TableCell className="text-right space-x-2">
-                                        <Button 
-                                            variant={currentGradeState === 'graded' ? 'default' : 'outline'}
+                                         <Button 
                                             size="sm"
-                                            onClick={() => handleGrade(submission)}
-                                            disabled={currentGradeState !== 'idle'}
+                                            variant={currentGradeState === 'graded' ? 'default' : 'outline'}
+                                            onClick={() => currentGradeState === 'graded' ? unGrade(submission) : handleGrade(submission)}
+                                            disabled={currentGradeState === 'loading'}
                                             className={cn(currentGradeState === 'graded' && 'bg-green-600 hover:bg-green-700 text-white')}
                                         >
                                             {currentGradeState === 'loading' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                            {currentGradeState === 'graded' && <CheckCircle className="mr-2 h-4 w-4" />}
-                                            {currentGradeState === 'graded' ? 'Graded' : 'Grade (1 pt)'}
+                                            {currentGradeState === 'graded' ? <XCircle className="mr-2 h-4 w-4" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+                                            {currentGradeState === 'graded' ? 'Revoke Point' : 'Grade (1 pt)'}
                                         </Button>
                                         <Button 
                                             variant="destructive"
