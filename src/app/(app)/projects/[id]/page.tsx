@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProjects } from '@/contexts/ProjectsContext';
-import { onSubmissions, Submission, deleteSubmission } from '@/services/submissions';
+import { Submission, deleteSubmission, fetchSubmissions } from '@/services/submissions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -36,22 +36,33 @@ export default function ProjectSubmissionsPage() {
 
   useEffect(() => {
     if (typeof projectId !== 'string') return;
-    setLoading(true);
-    const unsubscribe = onSubmissions(projectId, async (newSubmissions) => {
-      setSubmissions(newSubmissions);
-      const initialGradingState: {[submissionId: string]: 'idle' | 'loading' | 'graded'} = {};
-      
-      for (const s of newSubmissions) {
-        const activityId = `graded-project-${s.id}`;
-        const isGraded = await hasPointBeenAwarded(s.studentId, activityId);
-        initialGradingState[s.id] = isGraded ? 'graded' : 'idle';
-      }
+    
+    const getSubmissions = async () => {
+        setLoading(true);
+        try {
+            const newSubmissions = await fetchSubmissions(projectId);
+            setSubmissions(newSubmissions);
 
-      setGradingState(initialGradingState);
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, [projectId]);
+            const initialGradingState: {[submissionId: string]: 'idle' | 'loading' | 'graded'} = {};
+            for (const s of newSubmissions) {
+                const activityId = `graded-project-${s.id}`;
+                const isGraded = await hasPointBeenAwarded(s.studentId, activityId);
+                initialGradingState[s.id] = isGraded ? 'graded' : 'idle';
+            }
+            setGradingState(initialGradingState);
+
+        } catch (error) {
+             toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Could not load submissions."
+            });
+        } finally {
+            setLoading(false);
+        }
+    }
+    getSubmissions();
+  }, [projectId, toast]);
 
   if (role === 'student') {
     router.push('/projects');
@@ -120,6 +131,7 @@ export default function ProjectSubmissionsPage() {
             title: 'Submission Deleted',
             description: `The submission from ${submissionToDelete?.studentName} has been removed and points have been revoked.`,
         });
+        setSubmissions(prev => prev.filter(s => s.id !== submissionToDelete.id));
     } catch (error) {
         toast({
             variant: 'destructive',

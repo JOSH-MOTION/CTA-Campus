@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { onSubmissions, Submission, deleteSubmission } from '@/services/submissions';
+import { Submission, deleteSubmission, fetchSubmissions } from '@/services/submissions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -27,13 +27,24 @@ export default function HundredDaysSubmissionsPage() {
   const [submissionToDelete, setSubmissionToDelete] = useState<Submission | null>(null);
 
   useEffect(() => {
-    setLoading(true);
-    const unsubscribe = onSubmissions(HUNDRED_DAYS_OF_CODE_ASSIGNMENT_ID, (newSubmissions) => {
-      setSubmissions(newSubmissions);
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
+    const getSubmissions = async () => {
+        setLoading(true);
+        try {
+            const newSubmissions = await fetchSubmissions(HUNDRED_DAYS_OF_CODE_ASSIGNMENT_ID);
+            setSubmissions(newSubmissions);
+        } catch (error) {
+            console.error("Error fetching submissions:", error);
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Could not load submissions."
+            });
+        } finally {
+            setLoading(false);
+        }
+    }
+    getSubmissions();
+  }, [toast]);
 
   if (role === 'student') {
     router.push('/100-days-of-code');
@@ -50,6 +61,7 @@ export default function HundredDaysSubmissionsPage() {
             title: 'Submission Deleted',
             description: `The submission from ${submissionToDelete?.studentName} has been removed and points have been revoked.`,
         });
+        setSubmissions(prev => prev.filter(s => s.id !== submissionToDelete.id));
     } catch (error) {
         toast({
             variant: 'destructive',

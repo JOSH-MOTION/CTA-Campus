@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAssignments } from '@/contexts/AssignmentsContext';
-import { onSubmissions, Submission, deleteSubmission } from '@/services/submissions';
+import { Submission, deleteSubmission, fetchSubmissions } from '@/services/submissions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -36,22 +36,33 @@ export default function AssignmentSubmissionsPage() {
 
   useEffect(() => {
     if (typeof assignmentId !== 'string') return;
-    setLoading(true);
-    const unsubscribe = onSubmissions(assignmentId, async (newSubmissions) => {
-      setSubmissions(newSubmissions);
-      const initialGradingState: {[submissionId: string]: 'idle' | 'loading' | 'graded'} = {};
-      
-      for (const s of newSubmissions) {
-        const activityId = `graded-submission-${s.id}`;
-        const isGraded = await hasPointBeenAwarded(s.studentId, activityId);
-        initialGradingState[s.id] = isGraded ? 'graded' : 'idle';
-      }
+    
+    const getSubmissions = async () => {
+        setLoading(true);
+        try {
+            const newSubmissions = await fetchSubmissions(assignmentId);
+            setSubmissions(newSubmissions);
 
-      setGradingState(initialGradingState);
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, [assignmentId]);
+            const initialGradingState: {[submissionId: string]: 'idle' | 'loading' | 'graded'} = {};
+            for (const s of newSubmissions) {
+                const activityId = `graded-submission-${s.id}`;
+                const isGraded = await hasPointBeenAwarded(s.studentId, activityId);
+                initialGradingState[s.id] = isGraded ? 'graded' : 'idle';
+            }
+            setGradingState(initialGradingState);
+
+        } catch (error) {
+             toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Could not load submissions."
+            });
+        } finally {
+            setLoading(false);
+        }
+    }
+    getSubmissions();
+  }, [assignmentId, toast]);
 
   if (role === 'student') {
     // Redirect students away, this page is for teachers/admins
@@ -121,6 +132,7 @@ export default function AssignmentSubmissionsPage() {
             await removePointByActivityId(submissionToDelete.studentId, activityId);
         }
         await deleteSubmission(submissionToDelete.id);
+        setSubmissions(prev => prev.filter(s => s.id !== submissionToDelete.id));
         
         toast({
             title: 'Submission Deleted',
