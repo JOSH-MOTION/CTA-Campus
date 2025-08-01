@@ -169,7 +169,7 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
 
   return (
     <>
-    <div className="flex h-screen w-full flex-col bg-gray-100 dark:bg-gray-900">
+    <div className="flex h-screen max-h-screen w-full flex-col bg-gray-100 dark:bg-gray-900">
       <header className="flex h-[60px] flex-shrink-0 items-center gap-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-3">
         <Button variant="ghost" size="icon" onClick={() => router.back()} className="md:hidden">
             <ArrowLeft className="h-5 w-5" />
