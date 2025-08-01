@@ -6,18 +6,17 @@ import {useSearchParams, useRouter} from 'next/navigation';
 import {Avatar, AvatarFallback, AvatarImage} from '@/components/ui/avatar';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
-import {Search, Plus, MoreHorizontal} from 'lucide-react';
+import {Search, Users, Loader2} from 'lucide-react';
 import {Chat} from '@/components/chat/Chat';
 import {useAuth, UserData} from '@/contexts/AuthContext';
 import {Message, getChatId, sendMessage, onMessages} from '@/services/chat';
 import {Unsubscribe} from 'firebase/firestore';
 import {useToast} from '@/hooks/use-toast';
-import {Badge} from '@/components/ui/badge';
-import { useNotifications } from '@/contexts/NotificationsContext';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { format, isToday, isYesterday } from 'date-fns';
-import { cn } from '@/lib/utils';
-import { Loader2 } from 'lucide-react';
+import {useNotifications} from '@/contexts/NotificationsContext';
+import {ScrollArea} from '@/components/ui/scroll-area';
+import {format} from 'date-fns';
+import {cn} from '@/lib/utils';
+import {Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger} from '@/components/ui/sheet';
 
 type ChatEntityType = 'dm' | 'group';
 type ChatEntity = {id: string; name: string; type: ChatEntityType; avatar?: string; dataAiHint: string, lastMessage?: string, lastMessageTimestamp?: Date, unreadCount?: number};
@@ -35,6 +34,7 @@ export default function ChatPage() {
   const [selectedChat, setSelectedChat] = useState<ChatEntity | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const messageUnsubscribeRef = useRef<Unsubscribe | null>(null);
+  const [isContactListOpen, setIsContactListOpen] = useState(false);
 
   useEffect(() => {
     const loadUsers = async () => {
@@ -52,14 +52,13 @@ export default function ChatPage() {
     if (role === 'student') {
       const studentGen = userData?.gen;
       return allUsers.filter(u => {
-        if (u.uid === currentUser.uid) return false; // Exclude self
-        if (u.role === 'teacher' || u.role === 'admin') return true; // Include all teachers/admins
-        if (u.role === 'student' && u.gen === studentGen) return true; // Include students from the same gen
+        if (u.uid === currentUser.uid) return false;
+        if (u.role === 'teacher' || u.role === 'admin') return true;
+        if (u.role === 'student' && u.gen === studentGen) return true;
         return false;
       });
     }
 
-    // For teachers and admins, show everyone else
     return allUsers.filter(u => u.uid !== currentUser.uid);
   }, [allUsers, currentUser, role, userData?.gen]);
 
@@ -97,7 +96,7 @@ export default function ChatPage() {
         chatId = entity.id;
     }
     markChatAsRead(chatId);
-
+    setIsContactListOpen(false); // Close drawer on selection
   }, [router, currentUser, markChatAsRead]);
 
   useEffect(() => {
@@ -149,7 +148,7 @@ export default function ChatPage() {
         chatId = selectedChat.id;
       }
       
-      setMessages([]); // Clear previous messages
+      setMessages([]);
       markChatAsRead(chatId);
       
       const unsubscribe = onMessages(chatId, newMessages => {
@@ -233,24 +232,17 @@ export default function ChatPage() {
      return [...grps, ...dms];
   }, [otherUsers, groupChats]);
 
-  return (
-    <div className="grid h-screen max-h-screen overflow-hidden grid-cols-1 md:grid-cols-[350px_1fr] bg-white dark:bg-gray-900">
-      <div className="flex flex-col border-r border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950">
-        <header className="flex h-[60px] items-center justify-between border-b border-gray-200 dark:border-gray-800 px-4 shrink-0">
-            <h1 className="text-xl font-bold">Chats</h1>
-        </header>
-
+  const ContactList = () => (
+    <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-950">
+        <SheetHeader className="p-4 border-b border-gray-200 dark:border-gray-800">
+            <SheetTitle>Contacts</SheetTitle>
+        </SheetHeader>
         <div className="p-3 shrink-0">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500 dark:text-gray-400" />
             <Input placeholder="Search" className="bg-gray-100 dark:bg-gray-800 border-none pl-10 rounded-lg" />
           </div>
         </div>
-
-        <div className="flex items-center justify-between px-4 py-2 shrink-0">
-            <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400">Contact list</h2>
-        </div>
-
         <ScrollArea className="flex-1">
             {loading ? (
                 <div className="flex justify-center items-center p-4"> <Loader2 className="h-6 w-6 animate-spin text-gray-400" /> </div>
@@ -287,9 +279,17 @@ export default function ChatPage() {
                 </div>
             )}
         </ScrollArea>
-      </div>
+    </div>
+  );
 
-      <div className="flex flex-col h-screen">
+  return (
+    <div className="flex h-screen max-h-screen overflow-hidden bg-white dark:bg-gray-900">
+        <Sheet open={isContactListOpen} onOpenChange={setIsContactListOpen}>
+            <SheetContent side="left" className="p-0 w-[350px]">
+                <ContactList />
+            </SheetContent>
+        </Sheet>
+        
         {selectedChat ? (
           <Chat
             key={selectedChat.id}
@@ -297,16 +297,16 @@ export default function ChatPage() {
             messages={messages}
             onSendMessage={handleSendMessage}
             currentUser={currentUser}
+            onToggleContacts={() => setIsContactListOpen(prev => !prev)}
           />
         ) : (
-          <div className="flex h-full items-center justify-center bg-gray-100 dark:bg-gray-900">
+          <div className="flex h-full w-full items-center justify-center bg-gray-100 dark:bg-gray-900">
             <div className="text-center text-gray-500">
                 <h2 className="text-2xl font-semibold">Campus Compass Chat</h2>
                 <p>Select a chat to start messaging</p>
             </div>
           </div>
         )}
-      </div>
     </div>
   );
 }

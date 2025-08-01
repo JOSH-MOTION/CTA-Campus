@@ -6,7 +6,7 @@ import {Avatar, AvatarFallback, AvatarImage} from '@/components/ui/avatar';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {ScrollArea} from '@/components/ui/scroll-area';
-import {Send, Reply, Pin, X, Pencil, Trash2, Check, Loader2, Paperclip, Smile, Mic, Video, Phone, Search, CheckCheck, MoreVertical} from 'lucide-react';
+import {Send, Users, Loader2} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import type {Message} from '@/services/chat';
 import {deleteMessage, updateMessage, getChatId} from '@/services/chat';
@@ -14,7 +14,6 @@ import type {User} from 'firebase/auth';
 import {format, isToday, isYesterday} from 'date-fns';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 type ChatEntity = {id: string; name: string; avatar?: string; dataAiHint: string; type: 'dm' | 'group'};
 
@@ -23,9 +22,10 @@ interface ChatProps {
   messages: Message[];
   onSendMessage: (text: string, replyTo?: Message) => void;
   currentUser: User | null;
+  onToggleContacts: () => void;
 }
 
-export function Chat({entity, messages, onSendMessage, currentUser}: ChatProps) {
+export function Chat({entity, messages, onSendMessage, currentUser, onToggleContacts}: ChatProps) {
   const [text, setText] = useState('');
   const [replyTo, setReplyTo] = useState<Message | undefined>(undefined);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -167,15 +167,17 @@ export function Chat({entity, messages, onSendMessage, currentUser}: ChatProps) 
 
   return (
     <>
-    <div className="flex h-full flex-col bg-gray-100 dark:bg-gray-900">
-      <header className="flex h-[60px] items-center gap-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-3">
+    <div className="flex h-full w-full flex-col bg-gray-100 dark:bg-gray-900">
+      <header className="flex h-[60px] items-center gap-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-3 shrink-0">
+        <Button variant="ghost" size="icon" onClick={onToggleContacts}>
+            <Users className="h-5 w-5" />
+            <span className="sr-only">Toggle Contacts</span>
+        </Button>
+        <Avatar className="h-10 w-10">
+            <AvatarImage src={entity.avatar} alt={entity.name} />
+            <AvatarFallback>{entity.name.charAt(0)}</AvatarFallback>
+        </Avatar>
         <h2 className="text-lg font-semibold flex-1">{entity.name}</h2>
-        <Tabs defaultValue="messages" className="w-auto">
-          <TabsList className="bg-gray-200 dark:bg-gray-800">
-            <TabsTrigger value="messages">Messages</TabsTrigger>
-            <TabsTrigger value="participants">Participants</TabsTrigger>
-          </TabsList>
-        </Tabs>
       </header>
 
       <ScrollArea className="flex-1 bg-transparent" ref={scrollAreaRef}>
@@ -193,7 +195,7 @@ export function Chat({entity, messages, onSendMessage, currentUser}: ChatProps) 
         </div>
       </ScrollArea>
 
-      <footer className="bg-white dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800 p-4">
+      <footer className="bg-white dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800 p-4 shrink-0">
         <form onSubmit={handleSubmit} className="relative flex-1">
           <Input
               value={text}
