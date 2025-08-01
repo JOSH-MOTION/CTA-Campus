@@ -234,7 +234,7 @@ export default function ChatPage() {
   }, [otherUsers, groupChats]);
 
   return (
-    <div className="grid h-screen grid-cols-1 md:grid-cols-[350px_1fr] bg-white dark:bg-gray-900">
+    <div className="grid h-screen max-h-screen overflow-hidden grid-cols-1 md:grid-cols-[350px_1fr] bg-white dark:bg-gray-900">
       <div className="flex flex-col border-r border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950">
         <header className="flex h-[60px] items-center justify-between border-b border-gray-200 dark:border-gray-800 px-4 shrink-0">
             <h1 className="text-xl font-bold">Chats</h1>
@@ -248,11 +248,7 @@ export default function ChatPage() {
         </div>
 
         <div className="flex items-center justify-between px-4 py-2 shrink-0">
-            <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400">Last chats</h2>
-            <div>
-                <Button variant="ghost" size="icon"><Plus className="h-5 w-5"/></Button>
-                <Button variant="ghost" size="icon"><MoreHorizontal className="h-5 w-5"/></Button>
-            </div>
+            <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400">Contact list</h2>
         </div>
 
         <ScrollArea className="flex-1">
