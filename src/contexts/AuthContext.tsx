@@ -39,7 +39,6 @@ interface AuthContextType {
   setRole: (role: UserRole) => void;
   fetchAllUsers: () => Promise<UserData[]>;
   fetchAllStudents: () => Promise<UserData[]>;
-  allUsers: UserData[];
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -51,7 +50,6 @@ const AuthContext = createContext<AuthContextType>({
     setRole: () => {},
     fetchAllUsers: async () => [],
     fetchAllStudents: async () => [],
-    allUsers: [],
 });
 
 export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
@@ -59,14 +57,12 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [role, setRole] = useState<UserRole | null>(null);
   const [loading, setLoading] = useState(true);
-  const [allUsers, setAllUsers] = useState<UserData[]>([]);
 
   const fetchAllUsers = useCallback(async (): Promise<UserData[]> => {
     try {
         const usersCollection = collection(db, 'users');
         const usersSnapshot = await getDocs(usersCollection);
         const usersList = usersSnapshot.docs.map(doc => doc.data() as UserData);
-        setAllUsers(usersList);
         return usersList;
     } catch(e) {
         console.error("Error fetching all users:", e);
@@ -133,7 +129,7 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
   };
 
   return (
-    <AuthContext.Provider value={{user, userData, setUserData, role, loading, setRole: handleSetRole, fetchAllUsers, fetchAllStudents, allUsers}}>
+    <AuthContext.Provider value={{user, userData, setUserData, role, loading, setRole: handleSetRole, fetchAllUsers, fetchAllStudents}}>
       {children}
     </AuthContext.Provider>
   );
