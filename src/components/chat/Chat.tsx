@@ -30,8 +30,8 @@ interface ChatProps {
 export function Chat({entity, messages, onSendMessage, currentUser, onToggleContacts, loading}: ChatProps) {
   const [text, setText] = useState('');
   const [replyTo, setReplyTo] = useState<Message | undefined>(undefined);
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
@@ -40,10 +40,8 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
   const { toast } = useToast();
 
   useEffect(() => {
-    if (scrollAreaRef.current) {
-      scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'auto' });
-    }
-  }, [entity.id, messages.length]);
+    messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+  }, [messages.length, entity.id]);
   
   useEffect(() => {
       setReplyTo(undefined);
@@ -185,7 +183,7 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
         <h2 className="flex-1 text-lg font-semibold">{entity.name}</h2>
       </header>
 
-      <ScrollArea className="flex-1" viewportRef={scrollAreaRef}>
+      <ScrollArea className="flex-1">
         <div className="space-y-6 p-4 md:p-10">
           {messages.map((msg, index) => {
              const prevMessage = messages[index - 1];
@@ -197,6 +195,7 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
                 </React.Fragment>
             )
           })}
+          <div ref={messagesEndRef} />
         </div>
       </ScrollArea>
 
