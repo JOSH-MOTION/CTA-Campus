@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Users, Loader2, ArrowLeft, ArrowDownCircle, Reply, Pin, Trash2, Edit } from 'lucide-react';
+import { Send, Users, Loader2, ArrowLeft, ArrowDownCircle, Reply, Pin, Trash2, Edit, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Message } from '@/services/chat';
 import { updateMessage, getChatId } from '@/services/chat';
@@ -148,6 +148,9 @@ export const Chat = React.memo(function Chat({
   const router = useRouter();
   const viewportRef = useRef<HTMLDivElement>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  
+  // Pinned message state
+  const [pinnedMessage, setPinnedMessage] = useState<Message | null>(null);
 
   // Mention state
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
@@ -203,6 +206,10 @@ export const Chat = React.memo(function Chat({
   };
 
   useEffect(() => {
+    // Find the last pinned message from the list
+    const lastPinned = messages.filter(m => m.isPinned).sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis())[0];
+    setPinnedMessage(lastPinned || null);
+    
     if (!viewportRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = viewportRef.current;
     
@@ -244,8 +251,13 @@ export const Chat = React.memo(function Chat({
   };
   
   const messageList = useMemo(() => {
-    return messages.map((msg, index) => {
-      const prevMessage = messages[index - 1];
+    // Filter out the pinned message from the main list if it exists
+    const regularMessages = pinnedMessage 
+        ? messages.filter(m => m.id !== pinnedMessage.id) 
+        : messages;
+
+    return regularMessages.map((msg, index) => {
+      const prevMessage = regularMessages[index - 1];
       const showDateSeparator =
         msg.timestamp &&
         (!prevMessage ||
@@ -266,7 +278,7 @@ export const Chat = React.memo(function Chat({
         </React.Fragment>
       );
     });
-  }, [messages, currentUser, handlePin, handleEditClick]);
+  }, [messages, currentUser, pinnedMessage, handlePin, handleEditClick]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -344,6 +356,21 @@ export const Chat = React.memo(function Chat({
           </Avatar>
           <h2 className='flex-1 text-lg font-semibold'>{entity.name}</h2>
         </header>
+
+        {pinnedMessage && (
+            <div className="flex-shrink-0 border-b border-primary/20 bg-primary/5 p-3">
+                <div className="flex items-start gap-3">
+                    <Pin className="h-4 w-4 mt-1 text-primary" />
+                    <div className="flex-1">
+                        <p className="text-xs font-semibold text-primary">Pinned by {pinnedMessage.senderName}</p>
+                        <p className="text-sm text-foreground">{pinnedMessage.text}</p>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handlePin(pinnedMessage)}>
+                        <X className="h-4 w-4" />
+                    </Button>
+                </div>
+            </div>
+        )}
 
         <div className="flex-1 relative">
             <ScrollArea className='h-full' viewportRef={viewportRef} onScroll={handleScroll}>
