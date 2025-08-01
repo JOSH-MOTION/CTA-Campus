@@ -26,6 +26,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { UserData } from '@/contexts/AuthContext';
+import { Command } from '@/components/ui/command';
 
 type ChatEntity = { id: string; name: string; avatar?: string; dataAiHint: string; type: 'dm' | 'group' };
 
