@@ -101,19 +101,25 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (loading || !currentUser) return;
-    
+
     const directMessageUserId = searchParams.get('dm');
     const groupChatId = searchParams.get('group');
 
+    // Prevent re-selection if a chat is already selected
+    if (selectedChat) {
+      if (directMessageUserId && selectedChat.id === directMessageUserId) return;
+      if (groupChatId && selectedChat.id === `group-${groupChatId}`) return;
+    }
+
     if (groupChatId) {
         const groupToSelect = groupChats.find(g => g.id === `group-${groupChatId}`);
-        if (groupToSelect && (!selectedChat || selectedChat.id !== groupToSelect.id)) {
-          setSelectedChat({...groupToSelect, type: 'group'});
+        if (groupToSelect) {
+            handleSelectChat({...groupToSelect, type: 'group'});
         }
-      } else if (directMessageUserId) {
+    } else if (directMessageUserId) {
         const userToDm = allUsers.find(u => u.uid === directMessageUserId);
-        if (userToDm && (!selectedChat || selectedChat.id !== userToDm.uid)) {
-            setSelectedChat({
+        if (userToDm) {
+            handleSelectChat({
               id: userToDm.uid,
               name: userToDm.displayName,
               type: 'dm',
@@ -121,17 +127,18 @@ export default function ChatPage() {
               dataAiHint: 'user portrait',
             });
         }
-      } else if (otherUsers.length > 0) {
+    } else if (otherUsers.length > 0 && !selectedChat) {
+        // Only autoselect if no chat is currently selected
         const firstUser = otherUsers[0];
-         handleSelectChat({
+        handleSelectChat({
             id: firstUser.uid,
             name: firstUser.displayName,
             type: 'dm',
             avatar: firstUser.photoURL,
             dataAiHint: 'student portrait',
-         })
-      }
-  }, [loading, allUsers, groupChats, currentUser, searchParams, selectedChat, otherUsers, router, markChatAsRead, handleSelectChat]);
+        });
+    }
+  }, [loading, currentUser, allUsers, otherUsers, groupChats, searchParams, selectedChat, handleSelectChat]);
   
 
   useEffect(() => {
