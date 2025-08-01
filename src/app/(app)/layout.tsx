@@ -83,6 +83,8 @@ const MemoizedProtectedLayout = memo(function ProtectedLayout({children}: {child
     );
   }
 
+  const isChatPage = pathname === '/chat';
+
   return (
     <NotificationsProvider>
       <RoadmapProvider>
@@ -131,7 +133,7 @@ const MemoizedProtectedLayout = memo(function ProtectedLayout({children}: {child
                           </Button>
                         </div>
                       </header>
-                      <main className="flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
+                      <main className={cn('flex-1 overflow-y-auto', !isChatPage && 'p-4 sm:p-6')}>{children}</main>
                       <AIAssistant />
                     </SidebarInset>
                   </SidebarProvider>
