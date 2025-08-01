@@ -116,11 +116,15 @@ export default function AssignmentSubmissionsPage() {
     if (!submissionToDelete) return;
     try {
         const activityId = `graded-submission-${submissionToDelete.id}`;
+        // Only attempt to remove point if it was graded
+        if(gradingState[submissionToDelete.id] === 'graded') {
+            await removePointByActivityId(submissionToDelete.studentId, activityId);
+        }
         await deleteSubmission(submissionToDelete.id);
-        await removePointByActivityId(submissionToDelete.studentId, activityId);
+        
         toast({
             title: 'Submission Deleted',
-            description: `The submission from ${submissionToDelete?.studentName} has been removed and points have been revoked.`,
+            description: `The submission from ${submissionToDelete?.studentName} has been removed. Any points awarded have been revoked.`,
         });
     } catch (error) {
         toast({

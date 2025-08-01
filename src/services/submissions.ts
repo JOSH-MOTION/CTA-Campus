@@ -14,6 +14,7 @@ import {
     getDocs,
   } from 'firebase/firestore';
   import { db } from '@/lib/firebase';
+  import { awardPoint } from './points';
   
   export interface Submission {
     id: string;
@@ -27,34 +28,47 @@ import {
     submittedAt: Timestamp;
   }
   
-  export type NewSubmissionData = Omit<Submission, 'id' | 'submittedAt'>;
+  export interface NewSubmissionData extends Omit<Submission, 'id' | 'submittedAt'> {
+      pointsToAward?: number;
+      pointCategory?: string;
+  }
   
   /**
    * Creates a new submission for an assignment.
    */
   export const addSubmission = async (submissionData: NewSubmissionData): Promise<{ id: string }> => {
-    try {
-      const submissionsCol = collection(db, 'submissions');
-      const q = query(
-        submissionsCol,
+    const { pointsToAward, pointCategory, ...restOfSubmissionData } = submissionData;
+    
+    // Use assignmentTitle for duplicate check, as it will be unique for each day's 100-days-of-code post
+    const q = query(
+        collection(db, 'submissions'),
         where('studentId', '==', submissionData.studentId),
-        where('assignmentId', '==', submissionData.assignmentId)
-      );
+        where('assignmentTitle', '==', submissionData.assignmentTitle)
+    );
       
-      const querySnapshot = await getDocs(q);
-      if (!querySnapshot.empty) {
-          throw new Error('duplicate');
-      }
-      
-      const docRef = await addDoc(submissionsCol, {
-        ...submissionData,
-        submittedAt: serverTimestamp(),
-      });
-      return { id: docRef.id };
-    } catch (error) {
-      console.error('Error creating submission:', error);
-      throw error;
+    const querySnapshot = await getDocs(q);
+    if (!querySnapshot.empty) {
+        throw new Error('duplicate');
     }
+      
+    const docRef = await addDoc(collection(db, 'submissions'), {
+        ...restOfSubmissionData,
+        submittedAt: serverTimestamp(),
+    });
+
+    if (pointsToAward && pointCategory) {
+        // We use the new submission's ID to ensure point awarding is idempotent
+        const activityId = `graded-submission-${docRef.id}`;
+        try {
+            await awardPoint(submissionData.studentId, pointsToAward, pointCategory, activityId);
+        } catch(e) {
+            // If awarding points fails, we don't fail the whole submission,
+            // but we log the error. The teacher can manually award points.
+            console.error(`Failed to award points for submission ${docRef.id}:`, e);
+        }
+    }
+
+    return { id: docRef.id };
   };
   
   /**

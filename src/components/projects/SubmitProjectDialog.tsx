@@ -23,7 +23,6 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { type Project } from '@/contexts/ProjectsContext';
 import { addSubmission } from '@/services/submissions';
-import { awardPoint } from '@/services/points';
 
 const submissionSchema = z.object({
   submissionLink: z.string().url('Please enter a valid URL (e.g., https://github.com/...)'),
@@ -56,8 +55,7 @@ export function SubmitProjectDialog({ children, project, onSubmissionSuccess }: 
     if (!user || !userData) return;
     setIsSubmitting(true);
     try {
-      // 1. Add the submission to the database
-      const newSubmission = await addSubmission({
+      await addSubmission({
         studentId: user.uid,
         studentName: userData.displayName,
         studentGen: userData.gen || 'N/A',
@@ -65,15 +63,13 @@ export function SubmitProjectDialog({ children, project, onSubmissionSuccess }: 
         assignmentTitle: project.title,
         submissionLink: data.submissionLink,
         submissionNotes: data.submissionNotes || '',
+        pointsToAward: 1,
+        pointCategory: 'Weekly Projects',
       });
-
-      // 2. Award points for the submission
-      const activityId = `graded-project-${newSubmission.id}`;
-      await awardPoint(user.uid, 1, 'Weekly Projects', activityId);
 
       toast({
         title: 'Project Submitted!',
-        description: 'Your work has been sent to your teacher. It will be graded soon.',
+        description: 'Your work has been sent to your teacher. You have been awarded 1 point.',
       });
       onSubmissionSuccess();
       form.reset();

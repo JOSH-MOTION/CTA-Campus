@@ -10,22 +10,35 @@ import {Label} from '@/components/ui/label';
 import {Link, Loader2} from 'lucide-react';
 import {useAuth} from '@/contexts/AuthContext';
 import {useToast} from '@/hooks/use-toast';
-import {awardPoint} from '@/services/points';
+import {addSubmission} from '@/services/submissions';
+
+const HUNDRED_DAYS_OF_CODE_ASSIGNMENT_ID = '100-days-of-code';
 
 export default function OneHundredDaysOfCodePage() {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [link, setLink] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const {user} = useAuth();
+  const {user, userData} = useAuth();
   const {toast} = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !date) return;
+    if (!user || !userData || !date) return;
     setIsSubmitting(true);
     
     try {
-      await awardPoint(user.uid, 0.5, '100 Days of Code Submission', `submission-${date.toISOString().split('T')[0]}`);
+       await addSubmission({
+        studentId: user.uid,
+        studentName: userData.displayName,
+        studentGen: userData.gen || 'N/A',
+        assignmentId: HUNDRED_DAYS_OF_CODE_ASSIGNMENT_ID,
+        assignmentTitle: `100 Days of Code - ${date.toISOString().split('T')[0]}`,
+        submissionLink: link,
+        submissionNotes: `Submission for date: ${date.toISOString().split('T')[0]}`,
+        pointsToAward: 0.5,
+        pointCategory: '100 Days of Code',
+      });
+
       toast({
         title: 'Progress Submitted!',
         description: 'You earned 0.5 points for your daily post.',

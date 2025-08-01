@@ -23,7 +23,6 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { type Assignment } from '@/contexts/AssignmentsContext';
 import { addSubmission } from '@/services/submissions';
-import { awardPoint } from '@/services/points';
 
 const submissionSchema = z.object({
   submissionLink: z.string().url('Please enter a valid URL (e.g., https://github.com/...)'),
@@ -56,8 +55,7 @@ export function SubmitAssignmentDialog({ children, assignment, onSubmissionSucce
     if (!user || !userData) return;
     setIsSubmitting(true);
     try {
-      // 1. Add the submission to the database
-      const newSubmission = await addSubmission({
+      await addSubmission({
         studentId: user.uid,
         studentName: userData.displayName,
         studentGen: userData.gen || 'N/A',
@@ -65,16 +63,13 @@ export function SubmitAssignmentDialog({ children, assignment, onSubmissionSucce
         assignmentTitle: assignment.title,
         submissionLink: data.submissionLink,
         submissionNotes: data.submissionNotes || '',
+        pointsToAward: 1,
+        pointCategory: 'Class Assignments',
       });
-
-      // 2. Award points for the submission
-      const activityId = `graded-submission-${newSubmission.id}`;
-      await awardPoint(user.uid, 1, 'Class Assignments', activityId);
-
 
       toast({
         title: 'Assignment Submitted!',
-        description: 'Your work has been sent to your teacher. It will be graded soon.',
+        description: 'Your work has been sent to your teacher. You have been awarded 1 point.',
       });
       onSubmissionSuccess();
       form.reset();
@@ -88,7 +83,6 @@ export function SubmitAssignmentDialog({ children, assignment, onSubmissionSucce
           ? 'You have already submitted this assignment.'
           : 'Could not submit your assignment.',
       });
-      // If it's a duplicate error, we should still update the UI state
       if (isDuplicate) {
           onSubmissionSuccess();
       }
