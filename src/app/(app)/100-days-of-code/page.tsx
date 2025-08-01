@@ -43,7 +43,9 @@ export default function OneHundredDaysOfCodePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !userData || !date) return;
+
     setIsSubmitting(true);
+    // Clear previous submission summary when starting a new one
     setLastSubmission(null);
     
     try {
@@ -64,7 +66,10 @@ export default function OneHundredDaysOfCodePage() {
         title: 'Progress Submitted!',
         description: 'You earned 0.5 points for your daily post.',
       });
+      // Show summary for what was just submitted
       setLastSubmission({ link, date: submissionDate });
+      // Update calendar immediately
+      setSubmittedDates(prev => [...prev, new Date(submissionDate + 'T00:00:00')]);
       setLink('');
     } catch (error: any) {
       toast({
