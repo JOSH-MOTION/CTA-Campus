@@ -11,7 +11,7 @@ import {Label} from '@/components/ui/label';
 import {Link, Loader2, CheckCircle, ExternalLink} from 'lucide-react';
 import {useAuth} from '@/contexts/AuthContext';
 import {useToast} from '@/hooks/use-toast';
-import {addSubmission, onSubmissions} from '@/services/submissions';
+import {addSubmission, onSubmissionsForStudent} from '@/services/submissions';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import NextLink from 'next/link';
 
@@ -28,9 +28,11 @@ export default function OneHundredDaysOfCodePage() {
 
   useEffect(() => {
     if (!user) return;
-    const unsubscribe = onSubmissions(HUNDRED_DAYS_OF_CODE_ASSIGNMENT_ID, submissions => {
-        const userSubmissions = submissions.filter(s => s.studentId === user.uid);
-        const dates = userSubmissions.map(s => {
+    const unsubscribe = onSubmissionsForStudent(user.uid, submissions => {
+        const hundredDaysSubmissions = submissions.filter(
+          s => s.assignmentId === HUNDRED_DAYS_OF_CODE_ASSIGNMENT_ID
+        );
+        const dates = hundredDaysSubmissions.map(s => {
             const datePart = s.assignmentTitle.replace('100 Days of Code - ', '');
             // Adjust for potential timezone shifts by parsing as UTC
             return new Date(datePart + 'T00:00:00');
@@ -45,8 +47,7 @@ export default function OneHundredDaysOfCodePage() {
     if (!user || !userData || !date) return;
 
     setIsSubmitting(true);
-    // Clear previous submission summary when starting a new one
-    setLastSubmission(null);
+    // Do not clear the submission summary here
     
     try {
        const submissionDate = date.toISOString().split('T')[0];
@@ -69,7 +70,10 @@ export default function OneHundredDaysOfCodePage() {
       // Show summary for what was just submitted
       setLastSubmission({ link, date: submissionDate });
       // Update calendar immediately
-      setSubmittedDates(prev => [...prev, new Date(submissionDate + 'T00:00:00')]);
+      const newSubmissionDate = new Date(submissionDate + 'T00:00:00');
+      if (!submittedDates.some(d => d.getTime() === newSubmissionDate.getTime())) {
+        setSubmittedDates(prev => [...prev, newSubmissionDate]);
+      }
       setLink('');
     } catch (error: any) {
       toast({
