@@ -29,7 +29,8 @@ export default function OneHundredDaysOfCodePage() {
         const userSubmissions = submissions.filter(s => s.studentId === user.uid);
         const dates = userSubmissions.map(s => {
             const datePart = s.assignmentTitle.replace('100 Days of Code - ', '');
-            return new Date(datePart);
+            // Adjust for potential timezone shifts by parsing as UTC
+            return new Date(datePart + 'T00:00:00');
         });
         setSubmittedDates(dates);
     });
