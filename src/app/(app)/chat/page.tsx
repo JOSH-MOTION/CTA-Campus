@@ -244,22 +244,23 @@ export default function ChatPage() {
           </div>
         </div>
         <ScrollArea className="flex-1">
-            {loading ? (
-                <div className="flex justify-center items-center p-4"> <Loader2 className="h-6 w-6 animate-spin text-gray-400" /> </div>
-            ) : (
-                <div className="flex flex-col">
-                {chatList.length > 0 ? (
-                    chatList.map(chatItem => (
+            <div className="flex flex-col">
+                <p className="font-semibold text-sm px-3 pt-2 pb-1 text-gray-500">Contact list</p>
+                {loading ? (
+                    <div className="flex justify-center items-center p-4"> <Loader2 className="h-6 w-6 animate-spin text-gray-400" /> </div>
+                ) : (
+                    <>
+                    {groupChats.map(chatItem => (
                         <button
                             key={chatItem.id}
                             className={cn(
                                 "w-full text-left p-3 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors flex items-center gap-3",
                                 selectedChat?.id === chatItem.id && "bg-primary/10 dark:bg-primary/20"
                             )}
-                            onClick={() => handleSelectChat(chatItem)}
+                            onClick={() => handleSelectChat({...chatItem, type: 'group'})}
                         >
                             <Avatar className="h-12 w-12">
-                                <AvatarImage src={chatItem.avatar} alt={chatItem.name} data-ai-hint={chatItem.dataAiHint} />
+                                <AvatarImage src={`https://placehold.co/100x100.png?text=${chatItem.name.charAt(0)}`} alt={chatItem.name} data-ai-hint={chatItem.dataAiHint} />
                                 <AvatarFallback>{chatItem.name.charAt(0)}</AvatarFallback>
                             </Avatar>
                             <div className="flex-1">
@@ -268,22 +269,44 @@ export default function ChatPage() {
                                     <p className="text-xs text-gray-500 dark:text-gray-400">{formatTimestamp(new Date())}</p>
                                 </div>
                                 <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                                    {chatItem.type === 'group' ? 'Group Chat' : 'Direct Message'}
+                                    Group Chat
                                 </p>
                             </div>
                         </button>
-                    ))
-                ) : (
-                    <div className="text-center text-gray-500 p-4">No chats available.</div>
+                    ))}
+                    {otherUsers.map(chatItem => (
+                        <button
+                            key={chatItem.uid}
+                            className={cn(
+                                "w-full text-left p-3 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors flex items-center gap-3",
+                                selectedChat?.id === chatItem.uid && "bg-primary/10 dark:bg-primary/20"
+                            )}
+                            onClick={() => handleSelectChat({id: chatItem.uid, name: chatItem.displayName, type: 'dm', avatar: chatItem.photoURL, dataAiHint: 'student portrait'})}
+                        >
+                            <Avatar className="h-12 w-12">
+                                <AvatarImage src={chatItem.photoURL} alt={chatItem.displayName} data-ai-hint={'student portrait'} />
+                                <AvatarFallback>{chatItem.displayName.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1">
+                                <div className="flex justify-between">
+                                    <p className="font-semibold text-sm">{chatItem.displayName}</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">{formatTimestamp(new Date())}</p>
+                                </div>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                                    Direct Message
+                                </p>
+                            </div>
+                        </button>
+                    ))}
+                    </>
                 )}
-                </div>
-            )}
+            </div>
         </ScrollArea>
     </div>
   );
 
   return (
-    <div className="flex h-screen max-h-screen overflow-hidden bg-white dark:bg-gray-900">
+    <div className="flex h-full max-h-full overflow-hidden bg-white dark:bg-gray-900">
         <Sheet open={isContactListOpen} onOpenChange={setIsContactListOpen}>
             <SheetContent side="left" className="p-0 w-[350px]">
                 <ContactList />
@@ -301,10 +324,18 @@ export default function ChatPage() {
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-gray-100 dark:bg-gray-900">
-            <div className="text-center text-gray-500">
-                <h2 className="text-2xl font-semibold">Campus Compass Chat</h2>
-                <p>Select a chat to start messaging</p>
-            </div>
+            {loading ? (
+                <Loader2 className="h-8 w-8 animate-spin" />
+            ) : (
+                <div className="text-center text-gray-500">
+                    <h2 className="text-2xl font-semibold">Campus Connect</h2>
+                    <p>Select a chat to start messaging</p>
+                    <Button onClick={() => setIsContactListOpen(true)} className="mt-4">
+                        <Users className="mr-2 h-4 w-4" />
+                        Open Contacts
+                    </Button>
+                </div>
+            )}
           </div>
         )}
     </div>
