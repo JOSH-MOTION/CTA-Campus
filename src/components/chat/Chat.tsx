@@ -24,9 +24,7 @@ import {
 } from '../ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { UserData } from '@/contexts/AuthContext';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 
 type ChatEntity = { id: string; name: string; avatar?: string; dataAiHint: string; type: 'dm' | 'group' };
 
@@ -151,24 +149,6 @@ export const Chat = React.memo(function Chat({
   
   const [pinnedMessage, setPinnedMessage] = useState<Message | null>(null);
 
-  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
-  const [showMentionPopover, setShowMentionPopover] = useState(false);
-
-  const availableMentionUsers = useMemo(() => {
-    if (entity.type === 'dm') {
-      const otherUser = allUsers.find(u => u.uid === entity.id);
-      return otherUser ? [otherUser] : [];
-    }
-    return allUsers.filter(u => u.uid !== currentUser?.uid);
-  }, [entity, allUsers, currentUser]);
-
-  const filteredMentions = useMemo(() => {
-    if (mentionQuery === null) return [];
-    return availableMentionUsers.filter(u => 
-      u.displayName.toLowerCase().includes(mentionQuery.toLowerCase())
-    );
-  }, [mentionQuery, availableMentionUsers]);
-  
   const handlePin = async (message: Message) => {
     if (!currentUser) return;
      let chatId: string;
@@ -184,30 +164,6 @@ export const Chat = React.memo(function Chat({
     } catch (error) {
         toast({ variant: 'destructive', title: 'Error', description: 'Could not pin message.' });
     }
-  };
-  
-  const checkMentionState = (currentText: string) => {
-    const mentionMatch = currentText.match(/@(\w*)$/);
-    if (mentionMatch) {
-      setMentionQuery(mentionMatch[1]);
-      setShowMentionPopover(true);
-    } else {
-      setShowMentionPopover(false);
-      setMentionQuery(null);
-    }
-  };
-
-  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newText = e.target.value;
-    setText(newText);
-    checkMentionState(newText);
-  };
-  
-  const handleSelectMention = (user: UserData) => {
-    const newText = text.replace(/@\w*$/, `@${user.displayName} `);
-    setText(newText);
-    setShowMentionPopover(false);
-    setMentionQuery(null);
   };
 
   useEffect(() => {
@@ -385,54 +341,22 @@ export const Chat = React.memo(function Chat({
 
 
         <footer className='shrink-0 border-t border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-950'>
-          <Popover open={showMentionPopover} onOpenChange={setShowMentionPopover}>
-            <PopoverTrigger asChild>
-                <form onSubmit={handleSubmit} className='relative flex-1'>
-                    <Input
-                    value={text || ''}
-                    onChange={handleTextChange}
-                    placeholder='Write your message...'
-                    className='h-12 w-full rounded-lg border-none bg-gray-100 pr-12 focus:ring-0 dark:bg-gray-800'
-                    disabled={editingMessageId !== null}
-                    />
-                    <Button
-                    type='submit'
-                    size='icon'
-                    className='absolute right-2 top-1/2 h-9 w-9 -translate-y-1/2 rounded-lg bg-primary/20 text-primary hover:bg-primary/30'
-                    >
-                    <Send className='h-5 w-5' />
-                    </Button>
-                </form>
-            </PopoverTrigger>
-             <PopoverContent 
-                className="w-80 p-0" 
-                side="top" 
-                align="start"
-                onOpenAutoFocus={(e) => e.preventDefault()}
+          <form onSubmit={handleSubmit} className='relative flex-1'>
+              <Input
+              value={text || ''}
+              onChange={(e) => setText(e.target.value)}
+              placeholder='Write your message...'
+              className='h-12 w-full rounded-lg border-none bg-gray-100 pr-12 focus:ring-0 dark:bg-gray-800'
+              disabled={editingMessageId !== null}
+              />
+              <Button
+              type='submit'
+              size='icon'
+              className='absolute right-2 top-1/2 h-9 w-9 -translate-y-1/2 rounded-lg bg-primary/20 text-primary hover:bg-primary/30'
               >
-              <Command>
-                <CommandInput placeholder="Mention a user..." />
-                <CommandList>
-                  <CommandEmpty>No users found.</CommandEmpty>
-                  <CommandGroup>
-                    {filteredMentions.map(user => (
-                      <CommandItem
-                        key={user.uid}
-                        onSelect={() => handleSelectMention(user)}
-                        className="flex items-center gap-2 cursor-pointer"
-                      >
-                        <Avatar className="h-6 w-6">
-                          <AvatarImage src={user.photoURL} />
-                          <AvatarFallback>{user.displayName.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        <span>{user.displayName}</span>
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
+              <Send className='h-5 w-5' />
+              </Button>
+          </form>
         </footer>
       </div>
       <AlertDialog open={!!deletingMessage} onOpenChange={(open) => !open && setDeletingMessage(null)}>

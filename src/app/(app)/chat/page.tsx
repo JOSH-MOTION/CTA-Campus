@@ -155,14 +155,11 @@ export default function ChatPage() {
         if (!selectedChat || !text.trim() || !currentUser) return;
     
         let chatId: string;
-        let chatName: string;
     
         if (selectedChat.type === 'group') {
           chatId = selectedChat.id;
-          chatName = selectedChat.name;
         } else {
           chatId = getChatId(currentUser.uid, selectedChat.id);
-          chatName = `your DM with ${selectedChat.name}`
         }
     
         const messagePayload: any = {
@@ -181,30 +178,6 @@ export default function ChatPage() {
         }
         
         await sendMessage(chatId, messagePayload);
-    
-        const mentionRegex = /@(\w+(\s\w+)*)/g;
-        let match;
-        const mentionedUsernames = new Set<string>();
-
-        while ((match = mentionRegex.exec(text)) !== null) {
-            mentionedUsernames.add(match[1].trim().toLowerCase());
-        }
-        
-        if (mentionedUsernames.size > 0) {
-            const usersToNotify = allUsers.filter(u => 
-                mentionedUsernames.has(u.displayName.toLowerCase()) && u.uid !== currentUser.uid
-            );
-    
-            for (const userToNotify of usersToNotify) {
-                await addNotificationForUser(userToNotify.uid, {
-                    title: `You were mentioned in ${chatName}`,
-                    description: `${currentUser.displayName}: "${text.trim()}"`,
-                    href: selectedChat.type === 'group' 
-                        ? `/chat?group=${selectedChat.id.replace('group-', '')}` 
-                        : `/chat?dm=${currentUser.uid}`
-                });
-            }
-        }
       };
   
   const formatTimestamp = (date?: Date) => {
