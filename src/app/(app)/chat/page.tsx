@@ -182,13 +182,17 @@ export default function ChatPage() {
         
         await sendMessage(chatId, messagePayload);
     
-        const mentionRegex = /@(\w+)/g;
-        const mentions = text.match(mentionRegex);
-    
-        if (mentions) {
-            const mentionedUsernames = mentions.map(m => m.substring(1).toLowerCase());
+        const mentionRegex = /@(\w+(\s\w+)*)/g;
+        let match;
+        const mentionedUsernames = new Set<string>();
+
+        while ((match = mentionRegex.exec(text)) !== null) {
+            mentionedUsernames.add(match[1].trim().toLowerCase());
+        }
+        
+        if (mentionedUsernames.size > 0) {
             const usersToNotify = allUsers.filter(u => 
-                mentionedUsernames.includes(u.displayName.toLowerCase()) && u.uid !== currentUser.uid
+                mentionedUsernames.has(u.displayName.toLowerCase()) && u.uid !== currentUser.uid
             );
     
             for (const userToNotify of usersToNotify) {

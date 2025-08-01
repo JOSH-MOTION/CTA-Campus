@@ -26,7 +26,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { UserData } from '@/contexts/AuthContext';
-import { Command } from '@/components/ui/command';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 
 type ChatEntity = { id: string; name: string; avatar?: string; dataAiHint: string; type: 'dm' | 'group' };
 
@@ -187,7 +187,7 @@ export const Chat = React.memo(function Chat({
   };
 
   const handleSelectMention = (user: UserData) => {
-    const newText = text.replace(/@(\w*)$/, `@${user.displayName} `);
+    const newText = text.replace(/@\w*$/, `@${user.displayName} `);
     setText(newText);
     setShowMentionPopover(false);
     setMentionQuery(null);
@@ -411,24 +411,25 @@ export const Chat = React.memo(function Chat({
             </PopoverTrigger>
              <PopoverContent className="w-80 p-0" side="top" align="start">
               <Command>
-                <div className="p-2 text-xs text-muted-foreground">Mention a user</div>
-                {filteredMentions.length > 0 ? (
-                  filteredMentions.map(user => (
-                    <div
-                      key={user.uid}
-                      className="flex items-center gap-2 p-2 cursor-pointer hover:bg-muted"
-                      onClick={() => handleSelectMention(user)}
-                    >
-                      <Avatar className="h-6 w-6">
-                        <AvatarImage src={user.photoURL} />
-                        <AvatarFallback>{user.displayName.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                      <span>{user.displayName}</span>
-                    </div>
-                  ))
-                ) : (
-                  <div className="p-2 text-sm text-center text-muted-foreground">No users found</div>
-                )}
+                <CommandInput placeholder="Mention a user..." />
+                <CommandList>
+                  <CommandEmpty>No users found.</CommandEmpty>
+                  <CommandGroup>
+                    {filteredMentions.map(user => (
+                      <CommandItem
+                        key={user.uid}
+                        onSelect={() => handleSelectMention(user)}
+                        className="flex items-center gap-2 cursor-pointer"
+                      >
+                        <Avatar className="h-6 w-6">
+                          <AvatarImage src={user.photoURL} />
+                          <AvatarFallback>{user.displayName.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <span>{user.displayName}</span>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
               </Command>
             </PopoverContent>
           </Popover>
