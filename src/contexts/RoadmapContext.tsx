@@ -34,6 +34,26 @@ interface RoadmapContextType {
 
 const roadmapData: RoadmapSubject[] = [
   {
+    title: 'Git',
+    duration: '2 weeks',
+    weeks: [
+      {
+        title: 'Week 1',
+        topics: [
+          {id: 'git-1-1', title: 'Installing git'},
+          {id: 'git-1-2', title: 'Initialize git in repo'},
+          {id: 'git-1-3', title: 'Staging'},
+          {id: 'git-1-4', title: 'Committing'},
+        ],
+      },
+      {title: 'Week 2', topics: [
+          {id: 'git-2-1', title: 'Pushing'}, 
+          {id: 'git-2-2', title: 'Branching'}, 
+          {id: 'git-2-3', title: 'Pulling'}
+      ]},
+    ],
+  },
+  {
     title: 'HTML',
     duration: '2 weeks',
     weeks: [
@@ -99,31 +119,31 @@ const roadmapData: RoadmapSubject[] = [
         title: 'Week 4',
         topics: [
             {id: 'tailwind-4-1', title: 'Shopping Cart (in class)'}, 
-            {id: 'tailwind-4-2', title: 'Kawolegal (homework)'}
+            {id: 'tailwind-4-2', title: 'DentaCare (homework)'}
         ],
       },
     ],
   },
-  {
-    title: 'Git',
-    duration: '2 weeks',
-    weeks: [
-      {
-        title: 'Week 1',
-        topics: [
-          {id: 'git-1-1', title: 'Installing git'},
-          {id: 'git-1-2', title: 'Initialize git in repo'},
-          {id: 'git-1-3', title: 'Staging'},
-          {id: 'git-1-4', title: 'Committing'},
-        ],
-      },
-      {title: 'Week 2', topics: [
-          {id: 'git-2-1', title: 'Pushing'}, 
-          {id: 'git-2-2', title: 'Branching'}, 
-          {id: 'git-2-3', title: 'Pulling'}
-      ]},
-    ],
-  },
+  // {
+  //   title: 'Git',
+  //   duration: '2 weeks',
+  //   weeks: [
+  //     {
+  //       title: 'Week 1',
+  //       topics: [
+  //         {id: 'git-1-1', title: 'Installing git'},
+  //         {id: 'git-1-2', title: 'Initialize git in repo'},
+  //         {id: 'git-1-3', title: 'Staging'},
+  //         {id: 'git-1-4', title: 'Committing'},
+  //       ],
+  //     },
+  //     {title: 'Week 2', topics: [
+  //         {id: 'git-2-1', title: 'Pushing'}, 
+  //         {id: 'git-2-2', title: 'Branching'}, 
+  //         {id: 'git-2-3', title: 'Pulling'}
+  //     ]},
+  //   ],
+  // },
   {
     title: 'JS',
     duration: '5 weeks',
@@ -252,17 +272,17 @@ const roadmapData: RoadmapSubject[] = [
       },
       {
         title: 'Week 9',
-        topics: [{id: 'react-9-1', title: 'Redux intro (flux architecture, setup - store, reducers, actions )'}],
+        topics: [{id: 'react-9-1', title: 'Zustand intro (flux architecture, setup - store, reducers, actions )'}],
       },
       {
         title: 'Week 10',
         topics: [
-          {id: 'react-10-1', title: 'Redux (connect to components, mapStateToProps, MapDispatchToProps - create and retrieve) - Bank account project (assignment)'},
+          {id: 'react-10-1', title: 'Zustand (connect to components, mapStateToProps, MapDispatchToProps - create and retrieve) - Bank account project (assignment)'},
         ],
       },
       {
         title: 'Week 11',
-        topics: [{id: 'react-11-1', title: 'Redux (edit and delete) - continue Bank account management project (assignment)'}],
+        topics: [{id: 'react-11-1', title: 'Zustand (edit and delete) - continue Bank account management project (assignment)'}],
       },
       {
         title: 'Week 12',
@@ -284,60 +304,7 @@ const roadmapData: RoadmapSubject[] = [
       },
     ],
   },
-  {
-    title: 'React Native',
-    duration: '8 weeks',
-    weeks: [
-      {
-        title: 'Week 1',
-        topics: [
-          {id: 'rn-1-1', title: 'Setup React Native (install expo cli)'},
-          {id: 'rn-1-2', title: 'Basic Components (Text, View)'},
-          {id: 'rn-1-3', title: 'React Native Styles (Stylesheet.Create, flexbox)'},
-          {id: 'rn-1-4', title: 'Available Core Library Components (Image, ImageBackground, Modal)'},
-        ],
-      },
-      {
-        title: 'Week 2',
-        topics: [
-          {id: 'rn-2-1', title: 'Forms and Buttons (TextInput, TouchableOpacity, KeyboardAvoidingView, SafeAreaView, Validation)'},
-          {id: 'rn-2-2', title: 'Displaying List (FlatList, ScrollView)'},
-        ],
-      },
-      {title: 'Week 3', topics: [
-          {id: 'rn-3-1', title: 'Onboarding project exercise'},
-          {id: 'rn-3-2', title: 'Ecommerce app assignment'},
-      ]},
-      {
-        title: 'Week 4',
-        topics: [
-            {id: 'rn-4-1', title: 'Routing with React Navigation (Stack)'}, 
-            {id: 'rn-4-2', title: 'React native blog app'}
-        ],
-      },
-      {
-        title: 'Week 5',
-        topics: [
-          {id: 'rn-5-1', title: 'Ampersand contact app first 4 screens as exercise'},
-          {id: 'rn-5-2', title: 'Ampersand contact app last 4 screens as assignment'},
-        ],
-      },
-      {
-        title: 'Week 6',
-        topics: [
-          {id: 'rn-6-1', title: 'Redux'},
-          {id: 'rn-6-2', title: 'Firebase'},
-          {id: 'rn-6-3', title: 'Authentication'},
-          {id: 'rn-6-4', title: 'Add authentication to form and list project from week 2'},
-          {id: 'rn-6-5', title: 'React Native Project (Ampersand project) - add authentication as assignment'},
-        ],
-      },
-      {title: 'Week 7', topics: [
-          {id: 'rn-7-1', title: 'How react native works under the hood'},
-          {id: 'rn-7-2', title: 'Wrap up'},
-      ]},
-    ],
-  },
+  
   {
     title: 'Backend - NodeJS',
     duration: '9 weeks',
@@ -417,6 +384,60 @@ const roadmapData: RoadmapSubject[] = [
           {id: 'node-9-6', title: 'Route protection'},
         ],
       },
+    ],
+  },
+  {
+    title: 'React Native',
+    duration: '8 weeks',
+    weeks: [
+      {
+        title: 'Week 1',
+        topics: [
+          {id: 'rn-1-1', title: 'Setup React Native (install expo cli)'},
+          {id: 'rn-1-2', title: 'Basic Components (Text, View)'},
+          {id: 'rn-1-3', title: 'React Native Styles (Stylesheet.Create, flexbox)'},
+          {id: 'rn-1-4', title: 'Available Core Library Components (Image, ImageBackground, Modal)'},
+        ],
+      },
+      {
+        title: 'Week 2',
+        topics: [
+          {id: 'rn-2-1', title: 'Forms and Buttons (TextInput, TouchableOpacity, KeyboardAvoidingView, SafeAreaView, Validation)'},
+          {id: 'rn-2-2', title: 'Displaying List (FlatList, ScrollView)'},
+        ],
+      },
+      {title: 'Week 3', topics: [
+          {id: 'rn-3-1', title: 'Onboarding project exercise'},
+          {id: 'rn-3-2', title: 'Ecommerce app assignment'},
+      ]},
+      {
+        title: 'Week 4',
+        topics: [
+            {id: 'rn-4-1', title: 'Routing with React Navigation (Stack)'}, 
+            {id: 'rn-4-2', title: 'React native blog app'}
+        ],
+      },
+      {
+        title: 'Week 5',
+        topics: [
+          {id: 'rn-5-1', title: 'Ampersand contact app first 4 screens as exercise'},
+          {id: 'rn-5-2', title: 'Ampersand contact app last 4 screens as assignment'},
+        ],
+      },
+      {
+        title: 'Week 6',
+        topics: [
+          {id: 'rn-6-1', title: 'Redux'},
+          {id: 'rn-6-2', title: 'Firebase'},
+          {id: 'rn-6-3', title: 'Authentication'},
+          {id: 'rn-6-4', title: 'Add authentication to form and list project from week 2'},
+          {id: 'rn-6-5', title: 'React Native Project (Ampersand project) - add authentication as assignment'},
+        ],
+      },
+      {title: 'Week 7', topics: [
+          {id: 'rn-7-1', title: 'How react native works under the hood'},
+          {id: 'rn-7-2', title: 'Wrap up'},
+      ]},
     ],
   },
   {
