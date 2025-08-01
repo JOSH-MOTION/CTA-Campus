@@ -6,7 +6,7 @@ import {Avatar, AvatarFallback, AvatarImage} from '@/components/ui/avatar';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {ScrollArea} from '@/components/ui/scroll-area';
-import {Send, Users, Loader2} from 'lucide-react';
+import {Send, Users, Loader2, ArrowLeft} from 'lucide-react';
 import {cn} from '@/lib/utils';
 import type {Message} from '@/services/chat';
 import {deleteMessage, updateMessage, getChatId} from '@/services/chat';
@@ -14,6 +14,7 @@ import type {User} from 'firebase/auth';
 import {format, isToday, isYesterday} from 'date-fns';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
 
 type ChatEntity = {id: string; name: string; avatar?: string; dataAiHint: string; type: 'dm' | 'group'};
 
@@ -29,6 +30,7 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
   const [text, setText] = useState('');
   const [replyTo, setReplyTo] = useState<Message | undefined>(undefined);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
@@ -169,7 +171,11 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
     <>
     <div className="flex h-full w-full flex-col bg-gray-100 dark:bg-gray-900">
       <header className="flex h-[60px] items-center gap-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-3 shrink-0">
-        <Button variant="ghost" size="icon" onClick={onToggleContacts} className="md:hidden">
+        <Button variant="ghost" size="icon" onClick={() => router.back()} className="md:hidden">
+            <ArrowLeft className="h-5 w-5" />
+            <span className="sr-only">Back</span>
+        </Button>
+        <Button variant="ghost" size="icon" onClick={onToggleContacts}>
             <Users className="h-5 w-5" />
             <span className="sr-only">Toggle Contacts</span>
         </Button>
