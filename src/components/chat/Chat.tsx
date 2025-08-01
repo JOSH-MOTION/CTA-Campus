@@ -169,7 +169,7 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
     <>
     <div className="flex h-full w-full flex-col bg-gray-100 dark:bg-gray-900">
       <header className="flex h-[60px] items-center gap-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-3 shrink-0">
-        <Button variant="ghost" size="icon" onClick={onToggleContacts}>
+        <Button variant="ghost" size="icon" onClick={onToggleContacts} className="md:hidden">
             <Users className="h-5 w-5" />
             <span className="sr-only">Toggle Contacts</span>
         </Button>
@@ -184,7 +184,7 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
         <div className="space-y-6 p-4 md:p-10">
           {messages.map((msg, index) => {
              const prevMessage = messages[index - 1];
-             const showDateSeparator = !prevMessage || format(prevMessage.timestamp.toDate(), 'yyyy-MM-dd') !== format(msg.timestamp.toDate(), 'yyyy-MM-dd');
+             const showDateSeparator = msg.timestamp && (!prevMessage || !prevMessage.timestamp || format(prevMessage.timestamp.toDate(), 'yyyy-MM-dd') !== format(msg.timestamp.toDate(), 'yyyy-MM-dd'));
             return (
                 <React.Fragment key={msg.id}>
                     {showDateSeparator && <DateSeparator date={msg.timestamp.toDate()} />}
