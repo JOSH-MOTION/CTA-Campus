@@ -94,6 +94,7 @@ export default function HundredDaysSubmissionsPage() {
                     <TableRow>
                     <TableHead>Student</TableHead>
                     <TableHead>Generation</TableHead>
+                    <TableHead>Submitted For</TableHead>
                     <TableHead>Submitted At</TableHead>
                     <TableHead>Link</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -105,6 +106,7 @@ export default function HundredDaysSubmissionsPage() {
                             <TableRow key={submission.id}>
                                 <TableCell className="font-medium">{submission.studentName}</TableCell>
                                 <TableCell><Badge variant="secondary">{submission.studentGen}</Badge></TableCell>
+                                <TableCell>{submission.assignmentTitle.replace('100 Days of Code - ', '')}</TableCell>
                                 <TableCell>{formatDistanceToNow(submission.submittedAt.toDate(), { addSuffix: true })}</TableCell>
                                 <TableCell>
                                     <Button variant="link" asChild className="p-0 h-auto">
@@ -126,7 +128,7 @@ export default function HundredDaysSubmissionsPage() {
                         ))
                     ) : (
                         <TableRow>
-                            <TableCell colSpan={5} className="h-24 text-center">
+                            <TableCell colSpan={6} className="h-24 text-center">
                                 No submissions yet.
                             </TableCell>
                         </TableRow>

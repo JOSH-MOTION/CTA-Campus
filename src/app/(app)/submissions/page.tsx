@@ -12,9 +12,6 @@ import { onAllSubmissions, Submission } from '@/services/submissions';
 import { formatDistanceToNow } from 'date-fns';
 import { useAuth, UserData } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { useAssignments } from '@/contexts/AssignmentsContext';
-import { useProjects } from '@/contexts/ProjectsContext';
-import { useExercises } from '@/contexts/ExercisesContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function SubmissionsPage() {
@@ -22,9 +19,6 @@ export default function SubmissionsPage() {
   const [loading, setLoading] = useState(true);
   const { role, fetchAllUsers } = useAuth();
   const router = useRouter();
-  const { assignments } = useAssignments();
-  const { projects } = useProjects();
-  const { exercises } = useExercises();
   const [allUsers, setAllUsers] = useState<UserData[]>([]);
   const [selectedGen, setSelectedGen] = useState('all');
 
@@ -63,11 +57,14 @@ export default function SubmissionsPage() {
     return submissions.filter(s => s.studentGen === selectedGen);
   }, [submissions, selectedGen]);
 
-  const getSubmissionParentType = (assignmentId: string): 'assignments' | 'projects' | 'exercises' | null => {
-    if (assignments.some(a => a.id === assignmentId)) return 'assignments';
-    if (projects.some(p => p.id === assignmentId)) return 'projects';
-    if (exercises.some(e => e.id === assignmentId)) return 'exercises';
-    return null;
+  const getSubmissionParentType = (pointCategory: string): string => {
+    switch(pointCategory) {
+        case 'Class Assignments': return 'assignments';
+        case 'Weekly Projects': return 'projects';
+        case 'Class Exercises': return 'exercises';
+        case '100 Days of Code': return '100-days-of-code/submissions';
+        default: return '';
+    }
   };
   
   if (role === 'student') return null;
@@ -123,8 +120,8 @@ export default function SubmissionsPage() {
                 <TableBody>
                     {filteredSubmissions.length > 0 ? (
                         filteredSubmissions.map(submission => {
-                            const parentType = getSubmissionParentType(submission.assignmentId);
-                            const href = parentType ? `/${parentType}/${submission.assignmentId}` : '#';
+                            const parentPath = getSubmissionParentType(submission.pointCategory);
+                            const href = parentPath ? `/${parentPath}` : '#';
                             
                             return (
                                 <TableRow key={submission.id}>

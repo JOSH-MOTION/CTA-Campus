@@ -1,12 +1,12 @@
 // src/components/students/StudentCard.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Mail, MessageSquare, CalendarPlus, MoreHorizontal, GraduationCap, Info } from 'lucide-react';
+import { Mail, MessageSquare, Info, GraduationCap, FileText, ExternalLink, Loader2 } from 'lucide-react';
 import { UserData } from '@/contexts/AuthContext';
 import {
   Dialog,
@@ -19,6 +19,11 @@ import {
 import PerformanceHub from '../dashboards/PerformanceHub';
 import { Separator } from '../ui/separator';
 import { Badge } from '../ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { onSubmissionsForStudent, Submission } from '@/services/submissions';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
+import { formatDistanceToNow } from 'date-fns';
+import Link from 'next/link';
 
 interface StudentCardProps {
   student: UserData;
@@ -36,16 +41,76 @@ const InfoItem = ({ icon: Icon, label, value }: { icon: React.ElementType, label
     ) : null
   );
 
+const StudentSubmissions = ({ studentId }: { studentId: string }) => {
+    const [submissions, setSubmissions] = useState<Submission[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        setLoading(true);
+        const unsubscribe = onSubmissionsForStudent(studentId, (newSubmissions) => {
+            setSubmissions(newSubmissions);
+            setLoading(false);
+        });
+        return () => unsubscribe();
+    }, [studentId]);
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>All Submissions</CardTitle>
+                <CardDescription>A complete history of all work submitted by the student.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                {loading ? (
+                    <div className="flex h-64 items-center justify-center">
+                        <Loader2 className="h-8 w-8 animate-spin" />
+                    </div>
+                ) : (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Coursework</TableHead>
+                                <TableHead>Category</TableHead>
+                                <TableHead>Submitted</TableHead>
+                                <TableHead className="text-right">Link</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {submissions.length > 0 ? (
+                                submissions.map(submission => (
+                                    <TableRow key={submission.id}>
+                                        <TableCell className="font-medium">{submission.assignmentTitle}</TableCell>
+                                        <TableCell><Badge variant="outline">{submission.pointCategory}</Badge></TableCell>
+                                        <TableCell>{formatDistanceToNow(submission.submittedAt.toDate(), { addSuffix: true })}</TableCell>
+                                        <TableCell className="text-right">
+                                            <Button variant="ghost" size="icon" asChild>
+                                                <Link href={submission.submissionLink} target="_blank" rel="noopener noreferrer">
+                                                    <ExternalLink className="h-4 w-4" />
+                                                </Link>
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            ) : (
+                                <TableRow>
+                                    <TableCell colSpan={4} className="h-24 text-center">
+                                        No submissions yet.
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                )}
+            </CardContent>
+        </Card>
+    )
+}
+
 export function StudentCard({ student }: StudentCardProps) {
   const router = useRouter();
 
   const handleSendMessage = () => {
     router.push(`/chat?dm=${student.uid}`);
-  };
-
-  const handleBookSession = () => {
-    // This could be enhanced to pre-fill the staff member if the current user is a teacher
-    router.push('/book-session');
   };
 
   return (
@@ -84,50 +149,61 @@ export function StudentCard({ student }: StudentCardProps) {
                 Details
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-4xl h-[90vh]">
+          <DialogContent className="max-w-6xl h-[90vh]">
             <DialogHeader>
               <DialogTitle>{student.displayName}'s Details</DialogTitle>
               <DialogDescription>
                 Viewing performance and personal information for {student.displayName}.
               </DialogDescription>
             </DialogHeader>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 overflow-y-auto pr-4">
-                <div className="md:col-span-1 space-y-4">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Personal Info</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                             <div className="flex justify-center">
-                                <Avatar className="h-28 w-28 border-4 border-background shadow-md">
-                                <AvatarImage src={student.photoURL} alt={student.displayName} />
-                                <AvatarFallback className="text-4xl">
-                                    {student.displayName ? student.displayName.charAt(0).toUpperCase() : 'U'}
-                                </AvatarFallback>
-                                </Avatar>
-                            </div>
-                            <Separator/>
-                            <InfoItem icon={GraduationCap} label="Generation" value={student.gen} />
-                            <InfoItem icon={Mail} label="Email" value={student.email} />
-                            <InfoItem icon={Info} label="School ID" value={student.schoolId} />
-                            <InfoItem icon={Info} label="Lesson Day" value={student.lessonDay} />
-                            <InfoItem icon={Info} label="Lesson Type" value={student.lessonType} />
-                            {student.bio && (
-                                <>
-                                 <Separator />
-                                <div className="space-y-1 pt-2">
-                                    <p className="text-sm text-muted-foreground">Bio</p>
-                                    <p className="font-medium italic text-sm">"{student.bio}"</p>
+            <Tabs defaultValue="overview" className="flex-grow flex flex-col overflow-hidden">
+                <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="overview">Overview</TabsTrigger>
+                    <TabsTrigger value="performance">Performance</TabsTrigger>
+                    <TabsTrigger value="submissions">Submissions</TabsTrigger>
+                </TabsList>
+                <div className="flex-grow overflow-y-auto mt-4 pr-4">
+                    <TabsContent value="overview">
+                         <Card>
+                            <CardHeader>
+                                <CardTitle>Personal Info</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="flex items-center gap-6">
+                                    <Avatar className="h-28 w-28 border-4 border-background shadow-md">
+                                        <AvatarImage src={student.photoURL} alt={student.displayName} />
+                                        <AvatarFallback className="text-4xl">
+                                            {student.displayName ? student.displayName.charAt(0).toUpperCase() : 'U'}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <div className="space-y-4 flex-1">
+                                        <InfoItem icon={GraduationCap} label="Generation" value={student.gen} />
+                                        <InfoItem icon={Mail} label="Email" value={student.email} />
+                                        <InfoItem icon={Info} label="School ID" value={student.schoolId} />
+                                        <InfoItem icon={Info} label="Lesson Day" value={student.lessonDay} />
+                                        <InfoItem icon={Info} label="Lesson Type" value={student.lessonType} />
+                                    </div>
                                 </div>
-                                </>
-                            )}
-                        </CardContent>
-                    </Card>
+                                {student.bio && (
+                                    <>
+                                    <Separator className="my-4"/>
+                                    <div className="space-y-1 pt-2">
+                                        <p className="text-sm text-muted-foreground">Bio</p>
+                                        <p className="font-medium italic text-sm">"{student.bio}"</p>
+                                    </div>
+                                    </>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                    <TabsContent value="performance">
+                        <PerformanceHub studentId={student.uid} />
+                    </TabsContent>
+                     <TabsContent value="submissions">
+                        <StudentSubmissions studentId={student.uid} />
+                    </TabsContent>
                 </div>
-                <div className="md:col-span-2">
-                    <PerformanceHub studentId={student.uid} />
-                </div>
-            </div>
+            </Tabs>
           </DialogContent>
         </Dialog>
       </CardFooter>

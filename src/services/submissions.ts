@@ -26,18 +26,18 @@ import {
     submissionLink: string;
     submissionNotes: string;
     submittedAt: Timestamp;
+    pointCategory: string;
   }
   
   export interface NewSubmissionData extends Omit<Submission, 'id' | 'submittedAt'> {
       pointsToAward?: number;
-      pointCategory?: string;
   }
   
   /**
    * Creates a new submission for an assignment.
    */
   export const addSubmission = async (submissionData: NewSubmissionData): Promise<{ id: string }> => {
-    const { pointsToAward, pointCategory, ...restOfSubmissionData } = submissionData;
+    const { pointsToAward, ...restOfSubmissionData } = submissionData;
     
     // Use assignmentTitle for duplicate check, as it will be unique for each day's 100-days-of-code post
     const q = query(
@@ -56,11 +56,11 @@ import {
         submittedAt: serverTimestamp(),
     });
 
-    if (pointsToAward && pointCategory) {
+    if (pointsToAward && submissionData.pointCategory) {
         // We use the new submission's ID to ensure point awarding is idempotent
         const activityId = `graded-submission-${docRef.id}`;
         try {
-            await awardPoint(submissionData.studentId, pointsToAward, pointCategory, activityId);
+            await awardPoint(submissionData.studentId, pointsToAward, submissionData.pointCategory, activityId);
         } catch(e) {
             // If awarding points fails, we don't fail the whole submission,
             // but we log the error. The teacher can manually award points.
@@ -133,6 +133,37 @@ import {
 
     return unsubscribe;
   };
+
+  /**
+   * Fetches all submissions for a specific student in real-time.
+   * @param studentId - The UID of the student.
+   * @param callback - The function to call with the new array of submissions.
+   * @returns An unsubscribe function to stop the listener.
+   */
+    export const onSubmissionsForStudent = (studentId: string, callback: (submissions: Submission[]) => void) => {
+        const submissionsCol = collection(db, 'submissions');
+        const q = query(
+        submissionsCol,
+        where('studentId', '==', studentId),
+        orderBy('submittedAt', 'desc')
+        );
+
+        const unsubscribe = onSnapshot(
+            q,
+            (querySnapshot) => {
+                const submissions: Submission[] = querySnapshot.docs.map((doc) => {
+                return { id: doc.id, ...doc.data() } as Submission;
+                });
+                callback(submissions);
+            },
+            (error) => {
+                console.error(`Error listening to submissions for student ${studentId}:`, error);
+            }
+        );
+
+        return unsubscribe;
+    };
+
 
   /**
    * Deletes a submission from the database.
