@@ -4,7 +4,7 @@
 import {createContext, useContext, useState, ReactNode, FC, useEffect, useCallback} from 'react';
 import { useNotifications } from './NotificationsContext';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, Timestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, Timestamp, doc, updateDoc, deleteDoc, where } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
 
 
@@ -39,7 +39,7 @@ export const AssignmentsProvider: FC<{children: ReactNode}> = ({children}) => {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const { addNotificationForGen } = useNotifications();
-  const { user } = useAuth();
+  const { user, userData, role } = useAuth();
 
   useEffect(() => {
     if (!user) {
@@ -48,8 +48,25 @@ export const AssignmentsProvider: FC<{children: ReactNode}> = ({children}) => {
         return;
     }
     
+    setLoading(true);
     const assignmentsCol = collection(db, 'assignments');
-    const q = query(assignmentsCol, orderBy('createdAt', 'desc'));
+    
+    let q;
+    if (role === 'teacher' || role === 'admin') {
+      q = query(assignmentsCol, orderBy('createdAt', 'desc'));
+    } else if (role === 'student' && userData?.gen) {
+      q = query(
+        assignmentsCol,
+        where('targetGen', 'in', [userData.gen, 'All Students', 'Everyone']),
+        orderBy('createdAt', 'desc')
+      );
+    } else {
+      q = query(
+        assignmentsCol,
+        where('targetGen', '==', 'Everyone'),
+        orderBy('createdAt', 'desc')
+      );
+    }
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
         const fetchedAssignments = querySnapshot.docs.map(doc => {
@@ -67,7 +84,7 @@ export const AssignmentsProvider: FC<{children: ReactNode}> = ({children}) => {
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, role, userData]);
 
 
   const addAssignment = useCallback(async (assignment: AssignmentData) => {

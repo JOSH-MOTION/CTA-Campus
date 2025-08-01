@@ -49,18 +49,8 @@ export default function ExercisesPage() {
        fetchSubmissions();
     }
   }, [user, role, loading, exercises]);
-
-  const filteredExercises = useMemo(() => {
-    if (isTeacherOrAdmin) return exercises;
-    return exercises.filter(exercise => {
-      if (exercise.targetGen === 'Everyone') return true;
-      if (role === 'student' && exercise.targetGen === 'All Students') return true;
-      if (role === 'student' && exercise.targetGen === userData?.gen) return true;
-      return false;
-    });
-  }, [exercises, isTeacherOrAdmin, role, userData?.gen]);
   
-  const sortedExercises = [...filteredExercises].sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+  const sortedExercises = [...exercises].sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
 
   const isLoading = loading || (role === 'student' && checkingSubmissions);
 

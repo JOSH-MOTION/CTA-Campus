@@ -4,7 +4,7 @@
 import {createContext, useContext, useState, ReactNode, FC, useEffect, useCallback} from 'react';
 import { useNotifications } from './NotificationsContext';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, Timestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, Timestamp, doc, updateDoc, deleteDoc, where } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
 
 export interface Exercise {
@@ -32,7 +32,7 @@ export const ExercisesProvider: FC<{children: ReactNode}> = ({children}) => {
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(true);
   const { addNotificationForGen } = useNotifications();
-  const { user } = useAuth();
+  const { user, userData, role } = useAuth();
 
   useEffect(() => {
     if (!user) {
@@ -42,7 +42,23 @@ export const ExercisesProvider: FC<{children: ReactNode}> = ({children}) => {
     }
     setLoading(true);
     const exercisesCol = collection(db, 'exercises');
-    const q = query(exercisesCol, orderBy('createdAt', 'desc'));
+    
+    let q;
+    if (role === 'teacher' || role === 'admin') {
+      q = query(exercisesCol, orderBy('createdAt', 'desc'));
+    } else if (role === 'student' && userData?.gen) {
+      q = query(
+        exercisesCol,
+        where('targetGen', 'in', [userData.gen, 'All Students', 'Everyone']),
+        orderBy('createdAt', 'desc')
+      );
+    } else {
+       q = query(
+        exercisesCol,
+        where('targetGen', '==', 'Everyone'),
+        orderBy('createdAt', 'desc')
+      );
+    }
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
         const fetchedExercises = querySnapshot.docs.map(doc => {
@@ -60,7 +76,7 @@ export const ExercisesProvider: FC<{children: ReactNode}> = ({children}) => {
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, role, userData]);
 
   const addExercise = useCallback(async (exercise: ExerciseData) => {
     if(!user) throw new Error("User not authenticated");

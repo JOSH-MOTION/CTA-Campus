@@ -4,7 +4,7 @@
 import {createContext, useContext, useState, ReactNode, FC, useEffect, useCallback} from 'react';
 import { useNotifications } from './NotificationsContext';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, Timestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, Timestamp, doc, updateDoc, deleteDoc, where } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
 
 export interface Project {
@@ -32,7 +32,7 @@ export const ProjectsProvider: FC<{children: ReactNode}> = ({children}) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const { addNotificationForGen } = useNotifications();
-  const { user } = useAuth();
+  const { user, userData, role } = useAuth();
 
   useEffect(() => {
     if (!user) {
@@ -42,7 +42,23 @@ export const ProjectsProvider: FC<{children: ReactNode}> = ({children}) => {
     }
     setLoading(true);
     const projectsCol = collection(db, 'projects');
-    const q = query(projectsCol, orderBy('createdAt', 'desc'));
+    
+    let q;
+    if (role === 'teacher' || role === 'admin') {
+      q = query(projectsCol, orderBy('createdAt', 'desc'));
+    } else if (role === 'student' && userData?.gen) {
+      q = query(
+        projectsCol,
+        where('targetGen', 'in', [userData.gen, 'All Students', 'Everyone']),
+        orderBy('createdAt', 'desc')
+      );
+    } else {
+      q = query(
+        projectsCol,
+        where('targetGen', '==', 'Everyone'),
+        orderBy('createdAt', 'desc')
+      );
+    }
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
         const fetchedProjects = querySnapshot.docs.map(doc => {
@@ -60,7 +76,7 @@ export const ProjectsProvider: FC<{children: ReactNode}> = ({children}) => {
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, role, userData]);
 
   const addProject = useCallback(async (project: ProjectData) => {
     if(!user) throw new Error("User not authenticated");

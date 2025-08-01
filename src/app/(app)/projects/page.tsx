@@ -49,19 +49,8 @@ export default function ProjectsPage() {
        fetchSubmissions();
     }
   }, [user, role, loading, projects]);
-
-
-  const filteredProjects = useMemo(() => {
-    if (isTeacherOrAdmin) return projects;
-    return projects.filter(project => {
-      if (project.targetGen === 'Everyone') return true;
-      if (role === 'student' && project.targetGen === 'All Students') return true;
-      if (role === 'student' && project.targetGen === userData?.gen) return true;
-      return false;
-    });
-  }, [projects, isTeacherOrAdmin, role, userData?.gen]);
   
-  const sortedProjects = [...filteredProjects].sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+  const sortedProjects = [...projects].sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
 
   const isLoading = loading || (role === 'student' && checkingSubmissions);
 

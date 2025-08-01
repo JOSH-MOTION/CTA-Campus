@@ -24,24 +24,11 @@ const linkify = (text: string) => {
 };
 
 export default function AnnouncementsPage() {
-  const {role, userData} = useAuth();
+  const {role} = useAuth();
   const {announcements, loading} = useAnnouncements();
   const isTeacherOrAdmin = role === 'teacher' || role === 'admin';
 
-  const filteredAnnouncements = useMemo(() => {
-    if (isTeacherOrAdmin) {
-      return announcements;
-    }
-    return announcements.filter(ann => {
-      if (ann.targetGen === 'Everyone') return true;
-      if (role === 'student' && ann.targetGen === 'All Students') return true;
-      if (role === 'student' && ann.targetGen === userData?.gen) return true;
-      return false;
-    });
-  }, [announcements, isTeacherOrAdmin, role, userData?.gen]);
-
-
-  const sortedAnnouncements = [...filteredAnnouncements].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const sortedAnnouncements = [...announcements].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   return (
     <div className="space-y-6">

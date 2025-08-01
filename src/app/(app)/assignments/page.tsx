@@ -46,19 +46,7 @@ export default function AssignmentsPage() {
     }
   }, [user, role, loading]);
 
-
-  const filteredAssignments = useMemo(() => {
-    if (isTeacherOrAdmin) return assignments;
-    return assignments.filter(assign => {
-      if (assign.targetGen === 'Everyone') return true;
-      if (role === 'student' && assign.targetGen === 'All Students') return true;
-      if (role === 'student' && assign.targetGen === userData?.gen) return true;
-      return false;
-    });
-  }, [assignments, isTeacherOrAdmin, role, userData?.gen]);
-
-
-  const sortedAssignments = [...filteredAssignments].sort((a, b) => {
+  const sortedAssignments = [...assignments].sort((a, b) => {
       const aLatestDate = Math.max(...a.dueDates.map(d => new Date(d.dateTime).getTime()));
       const bLatestDate = Math.max(...b.dueDates.map(d => new Date(d.dateTime).getTime()));
       return bLatestDate - aLatestDate;

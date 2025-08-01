@@ -4,7 +4,7 @@
 import {createContext, useContext, useState, ReactNode, FC, useEffect, useCallback} from 'react';
 import { useNotifications } from './NotificationsContext';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, Timestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, Timestamp, doc, updateDoc, deleteDoc, where } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
 
 export interface Announcement {
@@ -33,7 +33,7 @@ export const AnnouncementsProvider: FC<{children: ReactNode}> = ({children}) => 
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const { addNotificationForGen } = useNotifications();
-  const { user } = useAuth();
+  const { user, userData, role } = useAuth();
 
   useEffect(() => {
     if (!user) {
@@ -44,7 +44,28 @@ export const AnnouncementsProvider: FC<{children: ReactNode}> = ({children}) => 
 
     setLoading(true);
     const announcementsCol = collection(db, 'announcements');
-    const q = query(announcementsCol, orderBy('date', 'desc'));
+    
+    // Build a query based on the user's role and generation
+    let q;
+    if (role === 'teacher' || role === 'admin') {
+        // Teachers and admins can see all announcements
+        q = query(announcementsCol, orderBy('date', 'desc'));
+    } else if (role === 'student' && userData?.gen) {
+        // Students see announcements for their gen, 'All Students', or 'Everyone'
+        q = query(
+            announcementsCol, 
+            where('targetGen', 'in', [userData.gen, 'All Students', 'Everyone']),
+            orderBy('date', 'desc')
+        );
+    } else {
+        // Fallback for users without a specific role/gen, only see 'Everyone'
+        q = query(
+            announcementsCol, 
+            where('targetGen', '==', 'Everyone'),
+            orderBy('date', 'desc')
+        );
+    }
+
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const fetchedAnnouncements = querySnapshot.docs.map(doc => {
@@ -75,7 +96,7 @@ export const AnnouncementsProvider: FC<{children: ReactNode}> = ({children}) => 
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, role, userData]);
 
   const addAnnouncement = useCallback(async (announcement: Omit<Announcement, 'id' | 'date'>) => {
     if (!user) throw new Error("User not authenticated");
