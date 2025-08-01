@@ -14,7 +14,7 @@ import { CheckCircle, Loader2 } from 'lucide-react';
 import { useRoadmap } from '@/contexts/RoadmapContext';
 import { useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { awardPoint } from '@/services/points';
+import { awardPointsFlow } from '@/ai/flows/award-points-flow';
 
 const attendanceSchema = z.object({
   classId: z.string().nonempty('Please select a class.'),
@@ -56,7 +56,16 @@ export default function AttendancePage() {
     setIsSubmitting(true);
     try {
       const attendanceDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-      await awardPoint(user.uid, 1, 'Class Attendance', `attendance-${data.classId}-${attendanceDate}`);
+      
+      const result = await awardPointsFlow({
+          studentId: user.uid,
+          points: 1,
+          reason: 'Class Attendance',
+          activityId: `attendance-${data.classId}-${attendanceDate}`,
+          action: 'award'
+      });
+      if (!result.success) throw new Error(result.message);
+
       toast({
         title: 'Attendance Marked!',
         description: 'You have been awarded 1 point for submitting your feedback.',

@@ -1,4 +1,3 @@
-
 // src/app/(app)/temp-update/page.tsx
 'use client';
 
@@ -11,17 +10,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Award, CheckCircle, Code, Edit, Film, GitBranch, Handshake, Loader2, PlusCircle, Presentation, Projector, Search, Star, ChevronsUpDown, Check } from 'lucide-react';
+import { PlusCircle, Loader2, ChevronsUpDown, Check } from 'lucide-react';
 import { useAuth, UserData } from '@/contexts/AuthContext';
-import { awardPoint } from '@/services/points';
 import { v4 as uuidv4 } from 'uuid';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
-
+import { awardPointsFlow } from '@/ai/flows/award-points-flow';
 
 const gradingData = [
     { title: "Class Attendance" },
@@ -68,7 +65,7 @@ export default function TempUpdatePage() {
     defaultValues: {
       studentId: '',
       activityTitle: '',
-      points: 0,
+      points: 1,
     },
   });
 
@@ -77,7 +74,17 @@ export default function TempUpdatePage() {
     try {
       const activityId = `manual-${data.activityTitle.toLowerCase().replace(/\s+/g, '-')}-${uuidv4()}`;
       
-      await awardPoint(data.studentId, data.points, data.activityTitle, activityId);
+      const result = await awardPointsFlow({
+          studentId: data.studentId,
+          points: data.points,
+          reason: data.activityTitle,
+          activityId: activityId,
+          action: 'award'
+      });
+      
+      if (!result.success) {
+          throw new Error(result.message);
+      }
       
       const selectedStudent = students.find(s => s.uid === data.studentId);
       toast({

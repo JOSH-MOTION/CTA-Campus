@@ -14,11 +14,12 @@ import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
 import { ArrowLeft, ExternalLink, Loader2, CheckCircle, Trash2, XCircle } from 'lucide-react';
 import Link from 'next/link';
-import { awardPoint, hasPointBeenAwarded, removePointByActivityId } from '@/services/points';
+import { hasPointBeenAwarded } from '@/services/points';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { cn } from '@/lib/utils';
+import { awardPointsFlow } from '@/ai/flows/award-points-flow';
 
 export default function AssignmentSubmissionsPage() {
   const { id: assignmentId } = useParams();
@@ -74,7 +75,15 @@ export default function AssignmentSubmissionsPage() {
     setGradingState(prev => ({ ...prev, [submission.id]: 'loading' }));
     const activityId = `graded-submission-${submission.id}`;
     try {
-      await awardPoint(submission.studentId, 1, 'Class Assignments', activityId);
+      const result = await awardPointsFlow({
+          studentId: submission.studentId,
+          points: 1,
+          reason: 'Class Assignments',
+          activityId,
+          action: 'award'
+      });
+      if (!result.success) throw new Error(result.message);
+
       setGradingState(prev => ({ ...prev, [submission.id]: 'graded' }));
       toast({
         title: 'Submission Graded',
@@ -106,7 +115,15 @@ export default function AssignmentSubmissionsPage() {
     setGradingState(prev => ({ ...prev, [submission.id]: 'loading' }));
     const activityId = `graded-submission-${submission.id}`;
     try {
-      await removePointByActivityId(submission.studentId, activityId);
+      const result = await awardPointsFlow({
+          studentId: submission.studentId,
+          points: 1,
+          reason: 'Class Assignments',
+          activityId,
+          action: 'revoke'
+      });
+       if (!result.success) throw new Error(result.message);
+
       setGradingState(prev => ({ ...prev, [submission.id]: 'idle' }));
       toast({
         title: 'Points Revoked',
@@ -127,11 +144,17 @@ export default function AssignmentSubmissionsPage() {
     if (!submissionToDelete) return;
     try {
         const activityId = `graded-submission-${submissionToDelete.id}`;
+        await deleteSubmission(submissionToDelete.id);
         // Only attempt to remove point if it was graded
         if(gradingState[submissionToDelete.id] === 'graded') {
-            await removePointByActivityId(submissionToDelete.studentId, activityId);
+             await awardPointsFlow({
+                studentId: submissionToDelete.studentId,
+                points: 1,
+                reason: 'Class Assignments',
+                activityId,
+                action: 'revoke'
+            });
         }
-        await deleteSubmission(submissionToDelete.id);
         setSubmissions(prev => prev.filter(s => s.id !== submissionToDelete.id));
         
         toast({

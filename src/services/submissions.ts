@@ -14,7 +14,7 @@ import {
     getDocs,
   } from 'firebase/firestore';
   import { db } from '@/lib/firebase';
-  import { awardPoint } from './points';
+  import { awardPointsFlow } from '@/ai/flows/award-points-flow';
   
   export interface Submission {
     id: string;
@@ -64,13 +64,16 @@ import {
     });
 
     if (pointsToAward && submissionData.pointCategory) {
-        // We use the new submission's ID to ensure point awarding is idempotent
         const activityId = `graded-submission-${docRef.id}`;
         try {
-            await awardPoint(submissionData.studentId, pointsToAward, submissionData.pointCategory, activityId);
+            await awardPointsFlow({
+                studentId: submissionData.studentId,
+                points: pointsToAward,
+                reason: submissionData.pointCategory,
+                activityId,
+                action: 'award'
+            });
         } catch(e) {
-            // If awarding points fails, we don't fail the whole submission,
-            // but we log the error. The teacher can manually award points.
             console.error(`Failed to award points for submission ${docRef.id}:`, e);
         }
     }

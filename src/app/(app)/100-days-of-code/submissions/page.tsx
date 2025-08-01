@@ -14,7 +14,7 @@ import { ArrowLeft, ExternalLink, Loader2, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { removePointByActivityId } from '@/services/points';
+import { awardPointsFlow } from '@/ai/flows/award-points-flow';
 
 const HUNDRED_DAYS_OF_CODE_ASSIGNMENT_ID = '100-days-of-code';
 
@@ -56,7 +56,15 @@ export default function HundredDaysSubmissionsPage() {
     try {
         const activityId = `graded-submission-${submissionToDelete.id}`;
         await deleteSubmission(submissionToDelete.id);
-        await removePointByActivityId(submissionToDelete.studentId, activityId);
+        
+        await awardPointsFlow({
+            studentId: submissionToDelete.studentId,
+            points: 0.5,
+            reason: '100 Days of Code',
+            activityId,
+            action: 'revoke'
+        });
+
         toast({
             title: 'Submission Deleted',
             description: `The submission from ${submissionToDelete?.studentName} has been removed and points have been revoked.`,
