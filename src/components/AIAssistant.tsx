@@ -43,14 +43,10 @@ export function AIAssistant() {
   const isMobile = useIsMobile();
 
   // Drag and drop state
-  const [position, setPosition] = useState({ x: 24, y: isChatPage ? 96 : 24 });
+  const [position, setPosition] = useState({ x: 24, y: 24 });
   const [isDragging, setIsDragging] = useState(false);
   const dragRef = useRef<HTMLDivElement>(null);
   const offset = useRef({ x: 0, y: 0 });
-
-  useEffect(() => {
-    setPosition(pos => ({ ...pos, y: isChatPage ? 96 : 24 }));
-  }, [isChatPage]);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -156,6 +152,10 @@ export function AIAssistant() {
 
   const handleClearHistory = () => {
     setMessages([]);
+  }
+
+  if (isChatPage) {
+    return null;
   }
 
   return (
