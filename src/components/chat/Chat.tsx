@@ -42,10 +42,10 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
     if (scrollAreaRef.current) {
       scrollAreaRef.current.scrollTo({
         top: scrollAreaRef.current.scrollHeight,
-        behavior: 'smooth',
+        behavior: 'auto',
       });
     }
-  }, [messages]);
+  }, [messages, entity]);
   
   useEffect(() => {
       setReplyTo(undefined);
@@ -132,7 +132,7 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
              )}
             <div className={cn("max-w-[75%]", isSender ? 'flex flex-col items-end' : 'flex flex-col items-start')}>
                 <div className="flex items-center gap-2 mb-1">
-                     <p className="text-sm font-semibold">{isSender ? "You" : msg.senderName}</p>
+                     <p className={cn("text-xs", isSender && "text-right")}>{isSender ? "You" : msg.senderName}</p>
                      <p className="text-xs text-gray-500">{messageTime}</p>
                 </div>
                 <div
