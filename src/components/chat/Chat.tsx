@@ -169,6 +169,23 @@ export const Chat = React.memo(function Chat({
     );
   }, [mentionQuery, availableMentionUsers]);
   
+  const handlePin = async (message: Message) => {
+    if (!currentUser) return;
+     let chatId: string;
+    if (entity.type === 'dm') {
+      chatId = getChatId(currentUser.uid, entity.id);
+    } else {
+      chatId = entity.id;
+    }
+    
+    try {
+        await updateMessage(chatId, message.id, { isPinned: !message.isPinned });
+        toast({ title: message.isPinned ? 'Message Unpinned' : 'Message Pinned!' });
+    } catch (error) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not pin message.' });
+    }
+  };
+  
   const checkMentionState = (currentText: string) => {
     const mentionMatch = currentText.match(/@(\w*)$/);
     if (mentionMatch) {
@@ -186,35 +203,11 @@ export const Chat = React.memo(function Chat({
     checkMentionState(newText);
   };
   
-  const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
-    // Only check for mention if the last character is @
-    if (e.target.value.endsWith('@')) {
-      checkMentionState(e.target.value);
-    }
-  };
-
   const handleSelectMention = (user: UserData) => {
     const newText = text.replace(/@\w*$/, `@${user.displayName} `);
     setText(newText);
     setShowMentionPopover(false);
     setMentionQuery(null);
-  };
-
-  const handlePin = async (message: Message) => {
-    if (!currentUser) return;
-     let chatId: string;
-    if (entity.type === 'dm') {
-      chatId = getChatId(currentUser.uid, entity.id);
-    } else {
-      chatId = entity.id;
-    }
-    
-    try {
-        await updateMessage(chatId, message.id, { isPinned: !message.isPinned });
-        toast({ title: message.isPinned ? 'Message Unpinned' : 'Message Pinned!' });
-    } catch (error) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not pin message.' });
-    }
   };
 
   useEffect(() => {
@@ -398,7 +391,6 @@ export const Chat = React.memo(function Chat({
                     <Input
                     value={text || ''}
                     onChange={handleTextChange}
-                    onFocus={handleInputFocus}
                     placeholder='Write your message...'
                     className='h-12 w-full rounded-lg border-none bg-gray-100 pr-12 focus:ring-0 dark:bg-gray-800'
                     disabled={editingMessageId !== null}
@@ -463,4 +455,3 @@ export const Chat = React.memo(function Chat({
     </>
   );
 });
-
