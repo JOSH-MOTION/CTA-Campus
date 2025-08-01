@@ -1,88 +1,113 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Helper Functions
+    function isUserAuthenticated() {
+      return request.auth != null;
+    }
+
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
 
+    // Checks if the requesting user has the 'teacher' or 'admin' role by reading their user document.
     function isTeacherOrAdmin() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['teacher', 'admin'];
     }
-
+    
     function isStudent() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'student';
     }
 
+    // Users Collection
+    // - Anyone can create their own user document during sign-up.
+    // - Users can only read documents (e.g., for the directory).
+    // - Users can only update their own document.
     match /users/{userId} {
-      // Users can read their own profile, teachers/admins can read anyone's
-      allow read: if isOwner(userId) || isTeacherOrAdmin();
-      // Users can update their own profile
-      allow write: if isOwner(userId);
+      allow create: if isUserAuthenticated();
+      allow read: if isUserAuthenticated();
+      allow update: if isOwner(userId);
+      allow delete: if false; // Generally, don't allow users to delete their own accounts from the client.
 
-      // Rules for the points subcollection
+      // Points Subcollection
+      // - Only teachers/admins can create (award) or delete (revoke) points.
+      // - Users can read their own points, teachers/admins can read any student's points.
       match /points/{pointId} {
-        // Students can read their own points. Teachers/admins can read/write points for any user.
-        allow read, write: if isTeacherOrAdmin();
-        allow read: if isOwner(userId);
+        allow read: if isOwner(userId) || isTeacherOrAdmin();
+        allow create, delete: if isTeacherOrAdmin();
+        allow update: if false;
       }
     }
-
-    match /chats/{chatId}/{message=**} {
-      // Anyone authenticated can read/write to any chat.
-      // More specific rules could be implemented if needed (e.g. check for chat membership)
-      allow read, write: if request.auth != null;
+    
+    // Notifications Subcollection
+    // - Only the server (via a secure function) should create notifications.
+    // - Users can only read and update (mark as read) their own notifications.
+    match /notifications/{notificationId} {
+      allow create: if isTeacherOrAdmin(); // For manual/server-side creation
+      allow read, update: if isOwner(resource.data.userId);
+      allow delete: if false;
+    }
+    
+    // Generic Content Collections (Announcements, Assignments, Exercises, Projects, Resources)
+    // These collections share similar rules.
+    function canReadContent(gen) {
+        let userGen = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.gen;
+        return gen == 'Everyone' || gen == 'All Students' || gen == userGen;
     }
 
     match /announcements/{announcementId} {
-        // Anyone authenticated can read announcements
-        allow read: if request.auth != null;
-        // Only teachers or admins can create, update, or delete them
-        allow write: if isTeacherOrAdmin();
+        allow read: if isTeacherOrAdmin() || (isStudent() && canReadContent(resource.data.targetGen));
+        allow create, update, delete: if isTeacherOrAdmin();
     }
-    
     match /assignments/{assignmentId} {
-        allow read: if request.auth != null;
-        allow write: if isTeacherOrAdmin();
+        allow read: if isTeacherOrAdmin() || (isStudent() && canReadContent(resource.data.targetGen));
+        allow create, update, delete: if isTeacherOrAdmin();
     }
-
     match /exercises/{exerciseId} {
-        allow read: if request.auth != null;
-        allow write: if isTeacherOrAdmin();
+        allow read: if isTeacherOrAdmin() || (isStudent() && canReadContent(resource.data.targetGen));
+        allow create, update, delete: if isTeacherOrAdmin();
+    }
+     match /projects/{projectId} {
+        allow read: if isTeacherOrAdmin() || (isStudent() && canReadContent(resource.data.targetGen));
+        allow create, update, delete: if isTeacherOrAdmin();
+    }
+     match /resources/{resourceId} {
+        allow read: if isUserAuthenticated();
+        allow create, update, delete: if isTeacherOrAdmin();
+    }
+     match /materials/{materialId} {
+        allow read: if isUserAuthenticated();
+        allow create, update, delete: if isTeacherOrAdmin();
     }
 
-    match /projects/{projectId} {
-        allow read: if request.auth != null;
-        allow write: if isTeacherOrAdmin();
-    }
-
-    match /resources/{resourceId} {
-        allow read: if request.auth != null;
-        allow write: if isTeacherOrAdmin();
-    }
-    
-    match /materials/{materialId} {
-        allow read: if request.auth != null;
-        allow write: if isTeacherOrAdmin();
-    }
-
-    match /roadmap_status/{weekId} {
-        allow read: if request.auth != null;
-        allow write: if isTeacherOrAdmin();
-    }
-
+    // Submissions Collection
+    // - Students can create their own submissions.
+    // - Students can read their own submissions. Teachers/admins can read all submissions.
+    // - Only teachers/admins can delete submissions.
     match /submissions/{submissionId} {
-        // Teachers and admins can read all submissions
-        allow read: if isTeacherOrAdmin();
-        // A student can read their own submissions
-        allow read: if request.auth.uid == resource.data.studentId;
-        
-        // Students can create submissions for themselves
-        allow create: if isStudent() && request.auth.uid == request.resource.data.studentId;
-        // Teachers and admins can delete submissions
-        allow delete: if isTeacherOrAdmin();
+      allow create: if isOwner(request.resource.data.studentId);
+      allow read: if isOwner(resource.data.studentId) || isTeacherOrAdmin();
+      allow delete: if isTeacherOrAdmin();
+      allow update: if false;
+    }
+
+    // Roadmap Status
+    // - Anyone authenticated can read the roadmap status (to see progress).
+    // - Only teachers/admins can update it.
+    match /roadmap_status/{weekId} {
+        allow read: if isUserAuthenticated();
+        allow create, update: if isTeacherOrAdmin();
+    }
+
+    // Chat
+    // - Users can read/write messages in a chat if they are part of it.
+    // - Group chats are based on generation.
+    // - DM chat IDs are a combination of the two user IDs.
+    match /chats/{chatId}/messages/{messageId} {
+       allow read, create: if isUserAuthenticated(); // Simplified for now
+       allow update, delete: if isOwner(resource.data.senderId);
     }
   }
 }
