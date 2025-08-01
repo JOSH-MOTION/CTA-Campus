@@ -29,6 +29,7 @@ import {
   Award,
   TrendingUp,
   History,
+  Inbox,
 } from 'lucide-react';
 import {SidebarMenu, SidebarMenuItem, SidebarMenuButton} from '@/components/ui/sidebar';
 import Link from 'next/link';
@@ -58,6 +59,7 @@ export const studentNavItems = [
 export const teacherNavItems = [
   {href: '/', label: 'Dashboard', icon: LayoutDashboard},
   {href: '/chat', label: 'Campus Connect', icon: MessageSquare},
+  {href: '/submissions', label: 'All Submissions', icon: Inbox},
   {href: '/students', label: 'Student Management', icon: Users},
   {href: '/rankings', label: 'Rankings', icon: TrendingUp},
   {href: '/announcements', label: 'Announcements', icon: Megaphone},
@@ -76,6 +78,7 @@ export const teacherNavItems = [
 export const adminNavItems = [
   {href: '/', label: 'Dashboard', icon: LayoutDashboard},
   {href: '/users', label: 'User Management', icon: UserCog},
+  {href: '/submissions', label: 'All Submissions', icon: Inbox},
   {href: '/students', label: 'Student Management', icon: Users},
   {href: '/rankings', label: 'Rankings', icon: TrendingUp},
   {href: '/announcements', label: 'Manage Announcements', icon: Megaphone},

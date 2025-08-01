@@ -113,32 +113,19 @@ import {
   };
 
   /**
-   * Fetches all submissions across all assignments in real-time.
-   * @param callback - The function to call with the new array of submissions.
-   * @returns An unsubscribe function to stop the listener.
+   * Fetches all submissions across all assignments once.
+   * @returns A promise that resolves to an array of all submissions.
    */
-  export const onAllSubmissions = (callback: (submissions: Submission[]) => void) => {
-    const submissionsCol = collection(db, 'submissions');
-    const q = query(submissionsCol, orderBy('submittedAt', 'desc'));
-
-    const unsubscribe = onSnapshot(
-      q,
-      (querySnapshot) => {
-        const submissions: Submission[] = querySnapshot.docs.map((doc) => {
-          const data = doc.data() as DocumentData;
-          return {
-            id: doc.id,
-            ...data,
-          } as Submission;
-        });
-        callback(submissions);
-      },
-      (error) => {
-        console.error('Error listening to all submissions:', error);
-      }
-    );
-
-    return unsubscribe;
+  export const getAllSubmissions = async (): Promise<Submission[]> => {
+    try {
+      const submissionsCol = collection(db, 'submissions');
+      const q = query(submissionsCol, orderBy('submittedAt', 'desc'));
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Submission));
+    } catch (error) {
+        console.error('Error fetching all submissions:', error);
+        throw new Error("Could not fetch submissions.");
+    }
   };
 
   /**
