@@ -20,7 +20,7 @@ interface StudentRank extends UserData {
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
 export default function RankingsPage() {
-  const { fetchAllUsers } = useAuth();
+  const { fetchAllStudents } = useAuth();
   const [allStudents, setAllStudents] = useState<UserData[]>([]);
   const [studentPoints, setStudentPoints] = useState<{[key: string]: number}>({});
   const [loading, setLoading] = useState(true);
@@ -30,8 +30,7 @@ export default function RankingsPage() {
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      const users = await fetchAllUsers();
-      const students = users.filter(u => u.role === 'student');
+      const students = await fetchAllStudents();
       setAllStudents(students);
       
       const pointsPromises = students.map(student => getPointsForStudent(student.uid));
@@ -46,7 +45,7 @@ export default function RankingsPage() {
       setLoading(false);
     };
     loadData();
-  }, [fetchAllUsers]);
+  }, [fetchAllStudents]);
 
   const availableGens = useMemo(() => {
     const gens = new Set(allStudents.map(student => student.gen).filter(Boolean));

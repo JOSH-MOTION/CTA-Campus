@@ -5,7 +5,7 @@ import {createContext, useContext, useState, ReactNode, useEffect, useCallback, 
 import {auth, db} from '@/lib/firebase';
 import type {User} from 'firebase/auth';
 import {onAuthStateChanged}from 'firebase/auth';
-import {doc, getDoc, setDoc, collection, getDocs} from 'firebase/firestore';
+import {doc, getDoc, setDoc, collection, getDocs, query, where} from 'firebase/firestore';
 
 export type UserRole = 'student' | 'teacher' | 'admin';
 
@@ -37,6 +37,7 @@ interface AuthContextType {
   loading: boolean;
   setRole: (role: UserRole) => void;
   fetchAllUsers: () => Promise<UserData[]>;
+  fetchAllStudents: () => Promise<UserData[]>;
   allUsers: UserData[];
 }
 
@@ -48,6 +49,7 @@ const AuthContext = createContext<AuthContextType>({
     loading: true,
     setRole: () => {},
     fetchAllUsers: async () => [],
+    fetchAllStudents: async () => [],
     allUsers: [],
 });
 
@@ -67,6 +69,19 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
         return usersList;
     } catch(e) {
         console.error("Error fetching all users:", e);
+        return [];
+    }
+  }, []);
+
+  const fetchAllStudents = useCallback(async (): Promise<UserData[]> => {
+    try {
+        const usersCollection = collection(db, 'users');
+        const q = query(usersCollection, where('role', '==', 'student'));
+        const usersSnapshot = await getDocs(q);
+        const usersList = usersSnapshot.docs.map(doc => doc.data() as UserData);
+        return usersList;
+    } catch(e) {
+        console.error("Error fetching all students:", e);
         return [];
     }
   }, []);
@@ -117,7 +132,7 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
   };
 
   return (
-    <AuthContext.Provider value={{user, userData, setUserData, role, loading, setRole: handleSetRole, fetchAllUsers, allUsers}}>
+    <AuthContext.Provider value={{user, userData, setUserData, role, loading, setRole: handleSetRole, fetchAllUsers, fetchAllStudents, allUsers}}>
       {children}
     </AuthContext.Provider>
   );
