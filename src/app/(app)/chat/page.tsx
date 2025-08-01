@@ -115,24 +115,11 @@ export default function ChatPage() {
           dataAiHint: 'user portrait',
         };
       }
-    } else if (otherUsers.length > 0 && !selectedChat) {
-      // Auto-select the first user only if no chat is selected and no params are in URL
-      const firstUser = otherUsers[0];
-       handleSelectChat({
-            id: firstUser.uid,
-            name: firstUser.displayName,
-            type: 'dm',
-            avatar: firstUser.photoURL,
-            dataAiHint: 'student portrait',
-        });
-        return;
     }
     
-    if (targetEntity) {
-        setSelectedChat(targetEntity);
-    }
+    setSelectedChat(targetEntity);
 
-  }, [loading, currentUser, allUsers, otherUsers, groupChats, searchParams, handleSelectChat, selectedChat]);
+  }, [loading, currentUser, allUsers, groupChats, searchParams]);
   
 
   useEffect(() => {
