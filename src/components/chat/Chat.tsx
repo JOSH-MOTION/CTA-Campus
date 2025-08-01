@@ -24,7 +24,6 @@ import {
 } from '../ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import * as ScrollAreaPrimitive from '@radix-ui/react-scroll-area';
 
 type ChatEntity = { id: string; name: string; avatar?: string; dataAiHint: string; type: 'dm' | 'group' };
 
@@ -46,17 +45,6 @@ export function Chat({ entity, messages, onSendMessage, currentUser, onToggleCon
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
-  const viewportRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    console.log('Chat rendered'); // Debug render
-  }, []);
-
-  useEffect(() => {
-    if (viewportRef.current) {
-      viewportRef.current.scrollTop = viewportRef.current.scrollHeight;
-    }
-  }, [messages]);
 
   useEffect(() => {
     setReplyTo(undefined);
@@ -201,27 +189,23 @@ export function Chat({ entity, messages, onSendMessage, currentUser, onToggleCon
         </header>
 
         <ScrollArea className='flex-1'>
-          <ScrollAreaPrimitive.Viewport ref={viewportRef} className='h-full w-full rounded-[inherit]'>
-            <div className='space-y-6 p-4 md:p-10'>
-              {messages.map((msg, index) => {
-                const prevMessage = messages[index - 1];
-                const showDateSeparator =
-                  msg.timestamp &&
-                  (!prevMessage ||
-                    !prevMessage.timestamp ||
-                    format(prevMessage.timestamp.toDate(), 'yyyy-MM-dd') !==
-                      format(msg.timestamp.toDate(), 'yyyy-MM-dd'));
-                return (
-                  <React.Fragment key={msg.id}>
-                    {showDateSeparator && <DateSeparator date={msg.timestamp.toDate()} />}
-                    <MessageBubble msg={msg} />
-                  </React.Fragment>
-                );
-              })}
-            </div>
-          </ScrollAreaPrimitive.Viewport>
-          <ScrollBar />
-          <ScrollAreaPrimitive.Corner />
+          <div className='space-y-6 p-4 md:p-10'>
+            {messages.map((msg, index) => {
+              const prevMessage = messages[index - 1];
+              const showDateSeparator =
+                msg.timestamp &&
+                (!prevMessage ||
+                  !prevMessage.timestamp ||
+                  format(prevMessage.timestamp.toDate(), 'yyyy-MM-dd') !==
+                    format(msg.timestamp.toDate(), 'yyyy-MM-dd'));
+              return (
+                <React.Fragment key={msg.id}>
+                  {showDateSeparator && <DateSeparator date={msg.timestamp.toDate()} />}
+                  <MessageBubble msg={msg} />
+                </React.Fragment>
+              );
+            })}
+          </div>
         </ScrollArea>
 
         <footer className='shrink-0 border-t border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-950'>
