@@ -129,8 +129,8 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
                 </Avatar>
              )}
             <div className={cn("max-w-[75%]", isSender ? 'flex flex-col items-end' : 'flex flex-col items-start')}>
-                 <div className="flex items-center gap-2 mb-1">
-                     <p className={cn("text-xs", isSender && "text-right")}>{isSender ? "You" : msg.senderName}</p>
+                 <div className={cn("flex items-baseline gap-2 mb-1", isSender && "text-right")}>
+                     <p className="text-xs">{isSender ? "You" : msg.senderName}</p>
                      <p className="text-xs text-gray-500">{messageTime}</p>
                 </div>
                 <div
@@ -168,7 +168,7 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
 
   return (
     <>
-    <div className="flex h-full w-full flex-col bg-gray-100 dark:bg-gray-900">
+    <div className="flex h-full flex-col bg-gray-100 dark:bg-gray-900">
       <header className="flex h-[60px] flex-shrink-0 items-center gap-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-3">
         <Button variant="ghost" size="icon" onClick={onToggleContacts} className="md:hidden">
             <ArrowLeft className="h-5 w-5" />
@@ -203,7 +203,7 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
       <footer className="bg-white dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800 p-4 shrink-0">
         <form onSubmit={handleSubmit} className="relative flex-1">
           <Input
-              value={text}
+              value={text || ''}
               onChange={e => setText(e.target.value)}
               placeholder="Write your message..."
               className="bg-gray-100 dark:bg-gray-800 border-none rounded-lg h-12 focus:ring-0 pr-12 w-full"
