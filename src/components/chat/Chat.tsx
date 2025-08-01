@@ -188,8 +188,8 @@ export function Chat({ entity, messages, onSendMessage, currentUser, onToggleCon
           <h2 className='flex-1 text-lg font-semibold'>{entity.name}</h2>
         </header>
 
-        <ScrollArea className='flex-1'>
-          <div className='space-y-6 p-4 md:p-10'>
+        {/* <ScrollArea className='flex-1'> */}
+          <div className='flex-1 space-y-6 p-4 md:p-10 overflow-y-auto'>
             {messages.map((msg, index) => {
               const prevMessage = messages[index - 1];
               const showDateSeparator =
@@ -206,7 +206,7 @@ export function Chat({ entity, messages, onSendMessage, currentUser, onToggleCon
               );
             })}
           </div>
-        </ScrollArea>
+        {/* </ScrollArea> */}
 
         <footer className='shrink-0 border-t border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-950'>
           <form onSubmit={handleSubmit} className='relative flex-1'>
