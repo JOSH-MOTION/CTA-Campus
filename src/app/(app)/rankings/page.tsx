@@ -68,7 +68,7 @@ export default function RankingsPage() {
       return rankedStudents.map(student => ({
           name: student.displayName,
           value: student.totalPoints,
-      })).slice(0, 15).reverse();
+      }));
   }, [rankedStudents]);
 
 
@@ -111,8 +111,8 @@ export default function RankingsPage() {
       ) : (
         <Card>
             <CardHeader>
-                <CardTitle>Top 15 Performers</CardTitle>
-                <CardDescription>Bar chart showing the top students based on total points. Filter by generation or search by name.</CardDescription>
+                <CardTitle>Student Performance</CardTitle>
+                <CardDescription>Bar chart showing all students based on total points. Filter by generation or search by name.</CardDescription>
             </CardHeader>
             <CardContent>
                 {chartData.length > 0 ? (
@@ -131,6 +131,7 @@ export default function RankingsPage() {
                                     axisLine={false}
                                     tick={{ fontSize: 12 }}
                                     interval={0}
+                                    width={120}
                                 />
                                 <Tooltip
                                     cursor={{ fill: 'hsl(var(--muted))' }}
