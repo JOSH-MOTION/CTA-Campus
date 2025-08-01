@@ -75,7 +75,7 @@ export const hasPointBeenAwarded = async (userId: string, activityId: string): P
  * @param userId - The UID of the user.
  * @returns The total points for the user.
  */
-export const getTotalPointsForUser = async (userId: string): Promise<number> => {
+export const getPointsForStudent = async (userId: string): Promise<number> => {
   const pointsCol = collection(db, 'users', userId, 'points');
   const querySnapshot = await getDocs(pointsCol);
   
@@ -86,31 +86,3 @@ export const getTotalPointsForUser = async (userId: string): Promise<number> => 
 
   return totalPoints;
 };
-
-/**
- * Retrieves total points for all students efficiently using a collectionGroup query.
- * @returns A map of student UID to their total points.
- */
-export const getPointsForAllStudents = async (): Promise<{[key: string]: number}> => {
-    const pointsMap: {[key: string]: number} = {};
-    
-    // Use a collection group query to get all 'points' documents across all users.
-    const pointsQuery = query(collectionGroup(db, 'points'));
-    const querySnapshot = await getDocs(pointsQuery);
-
-    querySnapshot.forEach(doc => {
-        const data = doc.data();
-        // The parent of a document in a subcollection is one level up.
-        // The path is 'users/{userId}/points/{pointId}'
-        const userId = doc.ref.parent.parent?.id; 
-        
-        if (userId) {
-            if (!pointsMap[userId]) {
-                pointsMap[userId] = 0;
-            }
-            pointsMap[userId] += data.points || 0;
-        }
-    });
-
-    return pointsMap;
-}

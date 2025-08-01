@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Cell } from 'recharts';
 import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
-import { getPointsForAllStudents } from '@/services/points';
+import { getPointsForStudent } from '@/services/points';
 
 interface StudentRank extends UserData {
   rank: number;
@@ -34,9 +34,15 @@ export default function RankingsPage() {
       const students = users.filter(u => u.role === 'student');
       setAllStudents(students);
       
-      const points = await getPointsForAllStudents();
-      setStudentPoints(points);
+      const pointsPromises = students.map(student => getPointsForStudent(student.uid));
+      const pointsResults = await Promise.all(pointsPromises);
 
+      const pointsMap: {[key: string]: number} = {};
+      students.forEach((student, index) => {
+        pointsMap[student.uid] = pointsResults[index];
+      });
+
+      setStudentPoints(pointsMap);
       setLoading(false);
     };
     loadData();
