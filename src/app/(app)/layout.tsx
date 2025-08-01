@@ -133,7 +133,7 @@ const MemoizedProtectedLayout = memo(function ProtectedLayout({children}: {child
                           </Button>
                         </div>
                       </header>
-                      <main className={cn('flex-1 overflow-y-auto', !isChatPage && 'p-4 sm:p-6')}>{children}</main>
+                      <main className={cn('flex-1', !isChatPage && 'p-4 sm:p-6 overflow-y-auto')}>{children}</main>
                       <AIAssistant />
                     </SidebarInset>
                   </SidebarProvider>
