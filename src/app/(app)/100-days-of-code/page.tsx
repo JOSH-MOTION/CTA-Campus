@@ -1,7 +1,8 @@
+
 // src/app/(app)/100-days-of-code/page.tsx
 'use client';
 
-import {useState} from 'react';
+import {useState, useEffect} from 'react';
 import {Button} from '@/components/ui/button';
 import {Calendar} from '@/components/ui/calendar';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
@@ -10,7 +11,7 @@ import {Label} from '@/components/ui/label';
 import {Link, Loader2} from 'lucide-react';
 import {useAuth} from '@/contexts/AuthContext';
 import {useToast} from '@/hooks/use-toast';
-import {addSubmission} from '@/services/submissions';
+import {addSubmission, onSubmissions} from '@/services/submissions';
 
 const HUNDRED_DAYS_OF_CODE_ASSIGNMENT_ID = '100-days-of-code';
 
@@ -18,8 +19,22 @@ export default function OneHundredDaysOfCodePage() {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [link, setLink] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submittedDates, setSubmittedDates] = useState<Date[]>([]);
   const {user, userData} = useAuth();
   const {toast} = useToast();
+
+  useEffect(() => {
+    if (!user) return;
+    const unsubscribe = onSubmissions(HUNDRED_DAYS_OF_CODE_ASSIGNMENT_ID, submissions => {
+        const userSubmissions = submissions.filter(s => s.studentId === user.uid);
+        const dates = userSubmissions.map(s => {
+            const datePart = s.assignmentTitle.replace('100 Days of Code - ', '');
+            return new Date(datePart);
+        });
+        setSubmittedDates(dates);
+    });
+    return () => unsubscribe();
+  }, [user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,6 +117,10 @@ export default function OneHundredDaysOfCodePage() {
             selected={date}
             onSelect={setDate}
             className="rounded-md border p-3"
+            modifiers={{ submitted: submittedDates }}
+            modifiersClassNames={{
+                submitted: 'bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200',
+            }}
             classNames={{
                 caption_label: 'text-lg font-medium',
                 head_cell: 'w-12 font-medium text-muted-foreground',
