@@ -149,10 +149,8 @@ export const Chat = React.memo(function Chat({
   const viewportRef = useRef<HTMLDivElement>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   
-  // Pinned message state
   const [pinnedMessage, setPinnedMessage] = useState<Message | null>(null);
 
-  // Mention state
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [showMentionPopover, setShowMentionPopover] = useState(false);
 
@@ -161,7 +159,6 @@ export const Chat = React.memo(function Chat({
       const otherUser = allUsers.find(u => u.uid === entity.id);
       return otherUser ? [otherUser] : [];
     }
-    // For group chats, mention anyone
     return allUsers.filter(u => u.uid !== currentUser?.uid);
   }, [entity, allUsers, currentUser]);
 
@@ -171,12 +168,9 @@ export const Chat = React.memo(function Chat({
       u.displayName.toLowerCase().includes(mentionQuery.toLowerCase())
     );
   }, [mentionQuery, availableMentionUsers]);
-
-  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newText = e.target.value;
-    setText(newText);
-    
-    const mentionMatch = newText.match(/@(\w*)$/);
+  
+  const checkMentionState = (currentText: string) => {
+    const mentionMatch = currentText.match(/@(\w*)$/);
     if (mentionMatch) {
       setMentionQuery(mentionMatch[1]);
       setShowMentionPopover(true);
@@ -185,6 +179,16 @@ export const Chat = React.memo(function Chat({
       setMentionQuery(null);
     }
   };
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newText = e.target.value;
+    setText(newText);
+    checkMentionState(newText);
+  };
+  
+  const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    checkMentionState(e.target.value);
+  }
 
   const handleSelectMention = (user: UserData) => {
     const newText = text.replace(/@\w*$/, `@${user.displayName} `);
@@ -222,14 +226,12 @@ export const Chat = React.memo(function Chat({
   };
 
   useEffect(() => {
-    // Find the last pinned message from the list
     const lastPinned = messages.filter(m => m.isPinned).sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis())[0];
     setPinnedMessage(lastPinned || null);
     
     if (!viewportRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = viewportRef.current;
     
-    // Auto-scroll only if user is near the bottom
     if (scrollHeight - scrollTop < clientHeight + 200) {
         scrollToBottom();
     }
@@ -238,20 +240,17 @@ export const Chat = React.memo(function Chat({
   const handleScroll = () => {
     if (viewportRef.current) {
         const { scrollTop, scrollHeight, clientHeight } = viewportRef.current;
-        // Show button if user has scrolled up more than a certain amount
         const isScrolledUp = scrollHeight - scrollTop > clientHeight + 100;
         setShowScrollToBottom(isScrolledUp);
     }
   };
   
-
   const handleEditClick = (message: Message) => {
     setEditingMessageId(message.id);
     setEditingText(message.text);
   };
   
   const messageList = useMemo(() => {
-    // Filter out the pinned message from the main list if it exists
     const regularMessages = pinnedMessage 
         ? messages.filter(m => m.id !== pinnedMessage.id) 
         : messages;
@@ -396,6 +395,7 @@ export const Chat = React.memo(function Chat({
                     <Input
                     value={text || ''}
                     onChange={handleTextChange}
+                    onFocus={handleInputFocus}
                     placeholder='Write your message...'
                     className='h-12 w-full rounded-lg border-none bg-gray-100 pr-12 focus:ring-0 dark:bg-gray-800'
                     disabled={editingMessageId !== null}
