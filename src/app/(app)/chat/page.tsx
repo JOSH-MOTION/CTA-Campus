@@ -235,7 +235,7 @@ export default function ChatPage() {
   const ContactList = () => (
     <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-950">
         <SheetHeader className="p-4 border-b border-gray-200 dark:border-gray-800 shrink-0">
-            <SheetTitle>Contacts</SheetTitle>
+            <SheetTitle>Contact list</SheetTitle>
         </SheetHeader>
         <div className="p-3 shrink-0">
           <div className="relative">
@@ -245,7 +245,6 @@ export default function ChatPage() {
         </div>
         <ScrollArea className="flex-1">
             <div className="flex flex-col">
-                <p className="font-semibold text-sm px-3 pt-2 pb-1 text-gray-500">Contact list</p>
                 {loading ? (
                     <div className="flex justify-center items-center p-4"> <Loader2 className="h-6 w-6 animate-spin text-gray-400" /> </div>
                 ) : (
@@ -306,7 +305,7 @@ export default function ChatPage() {
   );
 
   return (
-    <div className="h-screen w-full overflow-hidden">
+    <div className="h-full w-full overflow-hidden">
         <Sheet open={isContactListOpen} onOpenChange={setIsContactListOpen}>
             <SheetContent side="left" className="p-0 w-[350px]">
                 <ContactList />

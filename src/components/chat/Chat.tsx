@@ -130,7 +130,7 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
                     <AvatarFallback>{msg.senderName.charAt(0)}</AvatarFallback>
                 </Avatar>
              )}
-            <div className="flex-grow max-w-[75%]">
+            <div className={cn("max-w-[75%]", isSender ? 'flex flex-col items-end' : 'flex flex-col items-start')}>
                 <div className="flex items-center gap-2 mb-1">
                      <p className="text-sm font-semibold">{isSender ? "You" : msg.senderName}</p>
                      <p className="text-xs text-gray-500">{messageTime}</p>
@@ -138,7 +138,7 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
                 <div
                     className={cn(
                       'rounded-lg p-3 text-sm shadow-sm relative w-fit',
-                      isSender ? 'bg-gray-200 dark:bg-gray-700 ml-auto' : 'bg-white dark:bg-gray-800'
+                      isSender ? 'bg-gray-200 dark:bg-gray-700' : 'bg-white dark:bg-gray-800'
                     )}
                 >
                   <p className="whitespace-pre-wrap">{msg.text}</p>
@@ -169,7 +169,7 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
 
   return (
     <>
-    <div className="flex h-screen max-h-screen w-full flex-col bg-gray-100 dark:bg-gray-900">
+    <div className="flex h-full w-full flex-col bg-gray-100 dark:bg-gray-900">
       <header className="flex h-[60px] flex-shrink-0 items-center gap-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-3">
         <Button variant="ghost" size="icon" onClick={() => router.back()} className="md:hidden">
             <ArrowLeft className="h-5 w-5" />
