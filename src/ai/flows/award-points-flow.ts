@@ -12,6 +12,7 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { v4 as uuidv4 } from 'uuid';
 
 const AwardPointsFlowInputSchema = z.object({
     studentId: z.string().describe("The UID of the student to award points to."),
@@ -19,6 +20,7 @@ const AwardPointsFlowInputSchema = z.object({
     reason: z.string().describe("A short description of why the points are being awarded."),
     activityId: z.string().describe("A unique ID for the specific activity."),
     action: z.enum(['award', 'revoke']).describe("Whether to award or revoke the points."),
+    date: z.string().optional().describe("An optional date string (YYYY-MM-DD) for time-based activities."),
 });
 export type AwardPointsFlowInput = z.infer<typeof AwardPointsFlowInputSchema>;
 
@@ -30,8 +32,19 @@ export type AwardPointsFlowOutput = z.infer<typeof AwardPointsFlowOutputSchema>;
 
 
 export async function awardPointsFlow(input: AwardPointsFlowInput): Promise<AwardPointsFlowOutput> {
-  const { studentId, points, reason, activityId, action } = input;
-  const pointDocRef = doc(db, 'users', studentId, 'points', activityId);
+  const { studentId, points, reason, activityId, action, date } = input;
+  
+  let finalActivityId = activityId;
+  // For date-specific activities, create a unique ID based on the date
+  // to allow multiple historical entries. For others, use a UUID to ensure it's a one-time award.
+  if (date && (reason === 'Class Attendance' || reason === '100 Days of Code')) {
+      finalActivityId = `historical-${reason.toLowerCase().replace(/\s+/g, '-')}-${date}`;
+  } else if (!activityId.startsWith('graded-')) {
+      finalActivityId = `manual-${reason.toLowerCase().replace(/\s+/g, '-')}-${uuidv4()}`;
+  }
+
+
+  const pointDocRef = doc(db, 'users', studentId, 'points', finalActivityId);
 
   try {
     if (action === 'award') {
@@ -43,13 +56,15 @@ export async function awardPointsFlow(input: AwardPointsFlowInput): Promise<Awar
       await setDoc(pointDocRef, {
         points,
         reason,
-        activityId,
+        activityId: finalActivityId,
         awardedAt: serverTimestamp(),
       });
 
       return { success: true, message: "Points awarded successfully." };
     } else { // action === 'revoke'
-        await deleteDoc(pointDocRef);
+        // For revoke, we need the exact ID, which should be passed in `activityId`
+        const pointToRevokeRef = doc(db, 'users', studentId, 'points', activityId);
+        await deleteDoc(pointToRevokeRef);
         return { success: true, message: "Points revoked successfully." };
     }
   } catch (error: any) {

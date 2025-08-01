@@ -10,33 +10,35 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Loader2, ChevronsUpDown, Check } from 'lucide-react';
+import { PlusCircle, Loader2, ChevronsUpDown, Check, CalendarIcon } from 'lucide-react';
 import { useAuth, UserData } from '@/contexts/AuthContext';
-import { v4 as uuidv4 } from 'uuid';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { awardPointsFlow } from '@/ai/flows/award-points-flow';
+import { Calendar } from '@/components/ui/calendar';
+import { format } from 'date-fns';
 
 const gradingData = [
-    { title: "Class Attendance" },
-    { title: "Class Assignments" },
-    { title: "Class Exercises" },
-    { title: "Weekly Projects" },
-    { title: "Monthly Personal Projects" },
-    { title: "Soft Skills & Product Training" },
-    { title: "Mini Demo Days" },
-    { title: "100 Days of Code" },
-    { title: "Code Review" },
-    { title: "Final Project Completion" },
+    { title: "Class Attendance", points: 1 },
+    { title: "Class Assignments", points: 1 },
+    { title: "Class Exercises", points: 1 },
+    { title: "Weekly Projects", points: 1 },
+    { title: "Monthly Personal Projects", points: 1 },
+    { title: "Soft Skills & Product Training", points: 1 },
+    { title: "Mini Demo Days", points: 5 },
+    { title: "100 Days of Code", points: 0.5 },
+    { title: "Code Review", points: 1 },
+    { title: "Final Project Completion", points: 10 },
 ];
 
 const tempUpdateSchema = z.object({
   studentId: z.string().nonempty('Please select a student.'),
   activityTitle: z.string().nonempty('Please select an activity.'),
   points: z.coerce.number().min(0.1, 'Please enter a valid point value.'),
+  date: z.date({ required_error: 'Please select a date for the activity.' }),
 });
 
 type TempUpdateFormValues = z.infer<typeof tempUpdateSchema>;
@@ -66,20 +68,28 @@ export default function TempUpdatePage() {
       studentId: '',
       activityTitle: '',
       points: 1,
+      date: new Date(),
     },
   });
+
+  const selectedActivity = form.watch('activityTitle');
+  useEffect(() => {
+      const activity = gradingData.find(g => g.title === selectedActivity);
+      if (activity) {
+          form.setValue('points', activity.points);
+      }
+  }, [selectedActivity, form]);
 
   const onSubmit = async (data: TempUpdateFormValues) => {
     setIsSubmitting(true);
     try {
-      const activityId = `manual-${data.activityTitle.toLowerCase().replace(/\s+/g, '-')}-${uuidv4()}`;
-      
       const result = await awardPointsFlow({
           studentId: data.studentId,
           points: data.points,
           reason: data.activityTitle,
-          activityId: activityId,
-          action: 'award'
+          activityId: data.activityTitle, // The flow will make this unique
+          action: 'award',
+          date: data.date.toISOString().split('T')[0] // Pass date to flow
       });
       
       if (!result.success) {
@@ -91,12 +101,17 @@ export default function TempUpdatePage() {
         title: 'Points Awarded!',
         description: `${data.points} points awarded to ${selectedStudent?.displayName} for "${data.activityTitle}".`,
       });
-      form.reset();
+      form.reset({
+        studentId: '',
+        activityTitle: '',
+        points: 1,
+        date: new Date(),
+      });
     } catch (error: any) {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: error.message === 'duplicate' ? 'This Activity ID has already been used for this student.' : 'Could not award points.',
+        description: error.message === 'duplicate' ? 'This activity has already been recorded for this student on this date.' : 'Could not award points.',
       });
     } finally {
       setIsSubmitting(false);
@@ -106,14 +121,14 @@ export default function TempUpdatePage() {
   return (
     <div className="space-y-6">
        <div className="space-y-1">
-        <h1 className="text-3xl font-bold tracking-tight">Manual Point Entry</h1>
-        <p className="text-muted-foreground">Manually award points to students for historical data or special cases.</p>
+        <h1 className="text-3xl font-bold tracking-tight">Historical Data Entry</h1>
+        <p className="text-muted-foreground">Manually award points to students for past activities or special cases.</p>
       </div>
 
       <Card className="max-w-2xl mx-auto">
         <CardHeader>
           <CardTitle>Award Points</CardTitle>
-          <CardDescription>Select a student, activity, and enter the points to award.</CardDescription>
+          <CardDescription>Select a student, activity, date, and points to award.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -228,6 +243,43 @@ export default function TempUpdatePage() {
                     )}
                 />
               </div>
+
+               <FormField
+                  control={form.control}
+                  name="date"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Date of Activity</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant={'outline'}
+                              className={cn(
+                                'w-full pl-3 text-left font-normal',
+                                !field.value && 'text-muted-foreground'
+                              )}
+                            >
+                              {field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
 
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <PlusCircle className="mr-2 h-4 w-4" />}
