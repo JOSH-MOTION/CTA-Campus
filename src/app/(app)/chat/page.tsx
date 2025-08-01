@@ -6,8 +6,7 @@ import {useSearchParams, useRouter} from 'next/navigation';
 import {Avatar, AvatarFallback, AvatarImage} from '@/components/ui/avatar';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
-import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs';
-import {Search, Send, User, Users, Loader2, Check, Verified, CheckCheck} from 'lucide-react';
+import {Search, Plus, MoreHorizontal} from 'lucide-react';
 import {Chat} from '@/components/chat/Chat';
 import {useAuth, UserData} from '@/contexts/AuthContext';
 import {Message, getChatId, sendMessage, onMessages} from '@/services/chat';
@@ -17,6 +16,8 @@ import {Badge} from '@/components/ui/badge';
 import { useNotifications } from '@/contexts/NotificationsContext';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { format, isToday, isYesterday } from 'date-fns';
+import { cn } from '@/lib/utils';
+import { Loader2 } from 'lucide-react';
 
 type ChatEntityType = 'dm' | 'group';
 type ChatEntity = {id: string; name: string; type: ChatEntityType; avatar?: string; dataAiHint: string, lastMessage?: string, lastMessageTimestamp?: Date, unreadCount?: number};
@@ -33,7 +34,6 @@ export default function ChatPage() {
   
   const [selectedChat, setSelectedChat] = useState<ChatEntity | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [activeTab, setActiveTab] = useState<'dms' | 'groups'>('dms');
   const messageUnsubscribeRef = useRef<Unsubscribe | null>(null);
 
   useEffect(() => {
@@ -110,7 +110,6 @@ export default function ChatPage() {
         const groupToSelect = groupChats.find(g => g.id === `group-${groupChatId}`);
         if (groupToSelect && (!selectedChat || selectedChat.id !== groupToSelect.id)) {
           setSelectedChat({...groupToSelect, type: 'group'});
-          setActiveTab('groups');
         }
       } else if (directMessageUserId) {
         const userToDm = allUsers.find(u => u.uid === directMessageUserId);
@@ -122,8 +121,16 @@ export default function ChatPage() {
               avatar: userToDm.photoURL,
               dataAiHint: 'user portrait',
             });
-          setActiveTab('dms');
         }
+      } else if (otherUsers.length > 0) {
+        const firstUser = otherUsers[0];
+         handleSelectChat({
+            id: firstUser.uid,
+            name: firstUser.displayName,
+            type: 'dm',
+            avatar: firstUser.photoURL,
+            dataAiHint: 'student portrait',
+         })
       }
   }, [loading, allUsers, groupChats, currentUser, searchParams, selectedChat, handleSelectChat]);
   
@@ -149,12 +156,6 @@ export default function ChatPage() {
         setMessages(newMessages);
       });
       messageUnsubscribeRef.current = unsubscribe;
-
-      if(selectedChat.type === 'group') {
-        setActiveTab('groups')
-      } else {
-        setActiveTab('dms')
-      }
 
       return () => {
         if (messageUnsubscribeRef.current) {
@@ -215,19 +216,12 @@ export default function ChatPage() {
         }
       };
   
-  const handleTabChange = (value: string) => {
-      const newTab = value as 'dms' | 'groups';
-      setActiveTab(newTab);
-  }
-
   const formatTimestamp = (date?: Date) => {
     if (!date) return '';
-    if (isToday(date)) return format(date, 'p');
-    if (isYesterday(date)) return 'Yesterday';
-    return format(date, 'dd/MM/yyyy');
+    return format(date, 'HH:mm');
   };
   
-  const chatList: ChatEntity[] = useMemo(() => {
+  const chatList = useMemo(() => {
      const dms = otherUsers.map(user => ({
         id: user.uid,
         name: user.displayName,
@@ -235,105 +229,93 @@ export default function ChatPage() {
         avatar: user.photoURL,
         dataAiHint: 'student portrait'
      }));
-     const grps = groupChats.map(g => ({...g, type: 'group' as ChatEntityType}));
+     const grps = groupChats.map(g => ({...g, type: 'group' as ChatEntityType, avatar: `https://placehold.co/100x100.png?text=${g.name.charAt(0)}`}));
      return [...dms, ...grps];
   }, [otherUsers, groupChats]);
 
   return (
-    <div className="grid h-screen grid-cols-1 md:grid-cols-3 xl:grid-cols-4 bg-[#0b141a]">
-      <div className="flex flex-col border-r border-white/10 bg-[#111b21] md:col-span-1 xl:col-span-1">
-        <header className="flex h-[60px] items-center justify-between bg-[#202c33] px-4">
-            <h1 className="text-xl font-medium text-gray-200">Chats</h1>
+    <div className="grid h-screen grid-cols-1 md:grid-cols-[350px_1fr] bg-white dark:bg-gray-900">
+      <div className="flex flex-col border-r border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950">
+        <header className="flex h-[60px] items-center justify-between border-b border-gray-200 dark:border-gray-800 px-4">
+            <h1 className="text-xl font-bold">Chats</h1>
         </header>
 
         <div className="p-3">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-            <Input placeholder="Search or start new chat" className="bg-[#202c33] border-none text-gray-200 pl-12 rounded-lg focus:ring-0" />
+            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500 dark:text-gray-400" />
+            <Input placeholder="Search" className="bg-gray-100 dark:bg-gray-800 border-none pl-10 rounded-lg" />
           </div>
         </div>
-        <Tabs
-          value={activeTab}
-          onValueChange={handleTabChange}
-          className="flex flex-1 flex-col overflow-hidden"
-        >
-          <div className="flex-1 overflow-y-auto">
-            <ScrollArea className="h-full">
-                <TabsContent value="dms" className="m-0">
-                {loading ? (
-                    <div className="flex justify-center items-center p-4"> <Loader2 className="h-6 w-6 animate-spin text-gray-400" /> </div>
-                ) : (
-                    <div className="flex flex-col">
-                    {otherUsers.map(user => {
-                        return (
-                             <button
-                                key={user.uid}
-                                className={`w-full text-left p-3 hover:bg-[#202c33] transition-colors flex items-center gap-4 ${selectedChat?.id === user.uid ? 'bg-[#202c33]' : ''}`}
-                                onClick={() => handleSelectChat({id: user.uid, name: user.displayName, type: 'dm', avatar: user.photoURL, dataAiHint: 'student portrait'})}
-                            >
-                                <Avatar className="h-12 w-12">
-                                    <AvatarImage src={user.photoURL} alt={user.displayName} />
-                                    <AvatarFallback>{user.displayName.charAt(0)}</AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1 border-t border-white/10 pt-3">
-                                    <div className="flex justify-between">
-                                        <p className="font-semibold text-gray-100">{user.displayName}</p>
-                                        <p className="text-xs text-gray-400">{formatTimestamp(new Date())}</p>
-                                    </div>
-                                    <div className="flex items-center justify-between text-sm text-gray-400 mt-1">
-                                        <div className="flex items-center gap-1">
-                                           <CheckCheck className="h-4 w-4 text-sky-400" />
-                                            <p className="truncate">This is the last message</p>
-                                        </div>
-                                        <Badge className="bg-[#25d366] text-white rounded-full h-5 w-5 p-0 flex items-center justify-center">2</Badge>
-                                    </div>
+
+        <div className="flex items-center justify-between px-4 py-2">
+            <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400">Last chats</h2>
+            <div>
+                <Button variant="ghost" size="icon"><Plus className="h-5 w-5"/></Button>
+                <Button variant="ghost" size="icon"><MoreHorizontal className="h-5 w-5"/></Button>
+            </div>
+        </div>
+
+        <ScrollArea className="flex-1 overflow-y-auto">
+            {loading ? (
+                <div className="flex justify-center items-center p-4"> <Loader2 className="h-6 w-6 animate-spin text-gray-400" /> </div>
+            ) : (
+                <div className="flex flex-col">
+                {(otherUsers.length > 0 || groupChats.length > 0) ? (
+                    <>
+                    {otherUsers.map(user => (
+                        <button
+                            key={user.uid}
+                            className={cn(
+                                "w-full text-left p-3 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors flex items-center gap-3",
+                                selectedChat?.id === user.uid && "bg-primary/10 dark:bg-primary/20"
+                            )}
+                            onClick={() => handleSelectChat({id: user.uid, name: user.displayName, type: 'dm', avatar: user.photoURL, dataAiHint: 'student portrait'})}
+                        >
+                            <Avatar className="h-12 w-12">
+                                <AvatarImage src={user.photoURL} alt={user.displayName} />
+                                <AvatarFallback>{user.displayName.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1">
+                                <div className="flex justify-between">
+                                    <p className="font-semibold text-sm">{user.displayName}</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">{formatTimestamp(new Date())}</p>
                                 </div>
-                            </button>
-                        )
-                    })}
-                    </div>
-                )}
-                </TabsContent>
-                <TabsContent value="groups" className="m-0">
-                {loading ? (
-                    <div className="flex justify-center items-center p-4"><Loader2 className="h-6 w-6 animate-spin text-gray-400" /></div>
-                ) : (
-                     <div className="flex flex-col">
-                    {groupChats.map(group => {
-                        return (
-                             <button
-                                key={group.id}
-                                className={`w-full text-left p-3 hover:bg-[#202c33] transition-colors flex items-center gap-4 ${selectedChat?.id === group.id ? 'bg-[#202c33]' : ''}`}
-                                onClick={() => handleSelectChat({...group, type: 'group'})}
-                            >
-                                <Avatar className="h-12 w-12">
-                                    <AvatarFallback>{group.name.charAt(0)}</AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1 border-t border-white/10 pt-3">
-                                    <div className="flex justify-between">
-                                        <p className="font-semibold text-gray-100">{group.name}</p>
-                                        <p className="text-xs text-gray-400">{formatTimestamp(new Date())}</p>
-                                    </div>
-                                    <div className="flex items-center justify-between text-sm text-gray-400 mt-1">
-                                       <div className="flex items-center gap-1">
-                                            <CheckCheck className="h-4 w-4 text-sky-400" />
-                                            <p className="truncate">This is the last message for the group</p>
-                                        </div>
-                                        <Badge className="bg-[#25d366] text-white rounded-full h-5 w-5 p-0 flex items-center justify-center">5</Badge>
-                                    </div>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 truncate">I will send the document s...</p>
+                            </div>
+                        </button>
+                    ))}
+                    {groupChats.map(group => (
+                         <button
+                            key={group.id}
+                            className={cn(
+                                "w-full text-left p-3 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors flex items-center gap-3",
+                                selectedChat?.id === group.id && "bg-primary/10 dark:bg-primary/20"
+                            )}
+                            onClick={() => handleSelectChat({...group, type: 'group'})}
+                        >
+                            <Avatar className="h-12 w-12">
+                                <AvatarImage src={`https://placehold.co/100x100.png?text=${group.name.charAt(0)}`} alt={group.name} />
+                                <AvatarFallback>{group.name.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1">
+                                <div className="flex justify-between">
+                                    <p className="font-semibold text-sm">{group.name}</p>
+                                     <p className="text-xs text-gray-500 dark:text-gray-400">{formatTimestamp(new Date())}</p>
                                 </div>
-                            </button>
-                        )
-                    })}
-                    </div>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 truncate">typing...</p>
+                            </div>
+                        </button>
+                    ))}
+                    </>
+                ) : (
+                    <div className="text-center text-gray-500 p-4">No chats available.</div>
                 )}
-                </TabsContent>
-            </ScrollArea>
-          </div>
-        </Tabs>
+                </div>
+            )}
+        </ScrollArea>
       </div>
 
-      <div className="flex flex-col md:col-span-2 xl:col-span-3 h-screen">
+      <div className="flex flex-col h-screen">
         {selectedChat ? (
           <Chat
             key={selectedChat.id}
@@ -343,9 +325,9 @@ export default function ChatPage() {
             currentUser={currentUser}
           />
         ) : (
-          <div className="flex h-full items-center justify-center bg-[#0b141a]">
-            <div className="text-center text-gray-400">
-                <h2 className="text-3xl text-gray-200">Campus Compass Chat</h2>
+          <div className="flex h-full items-center justify-center bg-gray-100 dark:bg-gray-900">
+            <div className="text-center text-gray-500">
+                <h2 className="text-2xl font-semibold">Campus Compass Chat</h2>
                 <p>Select a chat to start messaging</p>
             </div>
           </div>

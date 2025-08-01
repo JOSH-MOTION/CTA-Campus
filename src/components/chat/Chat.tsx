@@ -1,7 +1,7 @@
 // src/components/chat/Chat.tsx
 'use client';
 
-import {useState, useRef, useEffect} from 'react';
+import React, {useState, useRef, useEffect} from 'react';
 import {Avatar, AvatarFallback, AvatarImage} from '@/components/ui/avatar';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
@@ -11,9 +11,10 @@ import {cn} from '@/lib/utils';
 import type {Message} from '@/services/chat';
 import {deleteMessage, updateMessage, getChatId} from '@/services/chat';
 import type {User} from 'firebase/auth';
-import {format} from 'date-fns';
+import {format, isToday, isYesterday} from 'date-fns';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 type ChatEntity = {id: string; name: string; avatar?: string; dataAiHint: string; type: 'dm' | 'group'};
 
@@ -117,61 +118,29 @@ export function Chat({entity, messages, onSendMessage, currentUser}: ChatProps) 
 
   const MessageBubble = ({msg}: {msg: Message}) => {
     const isSender = msg.senderId === currentUser?.uid;
-    const isEdited = msg.edited;
-    const messageTime = msg.timestamp ? format(msg.timestamp.toDate(), 'p') : '';
-    const readStatus = msg.read ? <CheckCheck className="h-4 w-4 text-sky-400" /> : <Check className="h-4 w-4" />;
+    const messageTime = msg.timestamp ? format(msg.timestamp.toDate(), 'HH:mm') : '';
 
     return (
-        <div className={cn("flex items-end gap-3 group w-full", isSender ? 'justify-end' : 'justify-start')}>
-            <div
-                className={cn(
-                  'max-w-[65%] rounded-lg p-2 text-sm shadow-sm relative text-white',
-                  isSender ? 'bg-[#005c4b]' : 'bg-[#202c33]'
-                )}
-              >
-              {isSender && (
-                  <div className="absolute top-0 -right-[8px] h-0 w-0 border-x-[8px] border-x-transparent border-t-[8px] border-t-[#005c4b]" />
-              )}
-               {!isSender && (
-                  <div className="absolute top-0 -left-[8px] h-0 w-0 border-x-[8px] border-x-transparent border-t-[8px] border-t-[#202c33]" />
-              )}
-
-              {!isSender && entity.type === 'group' && (
-                <p className="font-semibold text-xs text-primary mb-1">{msg.senderName}</p>
-              )}
-
-              {msg.replyTo && (
-                  <div className="mb-2 rounded-md bg-black/20 p-2 border-l-2 border-primary">
-                      <p className="font-bold text-xs">{msg.replyTo.senderName}</p>
-                      <p className="text-xs truncate opacity-80">{msg.replyTo.text}</p>
-                  </div>
-              )}
-              
-              {editingMessageId === msg.id ? (
-                  <div className="space-y-2 mt-2">
-                      <Input 
-                          value={editingText}
-                          onChange={(e) => setEditingText(e.target.value)}
-                          className="bg-white/10 text-white h-9"
-                          onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSaveEdit()}
-                      />
-                      <div className="flex gap-2 justify-end">
-                          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={handleSaveEdit} disabled={isProcessing}>
-                              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin"/> : <Check className="h-4 w-4"/>}
-                          </Button>
-                          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={handleCancelEdit}>
-                              <X className="h-4 w-4"/>
-                          </Button>
-                      </div>
-                  </div>
-              ) : (
+        <div className={cn("flex items-start gap-3 w-full", isSender ? 'justify-end' : 'justify-start')}>
+             {!isSender && (
+                <Avatar className="h-8 w-8">
+                    <AvatarImage src={`https://placehold.co/100x100.png?text=${msg.senderName.charAt(0)}`} alt={msg.senderName} />
+                    <AvatarFallback>{msg.senderName.charAt(0)}</AvatarFallback>
+                </Avatar>
+             )}
+            <div className="flex-grow max-w-[75%]">
+                <div className="flex items-center gap-2 mb-1">
+                     <p className="text-sm font-semibold">{isSender ? "You" : msg.senderName}</p>
+                     <p className="text-xs text-gray-500">{messageTime}</p>
+                </div>
+                <div
+                    className={cn(
+                      'rounded-lg p-3 text-sm shadow-sm relative w-fit',
+                      isSender ? 'bg-gray-200 dark:bg-gray-700 ml-auto' : 'bg-white dark:bg-gray-800'
+                    )}
+                >
                   <p className="whitespace-pre-wrap">{msg.text}</p>
-              )}
-               <div className="flex items-center justify-end gap-1 mt-1">
-                 {isEdited && <p className="text-xs opacity-70">Edited</p>}
-                 <p className="text-xs opacity-70">{messageTime}</p>
-                 {isSender && readStatus}
-               </div>
+                </div>
             </div>
         </div>
     )
@@ -189,7 +158,7 @@ export function Chat({entity, messages, onSendMessage, currentUser}: ChatProps) 
 
     return (
         <div className="flex justify-center my-4">
-            <span className="bg-[#111b21] text-gray-400 text-xs px-3 py-1 rounded-full">
+            <span className="bg-gray-200 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs px-3 py-1 rounded-full">
                 {label}
             </span>
         </div>
@@ -198,23 +167,19 @@ export function Chat({entity, messages, onSendMessage, currentUser}: ChatProps) 
 
   return (
     <>
-    <div className="flex h-full flex-col bg-[#0b141a]">
-      <header className="flex h-[60px] items-center gap-4 border-b border-white/10 bg-[#202c33] p-3">
-        <Avatar className="h-10 w-10">
-          <AvatarImage src={entity.avatar} alt={entity.name} data-ai-hint={entity.dataAiHint} />
-          <AvatarFallback>{entity.name.charAt(0)}</AvatarFallback>
-        </Avatar>
-        <h2 className="text-lg font-medium text-gray-100 flex-1">{entity.name}</h2>
-        <div className="flex items-center gap-2 text-gray-300">
-            <Button variant="ghost" size="icon" className="hover:bg-white/10"><Video className="h-5 w-5"/></Button>
-            <Button variant="ghost" size="icon" className="hover:bg-white/10"><Phone className="h-5 w-5"/></Button>
-            <Button variant="ghost" size="icon" className="hover:bg-white/10"><Search className="h-5 w-5"/></Button>
-            <Button variant="ghost" size="icon" className="hover:bg-white/10"><MoreVertical className="h-5 w-5"/></Button>
-        </div>
+    <div className="flex h-full flex-col bg-gray-100 dark:bg-gray-900">
+      <header className="flex h-[60px] items-center gap-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-3">
+        <h2 className="text-lg font-semibold flex-1">{entity.name}</h2>
+        <Tabs defaultValue="messages" className="w-auto">
+          <TabsList className="bg-gray-200 dark:bg-gray-800">
+            <TabsTrigger value="messages">Messages</TabsTrigger>
+            <TabsTrigger value="participants">Participants</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </header>
 
       <ScrollArea className="flex-1 bg-transparent" ref={scrollAreaRef}>
-        <div className="space-y-2 p-4 md:p-10">
+        <div className="space-y-6 p-4 md:p-10">
           {messages.map((msg, index) => {
              const prevMessage = messages[index - 1];
              const showDateSeparator = !prevMessage || format(prevMessage.timestamp.toDate(), 'yyyy-MM-dd') !== format(msg.timestamp.toDate(), 'yyyy-MM-dd');
@@ -228,32 +193,19 @@ export function Chat({entity, messages, onSendMessage, currentUser}: ChatProps) 
         </div>
       </ScrollArea>
 
-      <footer className="bg-[#202c33] p-3">
-        {replyTo && (
-            <div className="mb-2 p-2 rounded-t-lg bg-[#2a3942] text-sm relative">
-                <p className="text-primary text-xs font-semibold">Replying to {replyTo.senderName}</p>
-                <p className="truncate text-gray-300">{replyTo.text}</p>
-                <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 text-gray-300" onClick={() => setReplyTo(undefined)}>
-                    <X className="h-4 w-4"/>
-                </Button>
-            </div>
-        )}
-        <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="text-gray-300 hover:bg-white/10"><Smile className="h-6 w-6"/></Button>
-            <Button variant="ghost" size="icon" className="text-gray-300 hover:bg-white/10"><Paperclip className="h-6 w-6"/></Button>
-            <form onSubmit={handleSubmit} className="relative flex-1">
-            <Input
-                value={text}
-                onChange={e => setText(e.target.value)}
-                placeholder="Type a message"
-                className="bg-[#2a3942] border-none text-gray-200 rounded-lg h-12 focus:ring-0 pr-12"
-                disabled={editingMessageId !== null}
-            />
-            </form>
-            <Button variant="ghost" size="icon" className="text-gray-300 hover:bg-white/10">
-                {text ? <Send className="h-6 w-6" onClick={handleSubmit} /> : <Mic className="h-6 w-6" />}
-            </Button>
-        </div>
+      <footer className="bg-white dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800 p-4">
+        <form onSubmit={handleSubmit} className="relative flex-1">
+          <Input
+              value={text}
+              onChange={e => setText(e.target.value)}
+              placeholder="Write your message..."
+              className="bg-gray-100 dark:bg-gray-800 border-none rounded-lg h-12 focus:ring-0 pr-12 w-full"
+              disabled={editingMessageId !== null}
+          />
+          <Button type="submit" size="icon" className="absolute right-2 top-1/2 -translate-y-1/2 h-9 w-9 bg-primary/20 hover:bg-primary/30 text-primary rounded-lg">
+              <Send className="h-5 w-5" />
+          </Button>
+        </form>
       </footer>
     </div>
     <AlertDialog open={!!deletingMessage} onOpenChange={(open) => !open && setDeletingMessage(null)}>
