@@ -230,7 +230,7 @@ export default function ChatPage() {
         dataAiHint: 'student portrait'
      }));
      const grps = groupChats.map(g => ({...g, type: 'group' as ChatEntityType, avatar: `https://placehold.co/100x100.png?text=${g.name.charAt(0)}`}));
-     return [...dms, ...grps];
+     return [...grps, ...dms];
   }, [otherUsers, groupChats]);
 
   return (
@@ -260,53 +260,31 @@ export default function ChatPage() {
                 <div className="flex justify-center items-center p-4"> <Loader2 className="h-6 w-6 animate-spin text-gray-400" /> </div>
             ) : (
                 <div className="flex flex-col">
-                {(otherUsers.length > 0 || groupChats.length > 0) ? (
-                    <>
-                    {otherUsers.map(user => (
+                {chatList.length > 0 ? (
+                    chatList.map(chatItem => (
                         <button
-                            key={user.uid}
+                            key={chatItem.id}
                             className={cn(
                                 "w-full text-left p-3 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors flex items-center gap-3",
-                                selectedChat?.id === user.uid && "bg-primary/10 dark:bg-primary/20"
+                                selectedChat?.id === chatItem.id && "bg-primary/10 dark:bg-primary/20"
                             )}
-                            onClick={() => handleSelectChat({id: user.uid, name: user.displayName, type: 'dm', avatar: user.photoURL, dataAiHint: 'student portrait'})}
+                            onClick={() => handleSelectChat(chatItem)}
                         >
                             <Avatar className="h-12 w-12">
-                                <AvatarImage src={user.photoURL} alt={user.displayName} />
-                                <AvatarFallback>{user.displayName.charAt(0)}</AvatarFallback>
+                                <AvatarImage src={chatItem.avatar} alt={chatItem.name} data-ai-hint={chatItem.dataAiHint} />
+                                <AvatarFallback>{chatItem.name.charAt(0)}</AvatarFallback>
                             </Avatar>
                             <div className="flex-1">
                                 <div className="flex justify-between">
-                                    <p className="font-semibold text-sm">{user.displayName}</p>
+                                    <p className="font-semibold text-sm">{chatItem.name}</p>
                                     <p className="text-xs text-gray-500 dark:text-gray-400">{formatTimestamp(new Date())}</p>
                                 </div>
-                                <p className="text-sm text-gray-500 dark:text-gray-400 truncate">I will send the document s...</p>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                                    {chatItem.type === 'group' ? 'Group Chat' : 'Direct Message'}
+                                </p>
                             </div>
                         </button>
-                    ))}
-                    {groupChats.map(group => (
-                         <button
-                            key={group.id}
-                            className={cn(
-                                "w-full text-left p-3 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors flex items-center gap-3",
-                                selectedChat?.id === group.id && "bg-primary/10 dark:bg-primary/20"
-                            )}
-                            onClick={() => handleSelectChat({...group, type: 'group'})}
-                        >
-                            <Avatar className="h-12 w-12">
-                                <AvatarImage src={`https://placehold.co/100x100.png?text=${group.name.charAt(0)}`} alt={group.name} />
-                                <AvatarFallback>{group.name.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1">
-                                <div className="flex justify-between">
-                                    <p className="font-semibold text-sm">{group.name}</p>
-                                     <p className="text-xs text-gray-500 dark:text-gray-400">{formatTimestamp(new Date())}</p>
-                                </div>
-                                <p className="text-sm text-gray-500 dark:text-gray-400 truncate">typing...</p>
-                            </div>
-                        </button>
-                    ))}
-                    </>
+                    ))
                 ) : (
                     <div className="text-center text-gray-500 p-4">No chats available.</div>
                 )}
