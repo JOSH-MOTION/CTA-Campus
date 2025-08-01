@@ -20,9 +20,11 @@ import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, CheckCircle } from 'lucide-react';
 import { type Assignment } from '@/contexts/AssignmentsContext';
 import { addSubmission } from '@/services/submissions';
+import { Alert, AlertTitle, AlertDescription } from '../ui/alert';
+import Link from 'next/link';
 
 const submissionSchema = z.object({
   submissionLink: z.string().url('Please enter a valid URL (e.g., https://github.com/...)'),
@@ -40,6 +42,7 @@ interface SubmitAssignmentDialogProps {
 export function SubmitAssignmentDialog({ children, assignment, onSubmissionSuccess }: SubmitAssignmentDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submittedData, setSubmittedData] = useState<SubmissionFormValues | null>(null);
   const { toast } = useToast();
   const { user, userData } = useAuth();
 
@@ -50,6 +53,16 @@ export function SubmitAssignmentDialog({ children, assignment, onSubmissionSucce
       submissionNotes: '',
     },
   });
+
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open);
+    if (!open) {
+        // Reset state when dialog is closed
+        form.reset();
+        setSubmittedData(null);
+        setIsSubmitting(false);
+    }
+  }
 
   const onSubmit = async (data: SubmissionFormValues) => {
     if (!user || !userData) return;
@@ -72,8 +85,7 @@ export function SubmitAssignmentDialog({ children, assignment, onSubmissionSucce
         description: 'Your work has been sent to your teacher. You have been awarded 1 point.',
       });
       onSubmissionSuccess();
-      form.reset();
-      setIsOpen(false);
+      setSubmittedData(data);
     } catch (error: any) {
       const isDuplicate = error.message === 'duplicate';
       toast({
@@ -85,6 +97,7 @@ export function SubmitAssignmentDialog({ children, assignment, onSubmissionSucce
       });
       if (isDuplicate) {
           onSubmissionSuccess();
+          setIsOpen(false);
       }
     } finally {
       setIsSubmitting(false);
@@ -92,54 +105,89 @@ export function SubmitAssignmentDialog({ children, assignment, onSubmissionSucce
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Submit: {assignment.title}</DialogTitle>
-          <DialogDescription>
-            Provide a link to your work and any notes for your instructor.
-          </DialogDescription>
+           {!submittedData && (
+            <DialogDescription>
+                Provide a link to your work and any notes for your instructor.
+            </DialogDescription>
+           )}
         </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="submissionLink"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Submission Link</FormLabel>
-                  <FormControl>
-                    <Input placeholder="https://github.com/your-repo" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="submissionNotes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Notes (Optional)</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Anything you want your teacher to know?" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Submit Work
-              </Button>
+
+        {submittedData ? (
+            <div className="space-y-4">
+                <Alert variant="default" className="border-green-500 bg-green-50 dark:bg-green-950">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <AlertTitle className="text-green-700 dark:text-green-300">Submission Successful!</AlertTitle>
+                    <AlertDescription className="text-green-700 dark:text-green-400">
+                       Your work has been submitted for grading. Here's a summary of what you sent.
+                    </AlertDescription>
+                </Alert>
+                <div className="space-y-3 rounded-md border p-4">
+                    <p className="text-sm font-medium">
+                        Submission Link:{' '}
+                        <Link href={submittedData.submissionLink} target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                            {submittedData.submissionLink}
+                        </Link>
+                    </p>
+                    {submittedData.submissionNotes && (
+                        <p className="text-sm font-medium">
+                            Notes: <span className="font-normal text-muted-foreground">{submittedData.submissionNotes}</span>
+                        </p>
+                    )}
+                </div>
+            </div>
+        ) : (
+            <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                control={form.control}
+                name="submissionLink"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Submission Link</FormLabel>
+                    <FormControl>
+                        <Input placeholder="https://github.com/your-repo" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+                <FormField
+                control={form.control}
+                name="submissionNotes"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Notes (Optional)</FormLabel>
+                    <FormControl>
+                        <Textarea placeholder="Anything you want your teacher to know?" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+                <DialogFooter>
+                <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>
+                    Cancel
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Submit Work
+                </Button>
+                </DialogFooter>
+            </form>
+            </Form>
+        )}
+         {submittedData && (
+             <DialogFooter>
+                <Button type="button" onClick={() => setIsOpen(false)}>
+                    Close
+                </Button>
             </DialogFooter>
-          </form>
-        </Form>
+         )}
       </DialogContent>
     </Dialog>
   );

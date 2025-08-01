@@ -8,10 +8,12 @@ import {Calendar} from '@/components/ui/calendar';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
 import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
-import {Link, Loader2} from 'lucide-react';
+import {Link, Loader2, CheckCircle, ExternalLink} from 'lucide-react';
 import {useAuth} from '@/contexts/AuthContext';
 import {useToast} from '@/hooks/use-toast';
 import {addSubmission, onSubmissions} from '@/services/submissions';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import NextLink from 'next/link';
 
 const HUNDRED_DAYS_OF_CODE_ASSIGNMENT_ID = '100-days-of-code';
 
@@ -22,6 +24,7 @@ export default function OneHundredDaysOfCodePage() {
   const [submittedDates, setSubmittedDates] = useState<Date[]>([]);
   const {user, userData} = useAuth();
   const {toast} = useToast();
+  const [lastSubmission, setLastSubmission] = useState<{ link: string; date: string } | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -41,16 +44,18 @@ export default function OneHundredDaysOfCodePage() {
     e.preventDefault();
     if (!user || !userData || !date) return;
     setIsSubmitting(true);
+    setLastSubmission(null);
     
     try {
+       const submissionDate = date.toISOString().split('T')[0];
        await addSubmission({
         studentId: user.uid,
         studentName: userData.displayName,
         studentGen: userData.gen || 'N/A',
         assignmentId: HUNDRED_DAYS_OF_CODE_ASSIGNMENT_ID,
-        assignmentTitle: `100 Days of Code - ${date.toISOString().split('T')[0]}`,
+        assignmentTitle: `100 Days of Code - ${submissionDate}`,
         submissionLink: link,
-        submissionNotes: `Submission for date: ${date.toISOString().split('T')[0]}`,
+        submissionNotes: `Submission for date: ${submissionDate}`,
         pointsToAward: 0.5,
         pointCategory: '100 Days of Code',
       });
@@ -59,6 +64,7 @@ export default function OneHundredDaysOfCodePage() {
         title: 'Progress Submitted!',
         description: 'You earned 0.5 points for your daily post.',
       });
+      setLastSubmission({ link, date: submissionDate });
       setLink('');
     } catch (error: any) {
       toast({
@@ -110,6 +116,20 @@ export default function OneHundredDaysOfCodePage() {
                 Post Link
               </Button>
             </form>
+            {lastSubmission && (
+                <Alert className="mt-4" variant="default">
+                    <CheckCircle className="h-4 w-4" />
+                    <AlertTitle>Submission Successful!</AlertTitle>
+                    <AlertDescription className="space-y-2">
+                        <p>Your post for {lastSubmission.date} has been recorded.</p>
+                        <Button variant="link" asChild className="p-0 h-auto font-normal">
+                            <NextLink href={lastSubmission.link} target="_blank" rel="noopener noreferrer">
+                                View Submission <ExternalLink className="ml-1 h-3 w-3" />
+                            </NextLink>
+                        </Button>
+                    </AlertDescription>
+                </Alert>
+            )}
           </CardContent>
         </Card>
         <Card className="flex items-center justify-center">
