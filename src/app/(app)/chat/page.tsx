@@ -29,8 +29,7 @@ export default function ChatPage() {
 
   const [loading, setLoading] = useState(true);
   const [allUsers, setAllUsers] = useState<UserData[]>([]);
-  const [unreadChatCounts, setUnreadChatCounts] = useState<{ [chatId: string]: number }>({});
-
+  
   const [selectedChat, setSelectedChat] = useState<ChatEntity | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeTab, setActiveTab] = useState<'dms' | 'groups'>('dms');
@@ -82,7 +81,6 @@ export default function ChatPage() {
   }, [role, userData, allUsers]);
 
   const markChatAsRead = useCallback((chatId: string) => {
-    setUnreadChatCounts(prev => ({ ...prev, [chatId]: 0 }));
     localStorage.setItem(`lastSeen_${chatId}`, Date.now().toString());
   }, []);
 
@@ -164,59 +162,6 @@ export default function ChatPage() {
         }
       };
     }, [selectedChat, currentUser, markChatAsRead]);
-
-    // Listener for unread messages
-  useEffect(() => {
-    if (!currentUser || !userData || allUsers.length === 0) {
-      setUnreadChatCounts({});
-      return;
-    }
-
-    const allChatPartners = allUsers.filter(u => u.uid !== currentUser.uid);
-    const userGroupChats: {id: string}[] = [];
-    if(userData.role === 'teacher' || userData.role === 'admin') {
-      const allGens = new Set(allUsers.filter(u => u.role === 'student' && u.gen).map(u => u.gen));
-      allGens.forEach(gen => {
-        if(gen) userGroupChats.push({ id: `group-${gen}`})
-      });
-    } else if (userData.role === 'student' && userData.gen) {
-      userGroupChats.push({id: `group-${userData.gen}`});
-    }
-
-    const allChatIds = [
-      ...allChatPartners.map(u => getChatId(currentUser.uid, u.uid)),
-      ...userGroupChats.map(g => g.id),
-    ];
-    
-    const listeners: Unsubscribe[] = [];
-
-    allChatIds.forEach(chatId => {
-      const unsub = onMessages(chatId, (messages) => {
-        const lastSeenTimestamp = parseInt(localStorage.getItem(`lastSeen_${chatId}`) || '0', 10);
-        const newUnreadCount = messages.filter(m => 
-          m.timestamp && m.timestamp.toMillis() > lastSeenTimestamp && m.senderId !== currentUser.uid
-        ).length;
-
-        if (newUnreadCount > 0) {
-          setUnreadChatCounts(prev => ({ ...prev, [chatId]: newUnreadCount }));
-        }
-      });
-      listeners.push(unsub);
-    });
-    
-    // Initial check
-    allChatIds.forEach(chatId => {
-        const lastSeen = localStorage.getItem(`lastSeen_${chatId}`);
-        if(!lastSeen) {
-             localStorage.setItem(`lastSeen_${chatId}`, '0');
-        }
-    });
-
-
-    return () => {
-      listeners.forEach(unsub => unsub());
-    };
-  }, [currentUser, userData, allUsers]);
 
     const handleSendMessage = async (text: string, replyTo?: Message) => {
         if (!selectedChat || !text.trim() || !currentUser) return;
@@ -312,8 +257,6 @@ export default function ChatPage() {
                 ) : (
                     <div className="space-y-1 p-2">
                     {otherUsers.map(user => {
-                        const chatId = getChatId(currentUser!.uid, user.uid);
-                        const unreadCount = unreadChatCounts[chatId] || 0;
                         return (
                             <Button
                             key={user.uid}
@@ -329,9 +272,6 @@ export default function ChatPage() {
                                 <p className="font-semibold">{user.displayName}</p>
                                 <p className="text-xs text-muted-foreground capitalize">{user.role}</p>
                             </div>
-                            {unreadCount > 0 && (
-                                <Badge className="absolute right-3 top-1/2 -translate-y-1/2">{unreadCount}</Badge>
-                            )}
                             </Button>
                         )
                     })}
@@ -346,7 +286,6 @@ export default function ChatPage() {
                 ) : (
                     <div className="space-y-1 p-2">
                     {groupChats.map(group => {
-                        const unreadCount = unreadChatCounts[group.id] || 0;
                         return (
                             <Button
                             key={group.id}
@@ -360,9 +299,6 @@ export default function ChatPage() {
                             <div className="text-left">
                                 <p className="font-semibold">{group.name}</p>
                             </div>
-                            {unreadCount > 0 && (
-                                <Badge className="absolute right-3 top-1/2 -translate-y-1/2">{unreadCount}</Badge>
-                            )}
                             </Button>
                         )
                     })}
