@@ -1,7 +1,6 @@
-
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,7 +35,66 @@ interface ChatProps {
   loading: boolean;
 }
 
-export function Chat({ entity, messages, onSendMessage, currentUser, onToggleContacts, loading }: ChatProps) {
+const MessageBubble = React.memo(({ msg, currentUser }: { msg: Message; currentUser: User | null }) => {
+  const isSender = msg.senderId === currentUser?.uid;
+  const messageTime = msg.timestamp ? format(msg.timestamp.toDate(), 'HH:mm') : '';
+
+  return (
+    <div className={cn('flex w-full items-start gap-3', isSender ? 'flex-row-reverse' : 'justify-start')}>
+      {!isSender && (
+        <Avatar className='h-8 w-8'>
+          <AvatarImage src={`https://placehold.co/100x100.png?text=${msg.senderName.charAt(0)}`} alt={msg.senderName} />
+          <AvatarFallback>{msg.senderName.charAt(0)}</AvatarFallback>
+        </Avatar>
+      )}
+      <div className={cn('max-w-[75%]', isSender ? 'flex flex-col items-end' : 'flex flex-col items-start')}>
+        <div className={cn('mb-1 flex items-baseline gap-2', isSender ? 'flex-row-reverse' : 'justify-start')}>
+          <p className='text-xs'>{isSender ? 'You' : msg.senderName}</p>
+          <p className='text-xs text-gray-500'>{messageTime}</p>
+        </div>
+        <div
+          className={cn(
+            'relative w-fit rounded-lg p-3 text-sm shadow-sm',
+            isSender ? 'bg-gray-200 dark:bg-gray-700' : 'bg-white dark:bg-gray-800'
+          )}
+        >
+          <p className='whitespace-pre-wrap'>{msg.text}</p>
+        </div>
+      </div>
+    </div>
+  );
+});
+MessageBubble.displayName = 'MessageBubble';
+
+const DateSeparator = React.memo(({ date }: { date: Date }) => {
+  let label;
+  if (!date) return null;
+  if (isToday(date)) {
+    label = 'Today';
+  } else if (isYesterday(date)) {
+    label = 'Yesterday';
+  } else {
+    label = format(date, 'MMMM d, yyyy');
+  }
+
+  return (
+    <div className='my-4 flex justify-center'>
+      <span className='rounded-full bg-gray-200 px-3 py-1 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400'>
+        {label}
+      </span>
+    </div>
+  );
+});
+DateSeparator.displayName = 'DateSeparator';
+
+export const Chat = React.memo(function Chat({
+  entity,
+  messages,
+  onSendMessage,
+  currentUser,
+  onToggleContacts,
+  loading
+}: ChatProps) {
   const [text, setText] = useState('');
   const [replyTo, setReplyTo] = useState<Message | undefined>(undefined);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
@@ -50,6 +108,24 @@ export function Chat({ entity, messages, onSendMessage, currentUser, onToggleCon
     setReplyTo(undefined);
     setEditingMessageId(null);
   }, [entity.id]);
+
+  const messageList = useMemo(() => {
+    return messages.map((msg, index) => {
+      const prevMessage = messages[index - 1];
+      const showDateSeparator =
+        msg.timestamp &&
+        (!prevMessage ||
+          !prevMessage.timestamp ||
+          format(prevMessage.timestamp.toDate(), 'yyyy-MM-dd') !==
+            format(msg.timestamp.toDate(), 'yyyy-MM-dd'));
+      return (
+        <React.Fragment key={msg.id}>
+          {showDateSeparator && <DateSeparator date={msg.timestamp.toDate()} />}
+          <MessageBubble msg={msg} currentUser={currentUser} />
+        </React.Fragment>
+      );
+    });
+  }, [messages, currentUser]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,58 +193,6 @@ export function Chat({ entity, messages, onSendMessage, currentUser, onToggleCon
     }
   };
 
-  const MessageBubble = React.memo(({ msg }: { msg: Message }) => {
-    const isSender = msg.senderId === currentUser?.uid;
-    const messageTime = msg.timestamp ? format(msg.timestamp.toDate(), 'HH:mm') : '';
-
-    return (
-      <div className={cn('flex w-full items-start gap-3', isSender ? 'flex-row-reverse' : 'justify-start')}>
-        {!isSender && (
-          <Avatar className='h-8 w-8'>
-            <AvatarImage src={`https://placehold.co/100x100.png?text=${msg.senderName.charAt(0)}`} alt={msg.senderName} />
-            <AvatarFallback>{msg.senderName.charAt(0)}</AvatarFallback>
-          </Avatar>
-        )}
-        <div className={cn('max-w-[75%]', isSender ? 'flex flex-col items-end' : 'flex flex-col items-start')}>
-          <div className={cn('mb-1 flex items-baseline gap-2', isSender ? 'flex-row-reverse' : 'justify-start')}>
-            <p className='text-xs'>{isSender ? 'You' : msg.senderName}</p>
-            <p className='text-xs text-gray-500'>{messageTime}</p>
-          </div>
-          <div
-            className={cn(
-              'relative w-fit rounded-lg p-3 text-sm shadow-sm',
-              isSender ? 'bg-gray-200 dark:bg-gray-700' : 'bg-white dark:bg-gray-800'
-            )}
-          >
-            <p className='whitespace-pre-wrap'>{msg.text}</p>
-          </div>
-        </div>
-      </div>
-    );
-  });
-  MessageBubble.displayName = 'MessageBubble';
-
-  const DateSeparator = React.memo(({ date }: { date: Date }) => {
-    let label;
-    if (!date) return null;
-    if (isToday(date)) {
-      label = 'Today';
-    } else if (isYesterday(date)) {
-      label = 'Yesterday';
-    } else {
-      label = format(date, 'MMMM d, yyyy');
-    }
-
-    return (
-      <div className='my-4 flex justify-center'>
-        <span className='rounded-full bg-gray-200 px-3 py-1 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400'>
-          {label}
-        </span>
-      </div>
-    );
-  });
-  DateSeparator.displayName = 'DateSeparator';
-
   return (
     <>
       <div className='flex h-full flex-col bg-gray-100 dark:bg-gray-900'>
@@ -188,25 +212,9 @@ export function Chat({ entity, messages, onSendMessage, currentUser, onToggleCon
           <h2 className='flex-1 text-lg font-semibold'>{entity.name}</h2>
         </header>
 
-        {/* <ScrollArea className='flex-1'> */}
-          <div className='flex-1 space-y-6 p-4 md:p-10 overflow-y-auto'>
-            {messages.map((msg, index) => {
-              const prevMessage = messages[index - 1];
-              const showDateSeparator =
-                msg.timestamp &&
-                (!prevMessage ||
-                  !prevMessage.timestamp ||
-                  format(prevMessage.timestamp.toDate(), 'yyyy-MM-dd') !==
-                    format(msg.timestamp.toDate(), 'yyyy-MM-dd'));
-              return (
-                <React.Fragment key={msg.id}>
-                  {showDateSeparator && <DateSeparator date={msg.timestamp.toDate()} />}
-                  <MessageBubble msg={msg} />
-                </React.Fragment>
-              );
-            })}
-          </div>
-        {/* </ScrollArea> */}
+        <ScrollArea className='flex-1'>
+          <div className='space-y-6 p-4 md:p-10'>{messageList}</div>
+        </ScrollArea>
 
         <footer className='shrink-0 border-t border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-950'>
           <form onSubmit={handleSubmit} className='relative flex-1'>
@@ -246,4 +254,4 @@ export function Chat({ entity, messages, onSendMessage, currentUser, onToggleCon
       </AlertDialog>
     </>
   );
-}
+});

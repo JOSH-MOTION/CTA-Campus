@@ -131,7 +131,7 @@ export default function ChatPage() {
             dataAiHint: 'student portrait',
          })
       }
-  }, [loading, allUsers, groupChats, currentUser, searchParams, selectedChat, otherUsers, router, markChatAsRead]);
+  }, [loading, allUsers, groupChats, currentUser, searchParams, selectedChat, otherUsers, router, markChatAsRead, handleSelectChat]);
   
 
   useEffect(() => {
