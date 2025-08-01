@@ -20,7 +20,6 @@ const AwardPointsFlowInputSchema = z.object({
     reason: z.string().describe("A short description of why the points are being awarded."),
     activityId: z.string().describe("A unique ID for the specific activity."),
     action: z.enum(['award', 'revoke']).describe("Whether to award or revoke the points."),
-    date: z.string().optional().describe("An optional date string (YYYY-MM-DD) for time-based activities."),
 });
 export type AwardPointsFlowInput = z.infer<typeof AwardPointsFlowInputSchema>;
 
@@ -32,25 +31,24 @@ export type AwardPointsFlowOutput = z.infer<typeof AwardPointsFlowOutputSchema>;
 
 
 export async function awardPointsFlow(input: AwardPointsFlowInput): Promise<AwardPointsFlowOutput> {
-  const { studentId, points, reason, activityId, action, date } = input;
+  const { studentId, points, reason, activityId, action } = input;
   
-  let finalActivityId = activityId;
-  // For date-specific activities, create a unique ID based on the date
-  // to allow multiple historical entries. For others, use a UUID to ensure it's a one-time award.
-  if (date && (reason === 'Class Attendance' || reason === '100 Days of Code')) {
-      finalActivityId = `historical-${reason.toLowerCase().replace(/\s+/g, '-')}-${date}`;
-  } else if (!activityId.startsWith('graded-')) {
-      finalActivityId = `manual-${reason.toLowerCase().replace(/\s+/g, '-')}-${uuidv4()}`;
-  }
-
+  // For manually entered points, we always generate a new unique ID to ensure it's a distinct event.
+  // For system-generated points (like grading), the activityId should be stable (e.g., `graded-submission-XYZ`).
+  const finalActivityId = activityId.startsWith('manual-') 
+      ? `${activityId}-${uuidv4()}`
+      : activityId;
 
   const pointDocRef = doc(db, 'users', studentId, 'points', finalActivityId);
 
   try {
     if (action === 'award') {
-      const docSnap = await getDoc(pointDocRef);
-      if (docSnap.exists()) {
-        return { success: false, message: 'duplicate' };
+      // For one-off awards from grading, we prevent duplicates.
+      if (!finalActivityId.includes(uuidv4())) {
+        const docSnap = await getDoc(pointDocRef);
+        if (docSnap.exists()) {
+          return { success: false, message: 'duplicate' };
+        }
       }
       
       await setDoc(pointDocRef, {
@@ -62,7 +60,7 @@ export async function awardPointsFlow(input: AwardPointsFlowInput): Promise<Awar
 
       return { success: true, message: "Points awarded successfully." };
     } else { // action === 'revoke'
-        // For revoke, we need the exact ID, which should be passed in `activityId`
+        // For revoke, we need the exact ID, which should be passed in `activityId`.
         const pointToRevokeRef = doc(db, 'users', studentId, 'points', activityId);
         await deleteDoc(pointToRevokeRef);
         return { success: true, message: "Points revoked successfully." };
