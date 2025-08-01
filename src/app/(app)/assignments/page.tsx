@@ -41,8 +41,10 @@ export default function AssignmentsPage() {
             setCheckingSubmissions(false);
         }
     };
-    fetchSubmissions();
-  }, [user, role]);
+    if (!loading) {
+        fetchSubmissions();
+    }
+  }, [user, role, loading]);
 
 
   const filteredAssignments = useMemo(() => {
