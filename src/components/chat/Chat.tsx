@@ -41,7 +41,7 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
   useEffect(() => {
       setReplyTo(undefined);
       setEditingMessageId(null);
-  },[entity])
+  }, [entity.id]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,7 +109,7 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
     }
   }
 
-  const MessageBubble = ({msg}: {msg: Message}) => {
+  const MessageBubble = React.memo(({msg}: {msg: Message}) => {
     const isSender = msg.senderId === currentUser?.uid;
     const messageTime = msg.timestamp ? format(msg.timestamp.toDate(), 'HH:mm') : '';
 
@@ -137,9 +137,10 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
             </div>
         </div>
     )
-  }
+  });
+  MessageBubble.displayName = 'MessageBubble';
 
-  const DateSeparator = ({ date }: { date: Date }) => {
+  const DateSeparator = React.memo(({ date }: { date: Date }) => {
     let label;
     if (!date) return null;
     if (isToday(date)) {
@@ -157,7 +158,8 @@ export function Chat({entity, messages, onSendMessage, currentUser, onToggleCont
             </span>
         </div>
     );
-};
+  });
+  DateSeparator.displayName = 'DateSeparator';
 
   return (
     <>
