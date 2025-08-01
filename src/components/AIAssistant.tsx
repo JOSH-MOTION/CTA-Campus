@@ -22,6 +22,7 @@ import {useToast} from '@/hooks/use-toast';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePathname } from 'next/navigation';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface Message {
     id: string;
@@ -39,6 +40,7 @@ export function AIAssistant() {
 
   const pathname = usePathname();
   const isChatPage = pathname === '/chat';
+  const isMobile = useIsMobile();
 
   // Drag and drop state
   const [position, setPosition] = useState({ x: 24, y: isChatPage ? 96 : 24 });
@@ -69,13 +71,12 @@ export function AIAssistant() {
     }
   }
   
-  const handleMouseDown = (e: MouseEvent<HTMLDivElement>) => {
+  const handleMouseDown = (e: MouseEvent<HTMLButtonElement>) => {
     handleDragStart(e.clientX, e.clientY);
-    // Prevent text selection while dragging
     e.preventDefault();
   };
 
-  const handleTouchStart = (e: TouchEvent<HTMLDivElement>) => {
+  const handleTouchStart = (e: TouchEvent<HTMLButtonElement>) => {
     handleDragStart(e.touches[0].clientX, e.touches[0].clientY);
   }
 
@@ -84,7 +85,6 @@ export function AIAssistant() {
         let newX = window.innerWidth - (clientX - offset.current.x + dragRef.current.offsetWidth);
         let newY = window.innerHeight - (clientY - offset.current.y + dragRef.current.offsetHeight);
 
-        // Keep button within viewport
         newX = Math.max(8, Math.min(newX, window.innerWidth - dragRef.current.offsetWidth - 8));
         newY = Math.max(8, Math.min(newY, window.innerHeight - dragRef.current.offsetHeight - 8));
 
@@ -169,11 +169,14 @@ export function AIAssistant() {
           <Tooltip>
             <TooltipTrigger asChild>
               <SheetTrigger asChild>
-                <Button size="icon" className="h-14 w-14 rounded-full shadow-lg relative group/aibtn">
+                <Button 
+                  size="icon" 
+                  className="h-14 w-14 rounded-full shadow-lg relative group/aibtn flex items-center justify-center"
+                  onMouseDown={handleMouseDown}
+                  onTouchStart={handleTouchStart}
+                >
                    <div 
-                     onMouseDown={handleMouseDown}
-                     onTouchStart={handleTouchStart}
-                     className="absolute left-0 top-0 bottom-0 w-4 cursor-move flex items-center justify-center opacity-0 group-hover/aibtn:opacity-100 transition-opacity"
+                     className="absolute left-0 top-0 bottom-0 w-4 cursor-move flex items-center justify-center opacity-20 md:opacity-0 group-hover/aibtn:opacity-100 transition-opacity"
                    >
                     <GripVertical className="h-5 w-5 text-primary-foreground/50" />
                    </div>
@@ -186,7 +189,7 @@ export function AIAssistant() {
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
-        <SheetContent className="flex w-full flex-col sm:max-w-lg">
+        <SheetContent className={cn("flex w-full flex-col sm:max-w-lg", isMobile && "h-full")}>
           <SheetHeader>
             <div className="flex justify-between items-center">
               <SheetTitle className="flex items-center gap-2">
