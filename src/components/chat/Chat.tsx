@@ -229,7 +229,7 @@ export const Chat = React.memo(function Chat({
         </React.Fragment>
       );
     });
-  }, [messages, currentUser, pinnedMessage, handlePin]);
+  }, [messages, currentUser, pinnedMessage]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
