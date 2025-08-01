@@ -1,4 +1,6 @@
 // src/services/points.ts
+'use server';
+
 import {
     collection,
     doc,
