@@ -101,13 +101,10 @@ import {
    * @param messageId - The ID of the message to update.
    * @param newText - The new text for the message.
    */
-  export const updateMessage = async (chatId: string, messageId: string, newText: string) => {
+  export const updateMessage = async (chatId: string, messageId: string, updates: Partial<Message>) => {
       try {
           const messageRef = doc(db, 'chats', chatId, 'messages', messageId);
-          await updateDoc(messageRef, {
-              text: newText,
-              edited: true,
-          });
+          await updateDoc(messageRef, updates);
       } catch (error) {
           console.error("Error updating message: ", error);
           throw error;

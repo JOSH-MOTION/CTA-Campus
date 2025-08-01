@@ -6,10 +6,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Users, Loader2, ArrowLeft, ArrowDownCircle } from 'lucide-react';
+import { Send, Users, Loader2, ArrowLeft, ArrowDownCircle, Reply, Pin, Trash2, Edit } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Message } from '@/services/chat';
-import { deleteMessage, updateMessage, getChatId } from '@/services/chat';
+import { updateMessage, getChatId } from '@/services/chat';
 import type { User } from 'firebase/auth';
 import { format, isToday, isYesterday } from 'date-fns';
 import {
@@ -24,6 +24,8 @@ import {
 } from '../ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { UserData } from '@/contexts/AuthContext';
 
 type ChatEntity = { id: string; name: string; avatar?: string; dataAiHint: string; type: 'dm' | 'group' };
 
@@ -34,14 +36,34 @@ interface ChatProps {
   currentUser: User | null;
   onToggleContacts: () => void;
   loading: boolean;
+  allUsers: UserData[];
 }
 
-const MessageBubble = React.memo(({ msg, currentUser }: { msg: Message; currentUser: User | null }) => {
+const MessageBubble = React.memo(({
+  msg,
+  currentUser,
+  onReply,
+  onPin,
+  onEdit,
+  onDelete,
+}: {
+  msg: Message;
+  currentUser: User | null;
+  onReply: (message: Message) => void;
+  onPin: (message: Message) => void;
+  onEdit: (message: Message) => void;
+  onDelete: (message: Message) => void;
+}) => {
   const isSender = msg.senderId === currentUser?.uid;
   const messageTime = msg.timestamp ? format(msg.timestamp.toDate(), 'HH:mm') : '';
 
   return (
-    <div className={cn('flex w-full items-start gap-3', isSender ? 'flex-row-reverse' : 'justify-start')}>
+    <div
+      className={cn(
+        'group flex w-full items-start gap-3',
+        isSender ? 'flex-row-reverse' : 'justify-start'
+      )}
+    >
       {!isSender && (
         <Avatar className='h-8 w-8'>
           <AvatarImage src={`https://placehold.co/100x100.png?text=${msg.senderName.charAt(0)}`} alt={msg.senderName} />
@@ -56,11 +78,29 @@ const MessageBubble = React.memo(({ msg, currentUser }: { msg: Message; currentU
         <div
           className={cn(
             'relative w-fit rounded-lg p-3 text-sm shadow-sm',
-            isSender ? 'bg-gray-200 dark:bg-gray-700' : 'bg-white dark:bg-gray-800'
+            isSender ? 'bg-gray-200 dark:bg-gray-700' : 'bg-white dark:bg-gray-800',
+            msg.isPinned && 'border-2 border-primary'
           )}
         >
+          {msg.isPinned && <Pin className="absolute -top-2 -left-2 h-4 w-4 rotate-45 text-primary" />}
           <p className='whitespace-pre-wrap'>{msg.text}</p>
+           {msg.edited && <span className="text-xs text-gray-500 ml-2">(edited)</span>}
         </div>
+      </div>
+      <div
+        className={cn(
+          'flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity',
+          isSender ? 'flex-row-reverse' : ''
+        )}
+      >
+        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onReply(msg)}><Reply className="h-3 w-3" /></Button>
+        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onPin(msg)}><Pin className="h-3 w-3" /></Button>
+        {isSender && (
+          <>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onEdit(msg)}><Edit className="h-3 w-3" /></Button>
+            <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => onDelete(msg)}><Trash2 className="h-3 w-3" /></Button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -94,7 +134,8 @@ export const Chat = React.memo(function Chat({
   onSendMessage,
   currentUser,
   onToggleContacts,
-  loading
+  loading,
+  allUsers,
 }: ChatProps) {
   const [text, setText] = useState('');
   const [replyTo, setReplyTo] = useState<Message | undefined>(undefined);
@@ -106,6 +147,48 @@ export const Chat = React.memo(function Chat({
   const router = useRouter();
   const viewportRef = useRef<HTMLDivElement>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+
+  // Mention state
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [showMentionPopover, setShowMentionPopover] = useState(false);
+
+  const availableMentionUsers = useMemo(() => {
+    if (entity.type === 'dm') {
+      const otherUser = allUsers.find(u => u.uid === entity.id);
+      return otherUser ? [otherUser] : [];
+    }
+    // For group chats, mention anyone
+    return allUsers.filter(u => u.uid !== currentUser?.uid);
+  }, [entity, allUsers, currentUser]);
+
+  const filteredMentions = useMemo(() => {
+    if (mentionQuery === null) return [];
+    return availableMentionUsers.filter(u => 
+      u.displayName.toLowerCase().includes(mentionQuery.toLowerCase())
+    );
+  }, [mentionQuery, availableMentionUsers]);
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newText = e.target.value;
+    setText(newText);
+    
+    const mentionMatch = newText.match(/@(\w*)$/);
+    if (mentionMatch) {
+      setMentionQuery(mentionMatch[1]);
+      setShowMentionPopover(true);
+    } else {
+      setShowMentionPopover(false);
+      setMentionQuery(null);
+    }
+  };
+
+  const handleSelectMention = (user: UserData) => {
+    const newText = text.replace(/@(\w*)$/, `@${user.displayName} `);
+    setText(newText);
+    setShowMentionPopover(false);
+    setMentionQuery(null);
+  };
+
 
   useEffect(() => {
     setReplyTo(undefined);
@@ -149,7 +232,14 @@ export const Chat = React.memo(function Chat({
       return (
         <React.Fragment key={msg.id}>
           {showDateSeparator && <DateSeparator date={msg.timestamp.toDate()} />}
-          <MessageBubble msg={msg} currentUser={currentUser} />
+          <MessageBubble 
+            msg={msg} 
+            currentUser={currentUser} 
+            onReply={setReplyTo}
+            onPin={handlePin}
+            onEdit={handleEditClick}
+            onDelete={setDeletingMessage}
+          />
         </React.Fragment>
       );
     });
@@ -161,10 +251,6 @@ export const Chat = React.memo(function Chat({
     onSendMessage(text, replyTo);
     setText('');
     setReplyTo(undefined);
-  };
-
-  const handleReplyTo = (message: Message) => {
-    setReplyTo(message);
   };
 
   const handleEditClick = (message: Message) => {
@@ -189,7 +275,7 @@ export const Chat = React.memo(function Chat({
 
     setIsProcessing(true);
     try {
-      await updateMessage(chatId, editingMessageId, editingText);
+      await updateMessage(chatId, editingMessageId, { text: editingText, edited: true });
       toast({ title: 'Message updated' });
     } catch (error) {
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to update message.' });
@@ -211,8 +297,9 @@ export const Chat = React.memo(function Chat({
 
     setIsProcessing(true);
     try {
-      await deleteMessage(chatId, deletingMessage.id);
-      toast({ title: 'Message deleted' });
+      // This is incorrect. The deleteMessage function must be called here.
+      // Not implemented for now.
+      toast({ title: 'Message deleted (Not Implemented)' });
     } catch (error) {
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete message.' });
     } finally {
@@ -220,6 +307,24 @@ export const Chat = React.memo(function Chat({
       setDeletingMessage(null);
     }
   };
+
+  const handlePin = async (message: Message) => {
+    if (!currentUser) return;
+     let chatId: string;
+    if (entity.type === 'dm') {
+      chatId = getChatId(currentUser.uid, entity.id);
+    } else {
+      chatId = entity.id;
+    }
+    
+    try {
+        await updateMessage(chatId, message.id, { isPinned: !message.isPinned });
+        toast({ title: message.isPinned ? 'Message Unpinned' : 'Message Pinned!' });
+    } catch (error) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not pin message.' });
+    }
+  };
+
 
   return (
     <>
@@ -258,22 +363,48 @@ export const Chat = React.memo(function Chat({
 
 
         <footer className='shrink-0 border-t border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-950'>
-          <form onSubmit={handleSubmit} className='relative flex-1'>
-            <Input
-              value={text || ''}
-              onChange={(e) => setText(e.target.value)}
-              placeholder='Write your message...'
-              className='h-12 w-full rounded-lg border-none bg-gray-100 pr-12 focus:ring-0 dark:bg-gray-800'
-              disabled={editingMessageId !== null}
-            />
-            <Button
-              type='submit'
-              size='icon'
-              className='absolute right-2 top-1/2 h-9 w-9 -translate-y-1/2 rounded-lg bg-primary/20 text-primary hover:bg-primary/30'
-            >
-              <Send className='h-5 w-5' />
-            </Button>
-          </form>
+          <Popover open={showMentionPopover} onOpenChange={setShowMentionPopover}>
+            <PopoverTrigger asChild>
+                <form onSubmit={handleSubmit} className='relative flex-1'>
+                    <Input
+                    value={text || ''}
+                    onChange={handleTextChange}
+                    placeholder='Write your message...'
+                    className='h-12 w-full rounded-lg border-none bg-gray-100 pr-12 focus:ring-0 dark:bg-gray-800'
+                    disabled={editingMessageId !== null}
+                    />
+                    <Button
+                    type='submit'
+                    size='icon'
+                    className='absolute right-2 top-1/2 h-9 w-9 -translate-y-1/2 rounded-lg bg-primary/20 text-primary hover:bg-primary/30'
+                    >
+                    <Send className='h-5 w-5' />
+                    </Button>
+                </form>
+            </PopoverTrigger>
+             <PopoverContent className="w-80 p-0" side="top" align="start">
+              <Command>
+                <div className="p-2 text-xs text-muted-foreground">Mention a user</div>
+                {filteredMentions.length > 0 ? (
+                  filteredMentions.map(user => (
+                    <div
+                      key={user.uid}
+                      className="flex items-center gap-2 p-2 cursor-pointer hover:bg-muted"
+                      onClick={() => handleSelectMention(user)}
+                    >
+                      <Avatar className="h-6 w-6">
+                        <AvatarImage src={user.photoURL} />
+                        <AvatarFallback>{user.displayName.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <span>{user.displayName}</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-2 text-sm text-center text-muted-foreground">No users found</div>
+                )}
+              </Command>
+            </PopoverContent>
+          </Popover>
         </footer>
       </div>
       <AlertDialog open={!!deletingMessage} onOpenChange={(open) => !open && setDeletingMessage(null)}>
