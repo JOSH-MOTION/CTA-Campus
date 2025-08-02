@@ -133,10 +133,10 @@ export const fetchSubmissions = async (assignmentId: string): Promise<Submission
   /**
    * Fetches all submissions for a specific student in real-time.
    * @param studentId - The UID of the student.
-   * @param callback - The function to call with the new array of submissions.
+   * @param callback - The function to call with the new array of submissions and an optional error message.
    * @returns An unsubscribe function to stop the listener.
    */
-    export const onSubmissionsForStudent = (studentId: string, callback: (submissions: Submission[]) => void) => {
+    export const onSubmissionsForStudent = (studentId: string, callback: (submissions: Submission[], error: string | null) => void) => {
         const submissionsCol = collection(db, 'submissions');
         const q = query(
         submissionsCol,
@@ -150,10 +150,15 @@ export const fetchSubmissions = async (assignmentId: string): Promise<Submission
                 const submissions: Submission[] = querySnapshot.docs.map((doc) => {
                 return { id: doc.id, ...doc.data() } as Submission;
                 });
-                callback(submissions);
+                callback(submissions, null);
             },
             (error) => {
                 console.error(`Error listening to submissions for student ${studentId}:`, error);
+                let errorMessage = "Could not load submissions. Please try again later.";
+                if (error.code === 'failed-precondition') {
+                    errorMessage = "The required database index is still being built. Please wait a few minutes and try again.";
+                }
+                callback([], errorMessage);
             }
         );
 

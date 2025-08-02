@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Mail, MessageSquare, Info, GraduationCap, FileText, ExternalLink, Loader2 } from 'lucide-react';
+import { Mail, MessageSquare, Info, GraduationCap, FileText, ExternalLink, Loader2, AlertTriangle } from 'lucide-react';
 import { UserData } from '@/contexts/AuthContext';
 import {
   Dialog,
@@ -24,6 +24,7 @@ import { onSubmissionsForStudent, Submission } from '@/services/submissions';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { formatDistanceToNow } from 'date-fns';
 import Link from 'next/link';
+import { Alert, AlertTitle } from '../ui/alert';
 
 interface StudentCardProps {
   student: UserData;
@@ -44,10 +45,17 @@ const InfoItem = ({ icon: Icon, label, value }: { icon: React.ElementType, label
 const StudentSubmissions = ({ studentId }: { studentId: string }) => {
     const [submissions, setSubmissions] = useState<Submission[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         setLoading(true);
-        const unsubscribe = onSubmissionsForStudent(studentId, (newSubmissions) => {
+        setError(null);
+        const unsubscribe = onSubmissionsForStudent(studentId, (newSubmissions, err) => {
+            if (err) {
+                setError(err);
+                setLoading(false);
+                return;
+            }
             setSubmissions(newSubmissions);
             setLoading(false);
         });
@@ -65,6 +73,12 @@ const StudentSubmissions = ({ studentId }: { studentId: string }) => {
                     <div className="flex h-64 items-center justify-center">
                         <Loader2 className="h-8 w-8 animate-spin" />
                     </div>
+                ) : error ? (
+                    <Alert variant="destructive">
+                        <AlertTriangle className="h-4 w-4"/>
+                        <AlertTitle>Could Not Load Submissions</AlertTitle>
+                        <AlertDescription>{error}</AlertDescription>
+                    </Alert>
                 ) : (
                     <Table>
                         <TableHeader>
