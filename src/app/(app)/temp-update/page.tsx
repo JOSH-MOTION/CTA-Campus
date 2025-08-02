@@ -264,8 +264,12 @@ export default function TempUpdatePage() {
                )}
 
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <PlusCircle className="mr-2 h-4 w-4" />}
-                Award Points
+                {isSubmitting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                )}
+                {isSubmitting ? 'Awarding...' : 'Award Points'}
               </Button>
             </form>
           </Form>
