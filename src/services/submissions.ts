@@ -70,11 +70,12 @@ import {
                 studentId: submissionData.studentId,
                 points: pointsToAward,
                 reason: submissionData.pointCategory,
-                activityId,
+                activityId: activityId,
                 action: 'award'
             });
         } catch(e) {
             console.error(`Failed to award points for submission ${docRef.id}:`, e);
+            // Optionally, you could try to revert the submission or add a flag for failed point awards
         }
     }
 
