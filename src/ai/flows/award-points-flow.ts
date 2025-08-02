@@ -43,12 +43,11 @@ export async function awardPointsFlow(input: AwardPointsFlowInput): Promise<Awar
 
   try {
     if (action === 'award') {
-      // For one-off awards from grading, we prevent duplicates.
-      if (!finalActivityId.includes(uuidv4())) {
-        const docSnap = await getDoc(pointDocRef);
-        if (docSnap.exists()) {
-          return { success: false, message: 'duplicate' };
-        }
+      const docSnap = await getDoc(pointDocRef);
+      if (docSnap.exists()) {
+        // If the point already exists, we don't need to do anything.
+        // This makes the award action idempotent for stable activity IDs.
+        return { success: true, message: 'Point already awarded.' };
       }
       
       await setDoc(pointDocRef, {
