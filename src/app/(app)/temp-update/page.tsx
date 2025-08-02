@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Loader2, ChevronsUpDown, Check } from 'lucide-react';
+import { PlusCircle, Loader2, ChevronsUpDown, Check, Pencil } from 'lucide-react';
 import { useAuth, UserData } from '@/contexts/AuthContext';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -30,12 +30,14 @@ const gradingData = [
     { title: "100 Days of Code", points: 0.5 },
     { title: "Code Review", points: 1 },
     { title: "Final Project Completion", points: 10 },
+    { title: "Historical Data Adjustment", points: 0},
 ];
 
 const tempUpdateSchema = z.object({
   studentId: z.string().nonempty('Please select a student.'),
   activityTitle: z.string().nonempty('Please select an activity.'),
   points: z.coerce.number().min(0.1, 'Please enter a valid point value.'),
+  reason: z.string().min(3, "Please provide a reason.").optional(),
 });
 
 type TempUpdateFormValues = z.infer<typeof tempUpdateSchema>;
@@ -65,25 +67,31 @@ export default function TempUpdatePage() {
       studentId: '',
       activityTitle: '',
       points: 1,
+      reason: ''
     },
   });
 
   const selectedActivity = form.watch('activityTitle');
+  
   useEffect(() => {
       const activity = gradingData.find(g => g.title === selectedActivity);
-      if (activity) {
+      if (activity && activity.points > 0) {
           form.setValue('points', activity.points);
       }
   }, [selectedActivity, form]);
 
   const onSubmit = async (data: TempUpdateFormValues) => {
     setIsSubmitting(true);
+    const reasonForPoints = data.activityTitle === 'Historical Data Adjustment' 
+        ? data.reason || 'Manual Adjustment'
+        : data.activityTitle;
+
     try {
       const result = await awardPointsFlow({
           studentId: data.studentId,
           points: data.points,
-          reason: data.activityTitle,
-          activityId: `manual-${data.activityTitle.replace(/\s+/g, '-').toLowerCase()}`, // The flow will make this unique
+          reason: reasonForPoints,
+          activityId: `manual-${reasonForPoints.replace(/\s+/g, '-').toLowerCase()}`, // The flow will make this unique
           action: 'award',
       });
       
@@ -94,18 +102,19 @@ export default function TempUpdatePage() {
       const selectedStudent = students.find(s => s.uid === data.studentId);
       toast({
         title: 'Points Awarded!',
-        description: `${data.points} points awarded to ${selectedStudent?.displayName} for "${data.activityTitle}".`,
+        description: `${data.points} points awarded to ${selectedStudent?.displayName} for "${reasonForPoints}".`,
       });
       form.reset({
         studentId: '',
         activityTitle: '',
         points: 1,
+        reason: '',
       });
     } catch (error: any) {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: error.message === 'duplicate' ? 'This activity has already been recorded for this student on this date.' : 'Could not award points.',
+        description: 'Could not award points. ' + error.message,
       });
     } finally {
       setIsSubmitting(false);
@@ -116,13 +125,13 @@ export default function TempUpdatePage() {
     <div className="space-y-6">
        <div className="space-y-1">
         <h1 className="text-3xl font-bold tracking-tight">Manual Point Entry</h1>
-        <p className="text-muted-foreground">Manually award points to students for activities or special cases.</p>
+        <p className="text-muted-foreground">Manually award points to students for historical data, corrections, or special cases.</p>
       </div>
 
       <Card className="max-w-2xl mx-auto">
         <CardHeader>
           <CardTitle>Award Points</CardTitle>
-          <CardDescription>Select a student, activity, and the points to award.</CardDescription>
+          <CardDescription>Select a student, activity, and the points to award. This will be added to their current total.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -203,11 +212,11 @@ export default function TempUpdatePage() {
                     name="activityTitle"
                     render={({ field }) => (
                     <FormItem>
-                        <FormLabel>Activity</FormLabel>
+                        <FormLabel>Category</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                             <SelectTrigger>
-                            <SelectValue placeholder="Select an activity" />
+                            <SelectValue placeholder="Select a category" />
                             </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -237,6 +246,22 @@ export default function TempUpdatePage() {
                     )}
                 />
               </div>
+
+               {selectedActivity === 'Historical Data Adjustment' && (
+                 <FormField
+                    control={form.control}
+                    name="reason"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Reason for Adjustment</FormLabel>
+                            <FormControl>
+                                <Input placeholder="e.g., Points from last year" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+               )}
 
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <PlusCircle className="mr-2 h-4 w-4" />}
