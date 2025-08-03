@@ -3,78 +3,92 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Function to check if the requesting user is an admin or a teacher.
-    function isTeacherOrAdmin() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'teacher'];
+    // Helper functions
+    function isAuth() {
+      return request.auth != null;
+    }
+    
+    function isUser(userId) {
+        return isAuth() && request.auth.uid == userId;
+    }
+    
+    function getUserRole(userId) {
+        return get(/databases/$(database)/documents/users/$(userId)).data.role;
     }
 
+    function isTeacherOrAdmin(userId) {
+        let role = getUserRole(userId);
+        return role == 'teacher' || role == 'admin';
+    }
+
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+    
+    // Allow users to read and update their own document
+    // Allow teachers/admins to read any user document
     match /users/{userId} {
-      // Users can read and update their own main document.
-      allow read, update: if request.auth != null && request.auth.uid == userId;
-      // Allow users to be created.
-      allow create: if request.auth != null;
-      
-      // Teachers and Admins can read the list of all users.
-      allow list: if request.auth != null && isTeacherOrAdmin();
-       // Teachers and Admins can read any specific user's document.
-      allow get: if request.auth != null && (request.auth.uid == userId || isTeacherOrAdmin());
-
-      // Rules for the points subcollection.
-      match /points/{pointId} {
-        // Any authenticated user can read their own points.
-        allow read: if request.auth != null && request.auth.uid == userId;
-        // Only teachers and admins can create, update, or delete points for any user.
-        allow write, delete: if request.auth != null && isTeacherOrAdmin();
-      }
+      allow get: if isUser(userId) || isTeacherOrAdmin(request.auth.uid);
+      allow list: if isTeacherOrAdmin(request.auth.uid);
+      allow update: if isUser(userId);
     }
 
-    // Rules for all other collections.
+    // Allow users to read their own points
+    // Allow teachers/admins to read/write/delete any user's points
+    match /users/{userId}/points/{pointId} {
+        allow read: if isUser(userId) || isTeacherOrAdmin(request.auth.uid);
+        allow write, delete: if isTeacherOrAdmin(request.auth.uid);
+    }
+    
+    // Allow logged-in users to perform actions on other collections based on their roles
     match /announcements/{announcementId} {
-      allow read, write: if request.auth != null && isTeacherOrAdmin();
-      allow list: if request.auth != null;
+        allow read: if isAuth();
+        allow write: if isTeacherOrAdmin(request.auth.uid);
     }
 
     match /assignments/{assignmentId} {
-      allow read, write: if request.auth != null && isTeacherOrAdmin();
-      allow list: if request.auth != null;
+        allow read: if isAuth();
+        allow write: if isTeacherOrAdmin(request.auth.uid);
     }
-    
+
     match /exercises/{exerciseId} {
-      allow read, write: if request.auth != null && isTeacherOrAdmin();
-      allow list: if request.auth != null;
+        allow read: if isAuth();
+        allow write: if isTeacherOrAdmin(request.auth.uid);
     }
-    
+
     match /projects/{projectId} {
-      allow read, write: if request.auth != null && isTeacherOrAdmin();
-      allow list: if request.auth != null;
+        allow read: if isAuth();
+        allow write: if isTeacherOrAdmin(request.auth.uid);
     }
     
     match /resources/{resourceId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && isTeacherOrAdmin();
+        allow read: if isAuth();
+        allow write: if isTeacherOrAdmin(request.auth.uid);
     }
     
     match /materials/{materialId} {
-       allow read: if request.auth != null;
-       allow write: if request.auth != null && isTeacherOrAdmin();
+        allow read: if isAuth();
+        allow write: if isTeacherOrAdmin(request.auth.uid);
     }
 
-    match /submissions/{submissionId} {
-      allow read, write: if request.auth != null;
-      allow list: if request.auth != null && isTeacherOrAdmin();
+    match /roadmap_status/{weekId} {
+        allow read: if isAuth();
+        allow write: if isTeacherOrAdmin(request.auth.uid);
     }
     
-    match /roadmap_status/{weekId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && isTeacherOrAdmin();
+    match /submissions/{submissionId} {
+        allow read: if isTeacherOrAdmin(request.auth.uid) || get(/databases/$(database)/documents/submissions/$(submissionId)).data.studentId == request.auth.uid;
+        allow create: if isAuth();
+        allow delete: if isTeacherOrAdmin(request.auth.uid);
+    }
+
+    match /chats/{chatId}/messages/{messageId} {
+        allow read, write: if isAuth();
     }
     
     match /notifications/{notificationId} {
-       allow read, write: if request.auth != null;
-    }
-    
-    match /chats/{chatId}/{message=**} {
-      allow read, write: if request.auth != null;
+       allow read, write: if get(/databases/$(database)/documents/notifications/$(notificationId)).data.userId == request.auth.uid;
     }
   }
 }

@@ -11,6 +11,8 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { v4 as uuidv4 } from 'uuid';
+import { db } from '@/lib/firebase';
+import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 
 
 const AwardPointsFlowInputSchema = z.object({
@@ -34,53 +36,62 @@ export const awardPointsFlow = ai.defineFlow(
     name: 'awardPointsFlow',
     inputSchema: AwardPointsFlowInputSchema,
     outputSchema: AwardPointsFlowOutputSchema,
+    authPolicy: (auth, input) => {
+        // This policy is checked on the server before the flow runs.
+        // It ensures only authenticated users can call this flow.
+        if (!auth) {
+            throw new Error("User must be authenticated.");
+        }
+        // Further validation could check for a teacher/admin role if the user's
+        // custom claims were available in the auth object. Since they are not
+        // by default, we will rely on Firestore security rules for write permissions.
+    }
   },
   async (input) => {
-    // Dynamically import firebase-admin here to ensure it's only loaded on the server at runtime
-    const { adminDB, FieldValue } = await import('@/lib/firebase-admin');
-
     try {
       if (input.action === 'award') {
         const { studentId, points, reason, activityId } = input;
         
-        // For manually awarded points, create a unique ID every time to prevent overwrites.
-        // For graded items, the activityId is stable, which is desired behavior.
         const finalActivityId = activityId.startsWith('manual-')
             ? `${activityId}-${uuidv4()}` 
             : activityId;
         
-        const pointDocRef = adminDB.collection('users').doc(studentId).collection('points').doc(finalActivityId);
+        const pointDocRef = doc(db, 'users', studentId, 'points', finalActivityId);
 
-        const docSnap = await pointDocRef.get();
+        const docSnap = await getDoc(pointDocRef);
         // Prevent duplicate points for non-manual entries
-        if (docSnap.exists && !activityId.startsWith('manual-')) {
-            return { success: false, message: 'Point already awarded for this activity.' };
+        if (docSnap.exists() && !activityId.startsWith('manual-')) {
+            return { success: false, message: 'duplicate' };
         }
 
-        await pointDocRef.set({
+        await setDoc(pointDocRef, {
             points,
             reason,
             activityId: finalActivityId,
-            awardedAt: FieldValue.serverTimestamp(),
+            awardedAt: serverTimestamp(),
         });
         
         return { success: true, message: 'Points awarded successfully.' };
 
       } else { // action === 'revoke'
         const { studentId, activityId } = input;
-        const pointToRevokeRef = adminDB.collection('users').doc(studentId).collection('points').doc(activityId);
+        const pointToRevokeRef = doc(db, 'users', studentId, 'points', activityId);
         
-        const docSnap = await pointToRevokeRef.get();
+        const docSnap = await getDoc(pointToRevokeRef);
         if (!docSnap.exists) {
             return { success: true, message: "Points already revoked or never existed." };
         }
         
-        await pointToRevokeRef.delete();
+        await deleteDoc(pointToRevokeRef);
         
         return { success: true, message: "Points revoked successfully." };
       }
     } catch (error: any) {
-      console.error("Error processing points in tool:", error);
+      console.error("Error processing points in flow:", error);
+      // Firestore permission errors have a specific code.
+      if (error.code === 'permission-denied') {
+          return { success: false, message: "Server error: Could not process points. Reason: Missing or insufficient permissions." };
+      }
       const errorMessage = error.message || "An unexpected error occurred.";
       return { success: false, message: `Server error: Could not process points. Reason: ${errorMessage}` };
     }
