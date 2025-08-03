@@ -12,6 +12,7 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { v4 as uuidv4 } from 'uuid';
 
+
 const AwardPointsFlowInputSchema = z.object({
     studentId: z.string().describe("The UID of the student to award points to."),
     points: z.number().describe("The number of points to award. Can be negative to revoke."),
@@ -27,11 +28,10 @@ const AwardPointsFlowOutputSchema = z.object({
 });
 export type AwardPointsFlowOutput = z.infer<typeof AwardPointsFlowOutputSchema>;
 
-// This tool defines the secure server-side action using the Firebase Admin SDK.
-const awardOrRevokePointsTool = ai.defineTool(
+
+export const awardPointsFlow = ai.defineFlow(
   {
-    name: 'awardOrRevokePoints',
-    description: 'A tool to securely award or revoke points for a student using admin privileges.',
+    name: 'awardPointsFlow',
     inputSchema: AwardPointsFlowInputSchema,
     outputSchema: AwardPointsFlowOutputSchema,
   },
@@ -42,13 +42,17 @@ const awardOrRevokePointsTool = ai.defineTool(
     try {
       if (input.action === 'award') {
         const { studentId, points, reason, activityId } = input;
+        
+        // For manually awarded points, create a unique ID every time to prevent overwrites.
+        // For graded items, the activityId is stable, which is desired behavior.
         const finalActivityId = activityId.startsWith('manual-')
-            ? `${activityId}-${uuidv4()}`
+            ? `${activityId}-${uuidv4()}` 
             : activityId;
         
         const pointDocRef = adminDB.collection('users').doc(studentId).collection('points').doc(finalActivityId);
 
         const docSnap = await pointDocRef.get();
+        // Prevent duplicate points for non-manual entries
         if (docSnap.exists && !activityId.startsWith('manual-')) {
             return { success: false, message: 'Point already awarded for this activity.' };
         }
@@ -65,12 +69,12 @@ const awardOrRevokePointsTool = ai.defineTool(
       } else { // action === 'revoke'
         const { studentId, activityId } = input;
         const pointToRevokeRef = adminDB.collection('users').doc(studentId).collection('points').doc(activityId);
-
+        
         const docSnap = await pointToRevokeRef.get();
         if (!docSnap.exists) {
             return { success: true, message: "Points already revoked or never existed." };
         }
-
+        
         await pointToRevokeRef.delete();
         
         return { success: true, message: "Points revoked successfully." };
@@ -82,8 +86,3 @@ const awardOrRevokePointsTool = ai.defineTool(
     }
   }
 );
-
-// The exported flow function remains the same. It just calls the tool.
-export async function awardPointsFlow(input: AwardPointsFlowInput): Promise<AwardPointsFlowOutput> {
-    return await awardOrRevokePointsTool(input);
-}
