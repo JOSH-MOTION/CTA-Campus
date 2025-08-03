@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { awardPointsFlow } from '@/ai/flows/award-points-flow';
 import { Textarea } from '@/components/ui/textarea';
+import { useRouter } from 'next/navigation';
 
 const gradingData = [
     { title: "Class Attendance", points: 1 },
@@ -45,11 +46,21 @@ type TempUpdateFormValues = z.infer<typeof tempUpdateSchema>;
 
 export default function TempUpdatePage() {
   const { toast } = useToast();
-  const { fetchAllUsers } = useAuth();
+  const { fetchAllUsers, role, loading: authLoading } = useAuth();
   const [students, setStudents] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const router = useRouter();
+  
+  const isTeacherOrAdmin = role === 'teacher' || role === 'admin';
+
+  useEffect(() => {
+    if (!authLoading && !isTeacherOrAdmin) {
+      router.push('/'); // Redirect if not a teacher/admin
+    }
+  }, [authLoading, isTeacherOrAdmin, router]);
+
 
   useEffect(() => {
     const loadStudents = async () => {
@@ -59,8 +70,10 @@ export default function TempUpdatePage() {
       setStudents(studentUsers);
       setLoading(false);
     };
-    loadStudents();
-  }, [fetchAllUsers]);
+    if (isTeacherOrAdmin) {
+        loadStudents();
+    }
+  }, [fetchAllUsers, isTeacherOrAdmin]);
   
   const form = useForm<TempUpdateFormValues>({
     resolver: zodResolver(tempUpdateSchema),
@@ -122,6 +135,14 @@ export default function TempUpdatePage() {
       setIsSubmitting(false);
     }
   };
+
+  if (authLoading || !isTeacherOrAdmin) {
+    return (
+        <div className="flex h-full items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
