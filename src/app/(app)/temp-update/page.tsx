@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Loader2, ChevronsUpDown, Check, Pencil } from 'lucide-react';
+import { PlusCircle, Loader2, ChevronsUpDown, Check } from 'lucide-react';
 import { useAuth, UserData } from '@/contexts/AuthContext';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -37,8 +37,17 @@ const tempUpdateSchema = z.object({
   studentId: z.string().nonempty('Please select a student.'),
   activityTitle: z.string().nonempty('Please select an activity.'),
   points: z.coerce.number().min(0.1, 'Please enter a valid point value.'),
-  reason: z.string().min(3, "Please provide a reason.").optional(),
+  reason: z.string().optional(),
+}).refine(data => {
+    if (data.activityTitle === 'Historical Data Adjustment') {
+        return data.reason && data.reason.length >= 3;
+    }
+    return true;
+}, {
+    message: "Reason is required for historical adjustments (min 3 chars).",
+    path: ["reason"],
 });
+
 
 type TempUpdateFormValues = z.infer<typeof tempUpdateSchema>;
 
@@ -82,23 +91,25 @@ export default function TempUpdatePage() {
 
   const onSubmit = async (data: TempUpdateFormValues) => {
     setIsSubmitting(true);
+    console.log("Form submitted. Data:", data);
+
     const reasonForPoints = data.activityTitle === 'Historical Data Adjustment' 
         ? data.reason || 'Manual Adjustment'
         : data.activityTitle;
 
     try {
-      console.log("Submitting with data:", data);
+      console.log("Calling awardPointsFlow...");
       const result = await awardPointsFlow({
           studentId: data.studentId,
           points: data.points,
           reason: reasonForPoints,
-          activityId: `manual-${reasonForPoints.replace(/\s+/g, '-').toLowerCase()}`, // The flow will make this unique
+          activityId: `manual-${reasonForPoints.replace(/\s+/g, '-').toLowerCase()}`,
           action: 'award',
       });
       
-      console.log("Flow result:", result);
-      if (!result.success) {
-          throw new Error(result.message);
+      console.log("awardPointsFlow result:", result);
+      if (!result || !result.success) {
+          throw new Error(result?.message || "An unknown error occurred in the flow.");
       }
       
       const selectedStudent = students.find(s => s.uid === data.studentId);
@@ -113,13 +124,14 @@ export default function TempUpdatePage() {
         reason: '',
       });
     } catch (error: any) {
-      console.error("Error awarding points:", error);
+      console.error("Error in onSubmit:", error);
       toast({
         variant: 'destructive',
-        title: 'Error',
-        description: 'Could not award points. ' + error.message,
+        title: 'Error Awarding Points',
+        description: error.message || 'Could not award points. Please check the console.',
       });
     } finally {
+      console.log("Submission process finished.");
       setIsSubmitting(false);
     }
   };
