@@ -10,9 +10,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
-import { v4 as uuidv4 } from 'uuid';
+import { awardPointsAdmin, revokePointsAdmin } from '@/services/admin-points';
 
 const AwardPointsFlowInputSchema = z.object({
     studentId: z.string().describe("The UID of the student to award points to."),
@@ -29,64 +27,30 @@ const AwardPointsFlowOutputSchema = z.object({
 });
 export type AwardPointsFlowOutput = z.infer<typeof AwardPointsFlowOutputSchema>;
 
+// This tool defines the secure server-side action using the Firebase Admin SDK.
 const awardOrRevokePointsTool = ai.defineTool(
   {
     name: 'awardOrRevokePoints',
-    description: 'A tool to securely award or revoke points for a student in the database.',
+    description: 'A tool to securely award or revoke points for a student using admin privileges.',
     inputSchema: AwardPointsFlowInputSchema,
     outputSchema: AwardPointsFlowOutputSchema,
   },
   async (input) => {
     try {
-        const { studentId, points, reason, activityId, action } = input;
-        
-        // For manual entries, create a unique ID each time.
-        // For graded items, the ID is stable.
-        const finalActivityId = activityId.startsWith('manual-') 
-            ? `${activityId}-${uuidv4()}`
-            : activityId;
-
-        const pointDocRef = doc(db, 'users', studentId, 'points', finalActivityId);
-
-        if (action === 'award') {
-            const docSnap = await getDoc(pointDocRef);
-            // We only prevent duplicates for non-manual, specific activities.
-            if (docSnap.exists() && !activityId.startsWith('manual-')) {
-                return { success: false, message: 'Point already awarded for this activity.' };
-            }
-            
-            await setDoc(pointDocRef, {
-                points,
-                reason,
-                activityId: finalActivityId,
-                awardedAt: serverTimestamp(),
-            });
-
-            return { success: true, message: "Points awarded successfully." };
-        } else { // action === 'revoke'
-            // For revoking, we use the original, stable activityId.
-            const pointToRevokeRef = doc(db, 'users', studentId, 'points', activityId);
-            const docSnap = await getDoc(pointToRevokeRef);
-
-            if (!docSnap.exists()) {
-                // It's already gone, so the goal is achieved.
-                return { success: true, message: "Points already revoked or never existed." };
-            }
-            await deleteDoc(pointToRevokeRef);
-            return { success: true, message: "Points revoked successfully." };
-        }
+      if (input.action === 'award') {
+        return await awardPointsAdmin(input);
+      } else { // action === 'revoke'
+        return await revokePointsAdmin(input);
+      }
     } catch (error: any) {
       console.error("Error processing points in tool:", error);
-      // This will now correctly report permission errors from Firestore.
       const errorMessage = error.message || "An unexpected error occurred.";
       return { success: false, message: `Server error: Could not process points. Reason: ${errorMessage}` };
     }
   }
 );
 
-
+// The exported flow function remains the same. It just calls the tool.
 export async function awardPointsFlow(input: AwardPointsFlowInput): Promise<AwardPointsFlowOutput> {
-    // The tool is now the entire implementation. The flow just calls it.
-    // This is the correct pattern for secure server-side operations.
     return await awardOrRevokePointsTool(input);
 }
