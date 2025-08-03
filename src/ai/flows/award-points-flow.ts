@@ -52,6 +52,7 @@ export const awardPointsFlow = ai.defineFlow(
       if (input.action === 'award') {
         const { studentId, points, reason, activityId } = input;
         
+        // For manual entries, always append a UUID to ensure uniqueness.
         const finalActivityId = activityId.startsWith('manual-')
             ? `${activityId}-${uuidv4()}` 
             : activityId;
@@ -78,7 +79,7 @@ export const awardPointsFlow = ai.defineFlow(
         const pointToRevokeRef = doc(db, 'users', studentId, 'points', activityId);
         
         const docSnap = await getDoc(pointToRevokeRef);
-        if (!docSnap.exists) {
+        if (!docSnap.exists()) {
             return { success: true, message: "Points already revoked or never existed." };
         }
         

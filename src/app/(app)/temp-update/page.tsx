@@ -30,7 +30,7 @@ const gradingData = [
     { title: "100 Days of Code", points: 0.5 },
     { title: "Code Review", points: 1 },
     { title: "Final Project Completion", points: 10 },
-    { title: "Historical Data Adjustment", points: 0},
+    { title: "Manual Adjustment", points: 0},
 ];
 
 const tempUpdateSchema = z.object({
@@ -39,12 +39,12 @@ const tempUpdateSchema = z.object({
   points: z.coerce.number().min(0.1, 'Please enter a valid point value.'),
   reason: z.string().optional(),
 }).refine(data => {
-    if (data.activityTitle === 'Historical Data Adjustment') {
+    if (data.activityTitle === 'Manual Adjustment') {
         return data.reason && data.reason.trim().length >= 3;
     }
     return true;
 }, {
-    message: "Reason is required for historical adjustments (min 3 chars).",
+    message: "Reason is required for manual adjustments (min 3 chars).",
     path: ["reason"],
 });
 
@@ -93,7 +93,7 @@ export default function TempUpdatePage() {
     setIsSubmitting(true);
     console.log("Form submitted. Data:", data);
 
-    const reasonForPoints = data.activityTitle === 'Historical Data Adjustment' 
+    const reasonForPoints = data.activityTitle === 'Manual Adjustment' 
         ? data.reason?.trim() || 'Manual Adjustment'
         : data.activityTitle;
 
@@ -262,7 +262,7 @@ export default function TempUpdatePage() {
                 />
               </div>
 
-               {selectedActivity === 'Historical Data Adjustment' && (
+               {selectedActivity === 'Manual Adjustment' && (
                  <FormField
                     control={form.control}
                     name="reason"
