@@ -1,13 +1,13 @@
 // src/app/(app)/temp-update/page.tsx
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { PlusCircle, Loader2, ChevronsUpDown, Check } from 'lucide-react';
@@ -39,17 +39,7 @@ const tempUpdateSchema = z.object({
   activityTitle: z.string().nonempty('Please select an activity.'),
   points: z.coerce.number().min(0.1, 'Please enter a valid point value.'),
   reason: z.string().min(3, "Reason must have at least 3 characters."),
-}).refine(data => {
-    // Make reason required only if it's a manual adjustment
-    if (data.activityTitle === 'Manual Adjustment') {
-        return data.reason && data.reason.trim().length >= 3;
-    }
-    return true;
-}, {
-    message: "A specific reason is required for manual adjustments (min 3 chars).",
-    path: ["reason"],
 });
-
 
 type TempUpdateFormValues = z.infer<typeof tempUpdateSchema>;
 
@@ -91,6 +81,7 @@ export default function TempUpdatePage() {
           form.setValue('reason', activity.title);
       } else if (selectedActivity === 'Manual Adjustment') {
           form.setValue('reason', '');
+          form.setValue('points', 1);
       }
   }, [selectedActivity, form]);
 
