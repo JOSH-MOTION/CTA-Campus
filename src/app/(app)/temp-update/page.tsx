@@ -40,7 +40,7 @@ const tempUpdateSchema = z.object({
   reason: z.string().optional(),
 }).refine(data => {
     if (data.activityTitle === 'Historical Data Adjustment') {
-        return data.reason && data.reason.length >= 3;
+        return data.reason && data.reason.trim().length >= 3;
     }
     return true;
 }, {
@@ -94,7 +94,7 @@ export default function TempUpdatePage() {
     console.log("Form submitted. Data:", data);
 
     const reasonForPoints = data.activityTitle === 'Historical Data Adjustment' 
-        ? data.reason || 'Manual Adjustment'
+        ? data.reason?.trim() || 'Manual Adjustment'
         : data.activityTitle;
 
     try {

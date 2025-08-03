@@ -44,8 +44,8 @@ export async function awardPointsFlow(input: AwardPointsFlowInput): Promise<Awar
   try {
     if (action === 'award') {
       const docSnap = await getDoc(pointDocRef);
-      if (docSnap.exists()) {
-        // If the point already exists, we don't need to do anything.
+      if (docSnap.exists() && !activityId.startsWith('manual-')) {
+        // If the point already exists for a non-manual entry, we don't need to do anything.
         // This makes the award action idempotent for stable activity IDs.
         return { success: true, message: 'Point already awarded.' };
       }
@@ -66,6 +66,7 @@ export async function awardPointsFlow(input: AwardPointsFlowInput): Promise<Awar
     }
   } catch (error: any) {
     console.error("Error processing points:", error);
-    return { success: false, message: `Server error: ${error.message}` };
+    // Return a more generic but helpful error message to the client.
+    return { success: false, message: `Server error: Could not process points due to a permission or data issue.` };
   }
 }
