@@ -1,113 +1,127 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper Functions
-    function isUserAuthenticated() {
+    // Helper functions to check user roles from their document in the 'users' collection.
+    function isAuth() {
       return request.auth != null;
     }
 
-    function isOwner(userId) {
-      return request.auth.uid == userId;
+    function isUser(userId) {
+      return isAuth() && request.auth.uid == userId;
     }
 
-    // Checks if the requesting user has the 'teacher' or 'admin' role by reading their user document.
-    function isTeacherOrAdmin() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['teacher', 'admin'];
+    // It's important to only get data from trusted paths.
+    // This function securely gets the user's data document.
+    function getUserData(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data;
+    }
+
+    // Checks if the requesting user has a specific role.
+    function isRole(role) {
+      return isAuth() && getUserData(request.auth.uid).role == role;
     }
     
-    function isStudent() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'student';
+    // Checks if the requesting user has one of the specified roles.
+    function isOneOfRoles(roles) {
+        return isAuth() && getUserData(request.auth.uid).role in roles;
     }
 
-    // Users Collection
-    // - Anyone can create their own user document during sign-up.
-    // - Users can only read documents (e.g., for the directory).
-    // - Users can only update their own document.
+    // Rules for the 'users' collection
     match /users/{userId} {
-      allow create: if isUserAuthenticated();
-      allow read: if isUserAuthenticated();
-      allow update: if isOwner(userId);
-      allow delete: if false; // Generally, don't allow users to delete their own accounts from the client.
+      // A user can read their own document.
+      // An admin can read any user's document.
+      allow read: if isUser(userId) || isRole('admin');
+      
+      // A user can update their own document.
+      allow update: if isUser(userId);
 
-      // Points Subcollection
-      // - Only teachers/admins can create (award) or delete (revoke) points.
-      // - Users can read their own points, teachers/admins can read any student's points.
+      // Rules for the 'points' subcollection within each user document
       match /points/{pointId} {
-        allow read: if isOwner(userId) || isTeacherOrAdmin();
-        allow create, delete: if isTeacherOrAdmin();
-        allow update: if false;
+        // Teachers and admins can create (award) and delete (revoke) points for any user.
+        // A student can only read their own points. They cannot create or delete them directly.
+        allow read: if isUser(userId) || isOneOfRoles(['admin', 'teacher']);
+        allow create, delete: if isOneOfRoles(['admin', 'teacher']);
+      }
+      
+       // Rules for the 'notifications' subcollection within each user document
+      match /notifications/{notificationId} {
+        // A user can read and update (e.g., mark as read) their own notifications.
+        allow read, update: if isUser(userId);
+        // Notifications are created by the server/secure functions, so client-side creation is disallowed.
+        allow create, delete: if false;
       }
     }
-    
-    // Notifications Subcollection
-    // - Only the server (via a secure function) should create notifications.
-    // - Users can only read and update (mark as read) their own notifications.
-    match /notifications/{notificationId} {
-      allow create: if isTeacherOrAdmin(); // For manual/server-side creation
-      allow read, update: if isOwner(resource.data.userId);
-      allow delete: if false;
-    }
-    
-    // Generic Content Collections (Announcements, Assignments, Exercises, Projects, Resources)
-    // These collections share similar rules.
-    function canReadContent(gen) {
-        let userGen = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.gen;
-        return gen == 'Everyone' || gen == 'All Students' || gen == userGen;
-    }
 
+    // Rules for shared collections
     match /announcements/{announcementId} {
-        allow read: if isTeacherOrAdmin() || (isStudent() && canReadContent(resource.data.targetGen));
-        allow create, update, delete: if isTeacherOrAdmin();
+      // Any authenticated user can read announcements.
+      allow read: if isAuth();
+      // Only admins and teachers can create, update, or delete announcements.
+      allow write: if isOneOfRoles(['admin', 'teacher']);
     }
+
     match /assignments/{assignmentId} {
-        allow read: if isTeacherOrAdmin() || (isStudent() && canReadContent(resource.data.targetGen));
-        allow create, update, delete: if isTeacherOrAdmin();
+        allow read: if isAuth();
+        allow write: if isOneOfRoles(['admin', 'teacher']);
     }
+    
     match /exercises/{exerciseId} {
-        allow read: if isTeacherOrAdmin() || (isStudent() && canReadContent(resource.data.targetGen));
-        allow create, update, delete: if isTeacherOrAdmin();
+        allow read: if isAuth();
+        allow write: if isOneOfRoles(['admin', 'teacher']);
     }
-     match /projects/{projectId} {
-        allow read: if isTeacherOrAdmin() || (isStudent() && canReadContent(resource.data.targetGen));
-        allow create, update, delete: if isTeacherOrAdmin();
+    
+    match /projects/{projectId} {
+        allow read: if isAuth();
+        allow write: if isOneOfRoles(['admin', 'teacher']);
     }
-     match /resources/{resourceId} {
-        allow read: if isUserAuthenticated();
-        allow create, update, delete: if isTeacherOrAdmin();
+    
+    match /resources/{resourceId} {
+        allow read: if isAuth();
+        allow write: if isOneOfRoles(['admin', 'teacher']);
     }
-     match /materials/{materialId} {
-        allow read: if isUserAuthenticated();
-        allow create, update, delete: if isTeacherOrAdmin();
+    
+    match /materials/{materialId} {
+        allow read: if isAuth();
+        allow write: if isOneOfRoles(['admin', 'teacher']);
     }
-
-    // Submissions Collection
-    // - Students can create their own submissions.
-    // - Students can read their own submissions. Teachers/admins can read all submissions.
-    // - Only teachers/admins can delete submissions.
-    match /submissions/{submissionId} {
-      allow create: if isOwner(request.resource.data.studentId);
-      allow read: if isOwner(resource.data.studentId) || isTeacherOrAdmin();
-      allow delete: if isTeacherOrAdmin();
-      allow update: if false;
-    }
-
-    // Roadmap Status
-    // - Anyone authenticated can read the roadmap status (to see progress).
-    // - Only teachers/admins can update it.
+    
     match /roadmap_status/{weekId} {
-        allow read: if isUserAuthenticated();
-        allow create, update: if isTeacherOrAdmin();
+        allow read: if isAuth();
+        allow write: if isOneOfRoles(['admin', 'teacher']);
     }
-
-    // Chat
-    // - Users can read/write messages in a chat if they are part of it.
-    // - Group chats are based on generation.
-    // - DM chat IDs are a combination of the two user IDs.
+    
+    // Rules for submissions
+    match /submissions/{submissionId} {
+      // Users can only create their own submissions.
+      allow create: if isAuth() && request.resource.data.studentId == request.auth.uid;
+      // Admins and teachers can read any submission. Students can read their own.
+      allow read: if isAuth() && (isOneOfRoles(['admin', 'teacher']) || resource.data.studentId == request.auth.uid);
+      // Only admins and teachers can delete submissions.
+      allow delete: if isOneOfRoles(['admin', 'teacher']);
+      allow update: if false; // Submissions should be immutable.
+    }
+    
+    // Rules for chats
     match /chats/{chatId}/messages/{messageId} {
-       allow read, create: if isUserAuthenticated(); // Simplified for now
-       allow update, delete: if isOwner(resource.data.senderId);
+        // For one-on-one chats (DM), the chat ID is '{userId1}-{userId2}'
+        // For group chats, the chat ID is 'group-{genName}'
+        
+        function isDmMember() {
+            let userIds = chatId.split('-');
+            return request.auth.uid in userIds;
+        }
+        
+        function isGroupMember() {
+            let genName = chatId.split('-')[1];
+            // Check if the user is a teacher/admin or a student of that generation
+            return isOneOfRoles(['admin', 'teacher']) || (isRole('student') && getUserData(request.auth.uid).gen == genName);
+        }
+
+        // Allow read/write if the user is a member of the DM or the group chat.
+        allow read, write: if isAuth() && (chatId.startsWith('group-') ? isGroupMember() : isDmMember());
     }
   }
 }
