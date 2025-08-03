@@ -40,6 +40,8 @@ const awardOrRevokePointsTool = ai.defineTool(
     try {
         const { studentId, points, reason, activityId, action } = input;
         
+        // For manual entries, create a unique ID each time.
+        // For graded items, the ID is stable.
         const finalActivityId = activityId.startsWith('manual-') 
             ? `${activityId}-${uuidv4()}`
             : activityId;
@@ -48,8 +50,9 @@ const awardOrRevokePointsTool = ai.defineTool(
 
         if (action === 'award') {
             const docSnap = await getDoc(pointDocRef);
+            // We only prevent duplicates for non-manual, specific activities.
             if (docSnap.exists() && !activityId.startsWith('manual-')) {
-                return { success: true, message: 'Point already awarded.' };
+                return { success: false, message: 'Point already awarded for this activity.' };
             }
             
             await setDoc(pointDocRef, {
@@ -61,9 +64,12 @@ const awardOrRevokePointsTool = ai.defineTool(
 
             return { success: true, message: "Points awarded successfully." };
         } else { // action === 'revoke'
+            // For revoking, we use the original, stable activityId.
             const pointToRevokeRef = doc(db, 'users', studentId, 'points', activityId);
             const docSnap = await getDoc(pointToRevokeRef);
+
             if (!docSnap.exists()) {
+                // It's already gone, so the goal is achieved.
                 return { success: true, message: "Points already revoked or never existed." };
             }
             await deleteDoc(pointToRevokeRef);
@@ -71,7 +77,7 @@ const awardOrRevokePointsTool = ai.defineTool(
         }
     } catch (error: any) {
       console.error("Error processing points in tool:", error);
-      // Provide a more specific error message if possible, but fallback to a generic one.
+      // This will now correctly report permission errors from Firestore.
       const errorMessage = error.message || "An unexpected error occurred.";
       return { success: false, message: `Server error: Could not process points. Reason: ${errorMessage}` };
     }
