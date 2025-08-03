@@ -87,6 +87,7 @@ export default function TempUpdatePage() {
         : data.activityTitle;
 
     try {
+      console.log("Submitting with data:", data);
       const result = await awardPointsFlow({
           studentId: data.studentId,
           points: data.points,
@@ -95,6 +96,7 @@ export default function TempUpdatePage() {
           action: 'award',
       });
       
+      console.log("Flow result:", result);
       if (!result.success) {
           throw new Error(result.message);
       }
@@ -111,6 +113,7 @@ export default function TempUpdatePage() {
         reason: '',
       });
     } catch (error: any) {
+      console.error("Error awarding points:", error);
       toast({
         variant: 'destructive',
         title: 'Error',
