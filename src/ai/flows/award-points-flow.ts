@@ -60,7 +60,9 @@ export const awardPointsFlow = ai.defineFlow(
         const pointDocRef = doc(db, 'users', studentId, 'points', finalActivityId);
 
         const docSnap = await getDoc(pointDocRef);
-        if (docSnap.exists() && !activityId.startsWith('manual-')) {
+        // This check prevents awarding points for the same non-manual activity twice.
+        // It's crucial for submissions and attendance.
+        if (docSnap.exists() && !finalActivityId.startsWith('manual-')) {
             return { success: false, message: 'duplicate' };
         }
 
