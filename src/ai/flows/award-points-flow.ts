@@ -9,8 +9,6 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { adminDB } from '@/lib/firebase-admin';
-import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'genkit';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -38,6 +36,9 @@ const awardOrRevokePointsTool = ai.defineTool(
     outputSchema: AwardPointsFlowOutputSchema,
   },
   async (input) => {
+    // Dynamically import firebase-admin here to ensure it's only loaded on the server at runtime
+    const { adminDB, FieldValue } = await import('@/lib/firebase-admin');
+
     try {
       if (input.action === 'award') {
         const { studentId, points, reason, activityId } = input;

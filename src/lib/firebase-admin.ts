@@ -1,4 +1,5 @@
 import * as admin from 'firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 
 if (!admin.apps.length) {
   admin.initializeApp({
@@ -7,5 +8,5 @@ if (!admin.apps.length) {
   });
 }
 
-const db = admin.firestore();
-export { admin, db as adminDB };
+const adminDB = admin.firestore();
+export { admin, adminDB, FieldValue };
