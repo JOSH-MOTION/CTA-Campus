@@ -1,76 +1,82 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper function to check the role of the requesting user.
-    function isRole(role) {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+    // Helper function to check if the requesting user has a 'teacher' or 'admin' role.
+    function isStaff() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['teacher', 'admin'];
     }
-    
-    // Default deny all reads and writes to ensure security.
+
+    // By default, deny all reads and writes to all documents.
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // Rules for the 'users' collection
+    // Rules for the 'users' collection.
     match /users/{userId} {
-      // Allow users to read their own data.
-      // Allow teachers and admins to read any user's data for management purposes.
-      allow read: if request.auth.uid == userId || isRole('teacher') || isRole('admin');
-      
-      // Allow users to update their own data.
-      allow update: if request.auth.uid == userId;
+      // Users can read their own document. Staff can read any user document.
+      allow read: if request.auth.uid == userId || isStaff();
+      // Users can only write to their own document.
+      allow write: if request.auth.uid == userId;
 
-      // Rules for the 'points' subcollection
+      // Rules for the 'points' subcollection within a user document.
       match /points/{pointId} {
-        // Users can read their own points. Teachers/admins can read any user's points.
-        allow read: if request.auth.uid == userId || isRole('teacher') || isRole('admin');
+        // A user can read their own points. Staff can read any user's points.
+        allow read: if request.auth.uid == userId || isStaff();
+        // Staff (teachers or admins) can create, update, and delete point entries for any user.
+        allow write: if isStaff();
+      }
 
-        // Allow teachers and admins to create, update, or delete points for any user.
-        allow write: if isRole('teacher') || isRole('admin');
+      // Rules for the 'notifications' subcollection.
+      match /notifications/{notificationId} {
+        // Users can only read and write to their own notifications.
+        allow read, write: if request.auth.uid == userId;
       }
     }
 
-    // Rules for other collections
+    // Rules for top-level collections accessible by students and staff.
     match /announcements/{announcementId} {
-      allow read: if true;
-      allow write: if isRole('teacher') || isRole('admin');
+      allow read: if request.auth != null;
+      allow write: if isStaff();
     }
     match /assignments/{assignmentId} {
-      allow read: if true;
-      allow write: if isRole('teacher') || isRole('admin');
+      allow read: if request.auth != null;
+      allow write: if isStaff();
     }
     match /exercises/{exerciseId} {
-      allow read: if true;
-      allow write: if isRole('teacher') || isRole('admin');
+      allow read: if request.auth != null;
+      allow write: if isStaff();
     }
     match /projects/{projectId} {
-      allow read: if true;
-      allow write: if isRole('teacher') || isRole('admin');
+      allow read: if request.auth != null;
+      allow write: if isStaff();
     }
-    match /resources/{resourceId} {
-      allow read: if true;
-      allow write: if isRole('teacher') || isRole('admin');
-    }
-    match /roadmap_status/{weekId} {
-        allow read: if request.auth.uid != null;
-        allow write: if isRole('teacher') || isRole('admin');
+     match /resources/{resourceId} {
+      allow read: if request.auth != null;
+      allow write: if isStaff();
     }
     match /materials/{materialId} {
-        allow read: if request.auth.uid != null;
-        allow write: if isRole('teacher') || isRole('admin');
+      allow read: if request.auth != null;
+      allow write: if isStaff();
     }
+    match /roadmap_status/{weekId} {
+        allow read: if request.auth != null;
+        allow write: if isStaff();
+    }
+
+    // Rules for the 'submissions' collection.
     match /submissions/{submissionId} {
-      allow read: if request.auth.uid != null;
-      allow create: if request.auth.uid != null;
-      allow delete: if isRole('teacher') || isRole('admin');
+        // Students can create submissions.
+        allow create: if request.auth.uid == request.resource.data.studentId;
+        // Staff can read and delete any submission.
+        allow read, delete: if isStaff();
     }
-    match /notifications/{notificationId} {
-      allow read, write: if request.auth.uid != null;
-    }
+    
+    // Rules for the 'chats' collection
     match /chats/{chatId}/{message=**} {
-      allow read, write: if request.auth.uid != null;
+      allow read, write: if request.auth != null; // Simplistic rule, allows any authenticated user to read/write to any chat.
     }
   }
 }
