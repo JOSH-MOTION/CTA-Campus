@@ -1,4 +1,3 @@
-
 // src/contexts/AuthContext.tsx
 'use client';
 
@@ -22,6 +21,7 @@ export interface UserData {
   lessonType?: string;
   bio?: string;
   photoURL?: string;
+  totalPoints?: number;
   // Teacher specific
   gensTaught?: string;
   availableDays?: string[];

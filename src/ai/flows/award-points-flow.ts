@@ -12,7 +12,7 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, serverTimestamp, updateDoc, increment } from 'firebase/firestore';
 
 
 const AwardPointsFlowInputSchema = z.object({
@@ -48,11 +48,11 @@ export const awardPointsFlow = ai.defineFlow(
     }
   },
   async (input) => {
+    const { studentId, points, reason, activityId, action } = input;
+    const userDocRef = doc(db, 'users', studentId);
+    
     try {
-      if (input.action === 'award') {
-        const { studentId, points, reason, activityId } = input;
-        
-        // For manual entries, always append a UUID to ensure uniqueness.
+      if (action === 'award') {
         const finalActivityId = activityId.startsWith('manual-')
             ? `${activityId}-${uuidv4()}` 
             : activityId;
@@ -60,11 +60,16 @@ export const awardPointsFlow = ai.defineFlow(
         const pointDocRef = doc(db, 'users', studentId, 'points', finalActivityId);
 
         const docSnap = await getDoc(pointDocRef);
-        // Prevent duplicate points for non-manual entries
         if (docSnap.exists() && !activityId.startsWith('manual-')) {
             return { success: false, message: 'duplicate' };
         }
 
+        // Atomically increment the totalPoints on the user document
+        await updateDoc(userDocRef, {
+            totalPoints: increment(points)
+        });
+
+        // Create a log entry in the subcollection
         await setDoc(pointDocRef, {
             points,
             reason,
@@ -75,17 +80,23 @@ export const awardPointsFlow = ai.defineFlow(
         return { success: true, message: 'Points awarded successfully.' };
 
       } else { // action === 'revoke'
-        const { studentId, activityId } = input;
         const pointToRevokeRef = doc(db, 'users', studentId, 'points', activityId);
         
         const docSnap = await getDoc(pointToRevokeRef);
-        if (!docSnap.exists()) {
-            return { success: true, message: "Points already revoked or never existed." };
+        if (docSnap.exists()) {
+            const pointsToRevoke = docSnap.data().points || 0;
+            
+            // Atomically decrement the totalPoints on the user document
+            await updateDoc(userDocRef, {
+                totalPoints: increment(-pointsToRevoke)
+            });
+
+            // Delete the log entry
+            await deleteDoc(pointToRevokeRef);
+            return { success: true, message: "Points revoked successfully." };
         }
         
-        await deleteDoc(pointToRevokeRef);
-        
-        return { success: true, message: "Points revoked successfully." };
+        return { success: true, message: "Points already revoked or never existed." };
       }
     } catch (error: any) {
       console.error("Error processing points in flow:", error);
