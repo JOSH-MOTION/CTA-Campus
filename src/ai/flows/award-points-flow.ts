@@ -9,8 +9,10 @@
  */
 
 import { ai } from '@/ai/genkit';
+import { adminDB } from '@/lib/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 import { z } from 'genkit';
-import { awardPointsAdmin, revokePointsAdmin } from '@/services/admin-points';
+import { v4 as uuidv4 } from 'uuid';
 
 const AwardPointsFlowInputSchema = z.object({
     studentId: z.string().describe("The UID of the student to award points to."),
@@ -38,9 +40,39 @@ const awardOrRevokePointsTool = ai.defineTool(
   async (input) => {
     try {
       if (input.action === 'award') {
-        return await awardPointsAdmin(input);
+        const { studentId, points, reason, activityId } = input;
+        const finalActivityId = activityId.startsWith('manual-')
+            ? `${activityId}-${uuidv4()}`
+            : activityId;
+        
+        const pointDocRef = adminDB.collection('users').doc(studentId).collection('points').doc(finalActivityId);
+
+        const docSnap = await pointDocRef.get();
+        if (docSnap.exists && !activityId.startsWith('manual-')) {
+            return { success: false, message: 'Point already awarded for this activity.' };
+        }
+
+        await pointDocRef.set({
+            points,
+            reason,
+            activityId: finalActivityId,
+            awardedAt: FieldValue.serverTimestamp(),
+        });
+        
+        return { success: true, message: 'Points awarded successfully.' };
+
       } else { // action === 'revoke'
-        return await revokePointsAdmin(input);
+        const { studentId, activityId } = input;
+        const pointToRevokeRef = adminDB.collection('users').doc(studentId).collection('points').doc(activityId);
+
+        const docSnap = await pointToRevokeRef.get();
+        if (!docSnap.exists) {
+            return { success: true, message: "Points already revoked or never existed." };
+        }
+
+        await pointToRevokeRef.delete();
+        
+        return { success: true, message: "Points revoked successfully." };
       }
     } catch (error: any) {
       console.error("Error processing points in tool:", error);
