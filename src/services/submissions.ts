@@ -55,12 +55,9 @@ import {
       
     const querySnapshot = await getDocs(duplicateCheckQuery);
     if (!querySnapshot.empty) {
-        // If it's a 100 days of code submission, we can ignore duplicate submission records
-        // as the point awarding logic handles idempotency.
-        if (is100Days) {
-            return { id: querySnapshot.docs[0].id };
+        if (!is100Days) {
+           throw new Error('duplicate');
         }
-        throw new Error('duplicate');
     }
       
     const docRef = await addDoc(collection(db, 'submissions'), {
@@ -68,10 +65,12 @@ import {
         submittedAt: serverTimestamp(),
     });
 
-    // We now handle points for 100 Days of Code directly in the page component
-    // to allow for retroactive point awarding. Other submissions can still award points here.
-    if (pointsToAward && submissionData.pointCategory && !is100Days) {
-        const activityId = `graded-submission-${docRef.id}`;
+    if (pointsToAward && submissionData.pointCategory) {
+        // For 100 days of code, use the date as the unique part of the activity ID
+        const activityId = is100Days 
+            ? `100-days-of-code-${submissionData.assignmentTitle.replace('100 Days of Code - ', '')}`
+            : `graded-submission-${docRef.id}`;
+        
         try {
             await awardPointsFlow({
                 studentId: submissionData.studentId,

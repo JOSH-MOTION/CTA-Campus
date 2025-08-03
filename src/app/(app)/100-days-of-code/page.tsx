@@ -1,4 +1,3 @@
-
 // src/app/(app)/100-days-of-code/page.tsx
 'use client';
 
@@ -14,7 +13,6 @@ import {useToast} from '@/hooks/use-toast';
 import {addSubmission, onSubmissionsForStudent} from '@/services/submissions';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import NextLink from 'next/link';
-import { awardPointsFlow } from '@/ai/flows/award-points-flow';
 
 const HUNDRED_DAYS_OF_CODE_ASSIGNMENT_ID = '100-days-of-code';
 const HUNDRED_DAYS_OF_CODE_POINTS = 0.5;
@@ -55,15 +53,6 @@ export default function OneHundredDaysOfCodePage() {
     try {
        const submissionDate = date.toISOString().split('T')[0];
        
-       // Award points first using a stable ID based on the date
-       await awardPointsFlow({
-           studentId: user.uid,
-           points: HUNDRED_DAYS_OF_CODE_POINTS,
-           reason: HUNDRED_DAYS_OF_CODE_CATEGORY,
-           activityId: `100-days-of-code-${submissionDate}`,
-           action: 'award'
-       });
-
        await addSubmission({
         studentId: user.uid,
         studentName: userData.displayName,
@@ -73,6 +62,7 @@ export default function OneHundredDaysOfCodePage() {
         submissionLink: link,
         submissionNotes: `Submission for date: ${submissionDate}`,
         pointCategory: HUNDRED_DAYS_OF_CODE_CATEGORY,
+        pointsToAward: HUNDRED_DAYS_OF_CODE_POINTS,
       });
 
       toast({
