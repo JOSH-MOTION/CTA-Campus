@@ -1,82 +1,111 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Helper function to check the role of the requesting user.
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isRole(role) {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+    }
     
-    // Helper function to check if the requesting user has a 'teacher' or 'admin' role.
-    function isStaff() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['teacher', 'admin'];
+    function isStudent() {
+      return isRole('student');
     }
 
-    // By default, deny all reads and writes to all documents.
-    match /{document=**} {
-      allow read, write: if false;
+    function isTeacher() {
+      return isRole('teacher');
     }
 
-    // Rules for the 'users' collection.
+    function isAdmin() {
+      return isRole('admin');
+    }
+
+    function userGen() {
+        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.gen;
+    }
+
+    // Rules for the 'users' collection
     match /users/{userId} {
-      // Users can read their own document. Staff can read any user document.
-      allow read: if request.auth.uid == userId || isStaff();
-      // Users can only write to their own document.
-      allow write: if request.auth.uid == userId;
+      // Any authenticated user can read another user's public profile.
+      allow read: if isSignedIn();
+      // A user can write to their own document. Teachers/admins can also write (needed for subcollections).
+      allow write: if request.auth.uid == userId || isTeacher() || isAdmin();
 
-      // Rules for the 'points' subcollection within a user document.
+      // Rules for the 'points' subcollection within a user's document
       match /points/{pointId} {
-        // A user can read their own points. Staff can read any user's points.
-        allow read: if request.auth.uid == userId || isStaff();
-        // Staff (teachers or admins) can create, update, and delete point entries for any user.
-        allow write: if isStaff();
+        // Only the user themselves, a teacher, or an admin can read the points.
+        allow read: if request.auth.uid == userId || isTeacher() || isAdmin();
+        // Only teachers and admins can create, update, or delete point entries.
+        allow write: if isTeacher() || isAdmin();
       }
-
-      // Rules for the 'notifications' subcollection.
-      match /notifications/{notificationId} {
-        // Users can only read and write to their own notifications.
-        allow read, write: if request.auth.uid == userId;
-      }
-    }
-
-    // Rules for top-level collections accessible by students and staff.
-    match /announcements/{announcementId} {
-      allow read: if request.auth != null;
-      allow write: if isStaff();
-    }
-    match /assignments/{assignmentId} {
-      allow read: if request.auth != null;
-      allow write: if isStaff();
-    }
-    match /exercises/{exerciseId} {
-      allow read: if request.auth != null;
-      allow write: if isStaff();
-    }
-    match /projects/{projectId} {
-      allow read: if request.auth != null;
-      allow write: if isStaff();
-    }
-     match /resources/{resourceId} {
-      allow read: if request.auth != null;
-      allow write: if isStaff();
-    }
-    match /materials/{materialId} {
-      allow read: if request.auth != null;
-      allow write: if isStaff();
-    }
-    match /roadmap_status/{weekId} {
-        allow read: if request.auth != null;
-        allow write: if isStaff();
-    }
-
-    // Rules for the 'submissions' collection.
-    match /submissions/{submissionId} {
-        // Students can create submissions.
-        allow create: if request.auth.uid == request.resource.data.studentId;
-        // Staff can read and delete any submission.
-        allow read, delete: if isStaff();
     }
     
-    // Rules for the 'chats' collection
+    // Rules for top-level collections (announcements, assignments, etc.)
+    
+    // Generic function to check if a document is targeted to the current user
+    function isTargeted(resource) {
+        return resource.data.targetGen == 'Everyone' || 
+               resource.data.targetGen == 'All Students' || 
+               (isStudent() && resource.data.targetGen == userGen());
+    }
+
+    match /announcements/{announcementId} {
+        allow read: if isTeacher() || isAdmin() || isTargeted(resource);
+        allow write, delete: if isTeacher() || isAdmin();
+    }
+
+    match /assignments/{assignmentId} {
+        allow read: if isTeacher() || isAdmin() || isTargeted(resource);
+        allow write, delete: if isTeacher() || isAdmin();
+    }
+    
+    match /exercises/{exerciseId} {
+        allow read: if isTeacher() || isAdmin() || isTargeted(resource);
+        allow write, delete: if isTeacher() || isAdmin();
+    }
+    
+    match /projects/{projectId} {
+        allow read: if isTeacher() || isAdmin() || isTargeted(resource);
+        allow write, delete: if isTeacher() || isAdmin();
+    }
+    
+    match /submissions/{submissionId} {
+        // A user can read their own submission. Teachers/admins can read any submission.
+        allow read: if request.auth.uid == resource.data.studentId || isTeacher() || isAdmin();
+        // A user can create a submission for themselves. Teachers/admins can delete them.
+        allow create: if request.auth.uid == request.resource.data.studentId;
+        allow delete: if isTeacher() || isAdmin();
+    }
+    
+    match /resources/{resourceId} {
+        allow read: if isSignedIn();
+        allow write, delete: if isTeacher() || isAdmin();
+    }
+    
+    match /materials/{materialId} {
+        allow read: if isSignedIn();
+        allow write, delete: if isTeacher() || isAdmin();
+    }
+
+    match /roadmap_status/{weekId} {
+        allow read: if isSignedIn();
+        allow write: if isTeacher() || isAdmin();
+    }
+
+    match /notifications/{notificationId} {
+        allow read, write: if request.auth.uid == resource.data.userId;
+    }
+
+    // Rules for chat collections
     match /chats/{chatId}/{message=**} {
-      allow read, write: if request.auth != null; // Simplistic rule, allows any authenticated user to read/write to any chat.
+      // For now, allow any signed-in user to read/write to any chat.
+      // In a production app, you would add more granular checks here
+      // to ensure a user is actually part of the chat.
+      allow read, write: if isSignedIn();
     }
   }
 }
