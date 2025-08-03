@@ -3,92 +3,109 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions
-    function isAuth() {
+    // Helper function to check the role of the requesting user.
+    function isSignedIn() {
       return request.auth != null;
     }
-    
-    function isUser(userId) {
-        return isAuth() && request.auth.uid == userId;
+
+    function isRole(role) {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
     }
     
-    function getUserRole(userId) {
-        return get(/databases/$(database)/documents/users/$(userId)).data.role;
+    function isStudent() {
+      return isRole('student');
     }
 
-    function isTeacherOrAdmin(userId) {
-        let role = getUserRole(userId);
-        return role == 'teacher' || role == 'admin';
+    function isTeacher() {
+      return isRole('teacher');
     }
 
-    // Default deny all
-    match /{document=**} {
-      allow read, write: if false;
+    function isAdmin() {
+      return isRole('admin');
     }
-    
-    // Allow users to read and update their own document
-    // Allow teachers/admins to read any user document
+
+    function userGen() {
+        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.gen;
+    }
+
+    // Rules for the 'users' collection
     match /users/{userId} {
-      allow get: if isUser(userId) || isTeacherOrAdmin(request.auth.uid);
-      allow list: if isTeacherOrAdmin(request.auth.uid);
-      allow update: if isUser(userId);
-    }
+      // Any authenticated user can read another user's public profile (needed for directory, chat, etc.)
+      // Users can only write to their own document.
+      allow read: if isSignedIn();
+      allow write: if request.auth.uid == userId;
 
-    // Allow users to read their own points
-    // Allow teachers/admins to read/write/delete any user's points
-    match /users/{userId}/points/{pointId} {
-        allow read: if isUser(userId) || isTeacherOrAdmin(request.auth.uid);
-        allow write, delete: if isTeacherOrAdmin(request.auth.uid);
+      // Rules for the 'points' subcollection within a user's document
+      match /points/{pointId} {
+        // Only the user themselves, a teacher, or an admin can read the points.
+        allow read: if request.auth.uid == userId || isTeacher() || isAdmin();
+        // Only teachers and admins can create, update, or delete point entries.
+        allow write, delete: if isTeacher() || isAdmin();
+      }
     }
     
-    // Allow logged-in users to perform actions on other collections based on their roles
+    // Rules for top-level collections (announcements, assignments, etc.)
+    
+    // Generic function to check if a document is targeted to the current user
+    function isTargeted(resource) {
+        return resource.data.targetGen == 'Everyone' || 
+               resource.data.targetGen == 'All Students' || 
+               (isStudent() && resource.data.targetGen == userGen());
+    }
+
     match /announcements/{announcementId} {
-        allow read: if isAuth();
-        allow write: if isTeacherOrAdmin(request.auth.uid);
+        allow read: if isTeacher() || isAdmin() || isTargeted(resource);
+        allow write, delete: if isTeacher() || isAdmin();
     }
 
     match /assignments/{assignmentId} {
-        allow read: if isAuth();
-        allow write: if isTeacherOrAdmin(request.auth.uid);
+        allow read: if isTeacher() || isAdmin() || isTargeted(resource);
+        allow write, delete: if isTeacher() || isAdmin();
     }
-
+    
     match /exercises/{exerciseId} {
-        allow read: if isAuth();
-        allow write: if isTeacherOrAdmin(request.auth.uid);
+        allow read: if isTeacher() || isAdmin() || isTargeted(resource);
+        allow write, delete: if isTeacher() || isAdmin();
     }
-
+    
     match /projects/{projectId} {
-        allow read: if isAuth();
-        allow write: if isTeacherOrAdmin(request.auth.uid);
-    }
-    
-    match /resources/{resourceId} {
-        allow read: if isAuth();
-        allow write: if isTeacherOrAdmin(request.auth.uid);
-    }
-    
-    match /materials/{materialId} {
-        allow read: if isAuth();
-        allow write: if isTeacherOrAdmin(request.auth.uid);
-    }
-
-    match /roadmap_status/{weekId} {
-        allow read: if isAuth();
-        allow write: if isTeacherOrAdmin(request.auth.uid);
+        allow read: if isTeacher() || isAdmin() || isTargeted(resource);
+        allow write, delete: if isTeacher() || isAdmin();
     }
     
     match /submissions/{submissionId} {
-        allow read: if isTeacherOrAdmin(request.auth.uid) || get(/databases/$(database)/documents/submissions/$(submissionId)).data.studentId == request.auth.uid;
-        allow create: if isAuth();
-        allow delete: if isTeacherOrAdmin(request.auth.uid);
-    }
-
-    match /chats/{chatId}/messages/{messageId} {
-        allow read, write: if isAuth();
+        // A user can read their own submission. Teachers/admins can read any submission.
+        allow read: if request.auth.uid == resource.data.studentId || isTeacher() || isAdmin();
+        // A user can create a submission for themselves. Teachers/admins can delete them.
+        allow create: if request.auth.uid == request.resource.data.studentId;
+        allow delete: if isTeacher() || isAdmin();
     }
     
+    match /resources/{resourceId} {
+        allow read: if isSignedIn();
+        allow write, delete: if isTeacher() || isAdmin();
+    }
+    
+    match /materials/{materialId} {
+        allow read: if isSignedIn();
+        allow write, delete: if isTeacher() || isAdmin();
+    }
+
+    match /roadmap_status/{weekId} {
+        allow read: if isSignedIn();
+        allow write: if isTeacher() || isAdmin();
+    }
+
     match /notifications/{notificationId} {
-       allow read, write: if get(/databases/$(database)/documents/notifications/$(notificationId)).data.userId == request.auth.uid;
+        allow read, write: if request.auth.uid == resource.data.userId;
+    }
+
+    // Rules for chat collections
+    match /chats/{chatId}/{message=**} {
+      // For now, allow any signed-in user to read/write to any chat.
+      // In a production app, you would add more granular checks here
+      // to ensure a user is actually part of the chat.
+      allow read, write: if isSignedIn();
     }
   }
 }
