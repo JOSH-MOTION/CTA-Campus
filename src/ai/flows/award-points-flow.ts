@@ -29,44 +29,60 @@ const AwardPointsFlowOutputSchema = z.object({
 });
 export type AwardPointsFlowOutput = z.infer<typeof AwardPointsFlowOutputSchema>;
 
+const awardOrRevokePointsTool = ai.defineTool(
+  {
+    name: 'awardOrRevokePoints',
+    description: 'A tool to securely award or revoke points for a student in the database.',
+    inputSchema: AwardPointsFlowInputSchema,
+    outputSchema: AwardPointsFlowOutputSchema,
+  },
+  async (input) => {
+    const { studentId, points, reason, activityId, action } = input;
+    
+    const finalActivityId = activityId.startsWith('manual-') 
+        ? `${activityId}-${uuidv4()}`
+        : activityId;
+
+    const pointDocRef = doc(db, 'users', studentId, 'points', finalActivityId);
+
+    try {
+        if (action === 'award') {
+            const docSnap = await getDoc(pointDocRef);
+            if (docSnap.exists() && !activityId.startsWith('manual-')) {
+                return { success: true, message: 'Point already awarded.' };
+            }
+            
+            await setDoc(pointDocRef, {
+                points,
+                reason,
+                activityId: finalActivityId,
+                awardedAt: serverTimestamp(),
+            });
+
+            return { success: true, message: "Points awarded successfully." };
+        } else { // action === 'revoke'
+            const pointToRevokeRef = doc(db, 'users', studentId, 'points', activityId);
+            const docSnap = await getDoc(pointToRevokeRef);
+            if (!docSnap.exists()) {
+                return { success: true, message: "Points already revoked or never existed." };
+            }
+            await deleteDoc(pointToRevokeRef);
+            return { success: true, message: "Points revoked successfully." };
+        }
+    } catch (error: any) {
+      console.error("Error processing points in tool:", error);
+      return { success: false, message: `Server error: Could not process points due to a permission or data issue.` };
+    }
+  }
+);
+
 
 export async function awardPointsFlow(input: AwardPointsFlowInput): Promise<AwardPointsFlowOutput> {
-  const { studentId, points, reason, activityId, action } = input;
-  
-  // For manually entered points, we always generate a new unique ID to ensure it's a distinct event.
-  // For system-generated points (like grading), the activityId should be stable (e.g., `graded-submission-XYZ`).
-  const finalActivityId = activityId.startsWith('manual-') 
-      ? `${activityId}-${uuidv4()}`
-      : activityId;
-
-  const pointDocRef = doc(db, 'users', studentId, 'points', finalActivityId);
-
-  try {
-    if (action === 'award') {
-      const docSnap = await getDoc(pointDocRef);
-      if (docSnap.exists() && !activityId.startsWith('manual-')) {
-        // If the point already exists for a non-manual entry, we don't need to do anything.
-        // This makes the award action idempotent for stable activity IDs.
-        return { success: true, message: 'Point already awarded.' };
-      }
-      
-      await setDoc(pointDocRef, {
-        points,
-        reason,
-        activityId: finalActivityId,
-        awardedAt: serverTimestamp(),
-      });
-
-      return { success: true, message: "Points awarded successfully." };
-    } else { // action === 'revoke'
-        // For revoke, we need the exact ID, which should be passed in `activityId`.
-        const pointToRevokeRef = doc(db, 'users', studentId, 'points', activityId);
-        await deleteDoc(pointToRevokeRef);
-        return { success: true, message: "Points revoked successfully." };
+    try {
+        const response = await awardOrRevokePointsTool(input);
+        return response;
+    } catch (error: any) {
+        console.error("Error executing awardPointsFlow:", error);
+        return { success: false, message: `Server error: Could not process points due to a permission or data issue.` };
     }
-  } catch (error: any) {
-    console.error("Error processing points:", error);
-    // Return a more generic but helpful error message to the client.
-    return { success: false, message: `Server error: Could not process points due to a permission or data issue.` };
-  }
 }
