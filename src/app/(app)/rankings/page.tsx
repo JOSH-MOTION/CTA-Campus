@@ -10,7 +10,6 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Cell } from 'recharts';
 import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
-import { getPointsForStudent } from '@/services/points';
 
 interface StudentDetail extends UserData {
   totalPoints: number;
@@ -30,10 +29,10 @@ export default function RankingsPage() {
       setLoading(true);
       try {
         const students = await fetchAllStudents();
-        const pointsPromises = students.map(student => 
-          getPointsForStudent(student.uid).then(points => ({ ...student, totalPoints: points }))
-        );
-        const details = await Promise.all(pointsPromises);
+        const details = students.map(student => ({
+            ...student,
+            totalPoints: student.totalPoints || 0
+        }));
         setStudentDetails(details);
       } catch (error) {
         console.error("Failed to load rankings data:", error);

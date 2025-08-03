@@ -15,14 +15,15 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, doc } from 'firebase/firestore';
 
 import {Button} from '@/components/ui/button';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
 import {Progress} from '@/components/ui/progress';
 import {ChartContainer, ChartTooltipContent, type ChartConfig} from '@/components/ui/chart';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth, UserData } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
+import { getPointsForStudent } from '@/services/points';
 
 const initialGradingData = [
   {title: 'Class Attendance', current: 0, total: 50, description: '1 point per attendance'},
@@ -49,6 +50,7 @@ export default function PerformanceHub({ studentId }: { studentId?: string }) {
   const { user } = useAuth();
   const [chartType, setChartType] = useState<'bar' | 'pie'>('bar');
   const [gradingData, setGradingData] = useState(initialGradingData.map(item => ({...item, current: 0})));
+  const [totalPoints, setTotalPoints] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const targetUserId = studentId || user?.uid;
@@ -59,36 +61,43 @@ export default function PerformanceHub({ studentId }: { studentId?: string }) {
       return;
     }
 
-    // Reset state and set loading to true when targetUserId changes
-    setGradingData(initialGradingData.map(item => ({...item, current: 0})));
     setLoading(true);
 
-    const pointsCol = collection(db, 'users', targetUserId, 'points');
-    const q = query(pointsCol);
+    const userDocRef = doc(db, 'users', targetUserId);
+    const userUnsubscribe = onSnapshot(userDocRef, (docSnap) => {
+        const userData = docSnap.data() as UserData;
+        setTotalPoints(userData?.totalPoints || 0);
+    }, (error) => {
+        console.error("Error fetching user total points:", error);
+    });
 
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const userPoints: { [key: string]: number } = {};
+    const pointsCol = collection(db, 'users', targetUserId, 'points');
+    const pointsUnsubscribe = onSnapshot(pointsCol, (querySnapshot) => {
+      const userPointsByCategory: { [key: string]: number } = {};
       querySnapshot.forEach(doc => {
         const data = doc.data();
         const reason = data.reason;
         if (reason) {
-          userPoints[reason] = (userPoints[reason] || 0) + data.points;
+          userPointsByCategory[reason] = (userPointsByCategory[reason] || 0) + data.points;
         }
       });
       
       const updatedGradingData = initialGradingData.map(item => ({
         ...item,
-        current: userPoints[item.title] || 0,
+        current: userPointsByCategory[item.title] || 0,
       }));
 
       setGradingData(updatedGradingData);
       setLoading(false);
     }, (error) => {
-      console.error("Error fetching points data: ", error);
+      console.error("Error fetching points breakdown:", error);
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+        userUnsubscribe();
+        pointsUnsubscribe();
+    };
   }, [targetUserId]);
 
   const chartData = useMemo(() => gradingData.map((item, index) => ({
@@ -109,14 +118,13 @@ export default function PerformanceHub({ studentId }: { studentId?: string }) {
   }, [chartData]);
 
   const overallProgress = useMemo(() => {
-    const totalCurrent = gradingData.reduce((acc, item) => acc + item.current, 0);
     const totalPossible = gradingData.reduce((acc, item) => acc + item.total, 0);
     return {
-      current: totalCurrent,
+      current: totalPoints,
       total: totalPossible,
-      percentage: totalPossible > 0 ? (totalCurrent / totalPossible) * 100 : 0,
+      percentage: totalPossible > 0 ? (totalPoints / totalPossible) * 100 : 0,
     };
-  }, [gradingData]);
+  }, [gradingData, totalPoints]);
 
   if (loading) {
       return (
