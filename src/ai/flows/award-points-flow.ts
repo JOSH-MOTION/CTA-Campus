@@ -36,16 +36,6 @@ export const awardPointsFlow = ai.defineFlow(
     name: 'awardPointsFlow',
     inputSchema: AwardPointsFlowInputSchema,
     outputSchema: AwardPointsFlowOutputSchema,
-    authPolicy: (auth, input) => {
-        // This policy is checked on the server before the flow runs.
-        // It ensures only authenticated users can call this flow.
-        if (!auth) {
-            throw new Error("User must be authenticated.");
-        }
-        // Further validation could check for a teacher/admin role if the user's
-        // custom claims were available in the auth object. Since they are not
-        // by default, we will rely on Firestore security rules for write permissions.
-    }
   },
   async (input) => {
     const { studentId, points, reason, activityId, action } = input;
