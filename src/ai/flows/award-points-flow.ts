@@ -62,8 +62,11 @@ export const awardPointsFlow = ai.defineFlow(
         const docSnap = await getDoc(pointDocRef);
         // This check prevents awarding points for the same non-manual activity twice.
         // It's crucial for submissions and attendance.
-        if (docSnap.exists() && !finalActivityId.startsWith('manual-')) {
-            return { success: false, message: 'duplicate' };
+        if (docSnap.exists()) {
+             // For 100 days of code, we also check this, as the ID is date-based
+            if (finalActivityId.startsWith('100-days-of-code-') || !finalActivityId.startsWith('manual-')) {
+                return { success: false, message: 'duplicate' };
+            }
         }
 
         // Atomically increment the totalPoints on the user document
