@@ -18,6 +18,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { awardPointsFlow } from '@/ai/flows/award-points-flow';
+import { Textarea } from '@/components/ui/textarea';
 
 const gradingData = [
     { title: "Class Attendance", points: 1 },
@@ -37,14 +38,15 @@ const tempUpdateSchema = z.object({
   studentId: z.string().nonempty('Please select a student.'),
   activityTitle: z.string().nonempty('Please select an activity.'),
   points: z.coerce.number().min(0.1, 'Please enter a valid point value.'),
-  reason: z.string().optional(),
+  reason: z.string().min(3, "Reason must have at least 3 characters."),
 }).refine(data => {
+    // Make reason required only if it's a manual adjustment
     if (data.activityTitle === 'Manual Adjustment') {
         return data.reason && data.reason.trim().length >= 3;
     }
     return true;
 }, {
-    message: "Reason is required for manual adjustments (min 3 chars).",
+    message: "A specific reason is required for manual adjustments (min 3 chars).",
     path: ["reason"],
 });
 
@@ -84,30 +86,26 @@ export default function TempUpdatePage() {
   
   useEffect(() => {
       const activity = gradingData.find(g => g.title === selectedActivity);
-      if (activity && activity.points > 0) {
+      if (activity && selectedActivity !== 'Manual Adjustment') {
           form.setValue('points', activity.points);
+          form.setValue('reason', activity.title);
+      } else if (selectedActivity === 'Manual Adjustment') {
+          form.setValue('reason', '');
       }
   }, [selectedActivity, form]);
 
   const onSubmit = async (data: TempUpdateFormValues) => {
     setIsSubmitting(true);
-    console.log("Form submitted. Data:", data);
-
-    const reasonForPoints = data.activityTitle === 'Manual Adjustment' 
-        ? data.reason?.trim() || 'Manual Adjustment'
-        : data.activityTitle;
-
+    
     try {
-      console.log("Calling awardPointsFlow...");
       const result = await awardPointsFlow({
           studentId: data.studentId,
           points: data.points,
-          reason: reasonForPoints,
-          activityId: `manual-${reasonForPoints.replace(/\s+/g, '-').toLowerCase()}`,
+          reason: data.reason,
+          activityId: `manual-${data.reason.replace(/\s+/g, '-').toLowerCase()}`,
           action: 'award',
       });
       
-      console.log("awardPointsFlow result:", result);
       if (!result || !result.success) {
           throw new Error(result?.message || "An unknown error occurred in the flow.");
       }
@@ -115,7 +113,7 @@ export default function TempUpdatePage() {
       const selectedStudent = students.find(s => s.uid === data.studentId);
       toast({
         title: 'Points Awarded!',
-        description: `${data.points} points awarded to ${selectedStudent?.displayName} for "${reasonForPoints}".`,
+        description: `${data.points} points awarded to ${selectedStudent?.displayName} for "${data.reason}".`,
       });
       form.reset({
         studentId: '',
@@ -124,14 +122,12 @@ export default function TempUpdatePage() {
         reason: '',
       });
     } catch (error: any) {
-      console.error("Error in onSubmit:", error);
       toast({
         variant: 'destructive',
         title: 'Error Awarding Points',
         description: error.message || 'Could not award points. Please check the console.',
       });
     } finally {
-      console.log("Submission process finished.");
       setIsSubmitting(false);
     }
   };
@@ -262,21 +258,26 @@ export default function TempUpdatePage() {
                 />
               </div>
 
-               {selectedActivity === 'Manual Adjustment' && (
-                 <FormField
+                <FormField
                     control={form.control}
                     name="reason"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Reason for Adjustment</FormLabel>
+                            <FormLabel>Reason for Award</FormLabel>
+                            <FormDescription>
+                                {selectedActivity === 'Manual Adjustment' ? 'Please provide a specific reason.' : 'This is pre-filled from the category.'}
+                            </FormDescription>
                             <FormControl>
-                                <Input placeholder="e.g., Points from last year" {...field} />
+                                <Textarea 
+                                    placeholder="e.g., Won the monthly coding challenge" 
+                                    {...field} 
+                                    disabled={selectedActivity !== 'Manual Adjustment'}
+                                />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
                     )}
                 />
-               )}
 
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? (
