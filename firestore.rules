@@ -32,7 +32,7 @@ service cloud.firestore {
     match /users/{userId} {
       // Any authenticated user can read another user's public profile.
       allow read: if isSignedIn();
-      // A user can write to their own document. Teachers/admins can also write (needed for subcollections).
+      // A user can write to their own document, OR a teacher/admin can write to any user document.
       allow write: if request.auth.uid == userId || isTeacher() || isAdmin();
 
       // Rules for the 'points' subcollection within a user's document
