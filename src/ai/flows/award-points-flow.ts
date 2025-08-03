@@ -37,15 +37,15 @@ const awardOrRevokePointsTool = ai.defineTool(
     outputSchema: AwardPointsFlowOutputSchema,
   },
   async (input) => {
-    const { studentId, points, reason, activityId, action } = input;
-    
-    const finalActivityId = activityId.startsWith('manual-') 
-        ? `${activityId}-${uuidv4()}`
-        : activityId;
-
-    const pointDocRef = doc(db, 'users', studentId, 'points', finalActivityId);
-
     try {
+        const { studentId, points, reason, activityId, action } = input;
+        
+        const finalActivityId = activityId.startsWith('manual-') 
+            ? `${activityId}-${uuidv4()}`
+            : activityId;
+
+        const pointDocRef = doc(db, 'users', studentId, 'points', finalActivityId);
+
         if (action === 'award') {
             const docSnap = await getDoc(pointDocRef);
             if (docSnap.exists() && !activityId.startsWith('manual-')) {
@@ -71,18 +71,16 @@ const awardOrRevokePointsTool = ai.defineTool(
         }
     } catch (error: any) {
       console.error("Error processing points in tool:", error);
-      return { success: false, message: `Server error: Could not process points due to a permission or data issue.` };
+      // Provide a more specific error message if possible, but fallback to a generic one.
+      const errorMessage = error.message || "An unexpected error occurred.";
+      return { success: false, message: `Server error: Could not process points. Reason: ${errorMessage}` };
     }
   }
 );
 
 
 export async function awardPointsFlow(input: AwardPointsFlowInput): Promise<AwardPointsFlowOutput> {
-    try {
-        const response = await awardOrRevokePointsTool(input);
-        return response;
-    } catch (error: any) {
-        console.error("Error executing awardPointsFlow:", error);
-        return { success: false, message: `Server error: Could not process points due to a permission or data issue.` };
-    }
+    // The tool is now the entire implementation. The flow just calls it.
+    // This is the correct pattern for secure server-side operations.
+    return await awardOrRevokePointsTool(input);
 }
