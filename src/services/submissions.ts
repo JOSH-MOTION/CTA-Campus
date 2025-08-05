@@ -37,7 +37,7 @@ import {
    * Creates a new submission for an assignment.
    */
   export const addSubmission = async (submissionData: NewSubmissionData): Promise<{ id: string }> => {
-    const { pointsToAward, ...restOfSubmissionData } = submissionData;
+    const { pointsToAward, pointCategory, ...restOfSubmissionData } = submissionData;
     
     const is100Days = submissionData.assignmentId === '100-days-of-code';
 
@@ -61,10 +61,14 @@ import {
       
     const docRef = await addDoc(collection(db, 'submissions'), {
         ...restOfSubmissionData,
+        pointCategory, // Make sure to save the original point category
         submittedAt: serverTimestamp(),
     });
 
-    if (pointsToAward && submissionData.pointCategory) {
+    if (pointsToAward && pointCategory) {
+        // For "100 Days of Code", the reason in the points system needs to be exactly "100 Days of Code"
+        const reasonForPoints = is100Days ? '100 Days of Code' : pointCategory;
+
         const activityId = is100Days 
             ? `100-days-of-code-${submissionData.assignmentTitle.replace('100 Days of Code - ', '')}`
             : `graded-submission-${docRef.id}`;
@@ -73,7 +77,7 @@ import {
             const result = await awardPointsFlow({
                 studentId: submissionData.studentId,
                 points: pointsToAward,
-                reason: submissionData.pointCategory,
+                reason: reasonForPoints,
                 activityId: activityId,
                 action: 'award'
             });
