@@ -39,8 +39,9 @@ import {
   export const addSubmission = async (submissionData: NewSubmissionData): Promise<{ id: string }> => {
     const { pointsToAward, ...restOfSubmissionData } = submissionData;
     
-    // For "100 Days of Code", check by title. For others, check by assignment ID.
     const is100Days = submissionData.assignmentId === '100-days-of-code';
+
+    // For "100 Days of Code", check by title. For others, check by assignment ID.
     const duplicateCheckQuery = is100Days
       ? query(
           collection(db, 'submissions'),
@@ -55,9 +56,7 @@ import {
       
     const querySnapshot = await getDocs(duplicateCheckQuery);
     if (!querySnapshot.empty) {
-        if (!is100Days) {
-           throw new Error('duplicate');
-        }
+       throw new Error('duplicate');
     }
       
     const docRef = await addDoc(collection(db, 'submissions'), {
@@ -66,19 +65,25 @@ import {
     });
 
     if (pointsToAward && submissionData.pointCategory) {
-        // For 100 days of code, use the date as the unique part of the activity ID
         const activityId = is100Days 
             ? `100-days-of-code-${submissionData.assignmentTitle.replace('100 Days of Code - ', '')}`
             : `graded-submission-${docRef.id}`;
         
         try {
-            await awardPointsFlow({
+            const result = await awardPointsFlow({
                 studentId: submissionData.studentId,
                 points: pointsToAward,
                 reason: submissionData.pointCategory,
                 activityId: activityId,
                 action: 'award'
             });
+            if(result.message === 'duplicate' && is100Days) {
+                // If it's a duplicate for 100 days, we don't want to throw an error to the user
+                // as the submission itself might have been deleted but the point wasn't.
+                console.log(`Duplicate point award prevented for ${activityId}`);
+            } else if (!result.success) {
+                 throw new Error(result.message || 'Failed to award points in flow.');
+            }
         } catch(e) {
             console.error(`Failed to award points for submission ${docRef.id}:`, e);
             // Optionally, you could try to revert the submission or add a flag for failed point awards
