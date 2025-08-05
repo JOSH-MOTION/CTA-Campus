@@ -4,74 +4,75 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Helper function to check the role of the user making the request.
     function isStaff() {
-      // Check the role of the user making the request.
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['teacher', 'admin'];
     }
 
+    // Users can read/write to their own user document.
+    // Staff (teachers/admins) can read/write to any user document.
     match /users/{userId} {
-      // A user can manage their own document, or a staff member can.
       allow read, write: if request.auth.uid == userId || isStaff();
       
+      // Rules for the 'points' subcollection within each user document.
       match /points/{pointId} {
-        // A user can manage their own points, or a staff member can.
-        allow read, write, delete: if request.auth.uid == userId || isStaff();
-      }
-
-      match /notifications/{notificationId} {
-        // A user can manage their own notifications, or a staff member can.
-        allow read, write, delete: if request.auth.uid == userId || isStaff();
+        // A user can create point entries for themselves.
+        allow create: if request.auth.uid == userId;
+        // Staff can create, read, update, or delete any point entry.
+        allow read, update, delete: if isStaff();
       }
     }
 
-    match /chats/{chatId}/{message=**} {
-      // Anyone authenticated can read/write to any chat.
-      allow read, write: if request.auth != null;
-    }
-
+    // Authenticated users can create submissions. The backend service handles validation.
     match /submissions/{submissionId} {
-      // Allow any authenticated user to create a submission.
-      // The backend service ensures they can only create submissions for themselves.
       allow create: if request.auth != null;
-      // Allow only staff to read, update, or delete any submission.
-      allow read, update, delete: if isStaff();
-    }
-
-    match /announcements/{announcementId} {
-        // Any authenticated user can read.
-        allow read: if request.auth != null;
-        // Only staff can create, update, or delete.
-        allow write: if isStaff();
+      // Staff can read or delete any submission.
+      allow read, delete: if isStaff();
     }
     
-    match /assignments/{assignmentId} {
-        allow read: if request.auth != null;
-        allow write: if isStaff();
-    }
-
-    match /exercises/{exerciseId} {
-        allow read: if request.auth != null;
-        allow write: if isStaff();
+    // Default deny for all other collections to ensure security.
+    match /{path=**}/announcements/{announcementId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if isStaff();
     }
     
-    match /projects/{projectId} {
-        allow read: if request.auth != null;
-        allow write: if isStaff();
+    match /{path=**}/assignments/{assignmentId} {
+       allow read: if request.auth != null;
+       allow create, update, delete: if isStaff();
     }
 
-    match /resources/{resourceId} {
+    match /{path=**}/exercises/{exerciseId} {
+       allow read: if request.auth != null;
+       allow create, update, delete: if isStaff();
+    }
+
+    match /{path=**}/projects/{projectId} {
+       allow read: if request.auth != null;
+       allow create, update, delete: if isStaff();
+    }
+    
+    match /roadmap_status/{weekId} {
         allow read: if request.auth != null;
         allow write: if isStaff();
     }
     
     match /materials/{materialId} {
-        allow read: if request.auth != null;
-        allow write: if isStaff();
+      allow read: if request.auth != null;
+      allow create, update, delete: if isStaff();
     }
 
-    match /roadmap_status/{weekId} {
-        allow read: if request.auth != null;
-        allow write: if isStaff();
+    match /resources/{resourceId} {
+       allow read: if request.auth != null;
+       allow create, update, delete: if isStaff();
+    }
+
+    match /notifications/{notificationId} {
+      allow read, update: if request.auth.uid == resource.data.userId;
+      allow create, delete: if isStaff();
+    }
+
+    match /chats/{chatId}/{message=**} {
+      allow read, write: if request.auth != null;
     }
   }
 }
