@@ -43,20 +43,13 @@ export const awardPointsFlow = ai.defineFlow(
     
     try {
       if (action === 'award') {
-        const finalActivityId = activityId.startsWith('manual-')
-            ? `${activityId}-${uuidv4()}` 
-            : activityId;
-        
-        const pointDocRef = doc(db, 'users', studentId, 'points', finalActivityId);
+        const pointDocRef = doc(db, 'users', studentId, 'points', activityId);
 
         const docSnap = await getDoc(pointDocRef);
         // This check prevents awarding points for the same non-manual activity twice.
         // It's crucial for submissions and attendance.
         if (docSnap.exists()) {
-             // For 100 days of code, we also check this, as the ID is date-based
-            if (finalActivityId.startsWith('100-days-of-code-') || !finalActivityId.startsWith('manual-')) {
-                return { success: false, message: 'duplicate' };
-            }
+            return { success: false, message: 'duplicate' };
         }
 
         // Atomically increment the totalPoints on the user document
@@ -68,7 +61,7 @@ export const awardPointsFlow = ai.defineFlow(
         await setDoc(pointDocRef, {
             points,
             reason,
-            activityId: finalActivityId,
+            activityId,
             awardedAt: serverTimestamp(),
         });
         

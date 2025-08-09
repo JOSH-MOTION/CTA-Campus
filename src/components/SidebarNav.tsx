@@ -72,7 +72,6 @@ export const teacherNavItems = [
   {href: '/roadmap', label: 'Roadmap', icon: Map},
   {href: '/directory', label: 'Directory', icon: Contact},
   {href: '/availability', label: 'Manage Availability', icon: CalendarClock},
-  {href: '/temp-update', label: 'Manual Point Entry', icon: History},
   {href: '/profile', label: 'Profile', icon: User},
 ];
 
@@ -92,7 +91,6 @@ export const adminNavItems = [
   {href: '/roadmap', label: 'Roadmap', icon: Map},
   {href: '/directory', label: 'Directory', icon: Contact},
   {href: '/career', label: 'Career Module', icon: GraduationCap},
-  {href: '/temp-update', label: 'Manual Point Entry', icon: History},
   {href: '/profile', label: 'Profile', icon: User},
 ];
 
