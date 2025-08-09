@@ -1,7 +1,7 @@
 // src/app/(app)/submissions/page.tsx
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth, UserData } from '@/contexts/AuthContext';
 import { getAllSubmissions, Submission } from '@/services/submissions';
