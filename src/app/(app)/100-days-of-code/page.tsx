@@ -1,22 +1,50 @@
 // src/app/(app)/100-days-of-code/page.tsx
 'use client';
 
-import {useState, useEffect} from 'react';
+import {useState, useEffect, useMemo} from 'react';
 import {Button} from '@/components/ui/button';
 import {Calendar} from '@/components/ui/calendar';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
 import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
-import {Link, Loader2, CheckCircle, ExternalLink} from 'lucide-react';
+import {Link, Loader2, CheckCircle, ExternalLink, Sparkles} from 'lucide-react';
 import {useAuth} from '@/contexts/AuthContext';
 import {useToast} from '@/hooks/use-toast';
 import {addSubmission, onSubmissionsForStudent} from '@/services/submissions';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import NextLink from 'next/link';
+import { Carousel, CarouselContent, CarouselItem } from '@/components/ui/carousel';
 
 const HUNDRED_DAYS_OF_CODE_ASSIGNMENT_ID = '100-days-of-code';
 const HUNDRED_DAYS_OF_CODE_POINTS = 0.5;
 const HUNDRED_DAYS_OF_CODE_CATEGORY = '100 Days of Code';
+
+const motivationalQuotes = [
+    "The secret of getting ahead is getting started.",
+    "The journey of a thousand miles begins with a single step.",
+    "Don't watch the clock; do what it does. Keep going.",
+    "Success is the sum of small efforts, repeated day in and day out.",
+    "Believe you can and you're halfway there."
+];
+
+const MotivationalCarousel = () => (
+    <Card className="bg-muted/50">
+        <CardContent className="flex flex-col items-center justify-center text-center p-6">
+            <Sparkles className="h-8 w-8 text-primary mb-4" />
+            <Carousel opts={{ loop: true }} className="w-full max-w-xs">
+                <CarouselContent>
+                    {motivationalQuotes.map((quote, index) => (
+                        <CarouselItem key={index}>
+                            <div className="p-1">
+                                <p className="font-medium italic">"{quote}"</p>
+                            </div>
+                        </CarouselItem>
+                    ))}
+                </CarouselContent>
+            </Carousel>
+        </CardContent>
+    </Card>
+);
 
 
 export default function OneHundredDaysOfCodePage() {
@@ -43,6 +71,13 @@ export default function OneHundredDaysOfCodePage() {
     });
     return () => unsubscribe();
   }, [user]);
+
+  const hasSubmittedForSelectedDate = useMemo(() => {
+    if (!date) return false;
+    const selectedDateStr = date.toISOString().split('T')[0];
+    return submittedDates.some(d => d.toISOString().split('T')[0] === selectedDateStr);
+  }, [date, submittedDates]);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,6 +131,8 @@ export default function OneHundredDaysOfCodePage() {
           Select a day on the calendar and post the link to your daily progress to earn 0.5 points.
         </p>
       </div>
+      
+      <MotivationalCarousel />
 
       <div className="grid gap-8 md:grid-cols-2">
         <Card>
@@ -122,12 +159,16 @@ export default function OneHundredDaysOfCodePage() {
                   />
                 </div>
               </div>
-              <Button type="submit" className="w-full" disabled={!link || isSubmitting}>
-                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Post Link
+              <Button type="submit" className="w-full" disabled={!link || isSubmitting || hasSubmittedForSelectedDate}>
+                {isSubmitting ? ( 
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 
+                ) : hasSubmittedForSelectedDate ? (
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                ) : null }
+                {hasSubmittedForSelectedDate ? 'Submitted for this date' : 'Post Link'}
               </Button>
             </form>
-            {lastSubmission && (
+            {lastSubmission && !hasSubmittedForSelectedDate && (
                 <Alert className="mt-4" variant="default">
                     <CheckCircle className="h-4 w-4" />
                     <AlertTitle>Submission Successful!</AlertTitle>
