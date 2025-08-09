@@ -89,7 +89,7 @@ export default function ExercisesPage() {
                       <CardTitle>{exercise.title}</CardTitle>
                       {isTeacherOrAdmin && <Badge variant={exercise.targetGen === 'Everyone' ? 'destructive' : exercise.targetGen === 'All Students' ? 'default' : 'secondary'} className="mt-1">{exercise.targetGen}</Badge>}
                     </div>
-                    <ExerciseActions exercise={exercise} />
+                    {isTeacherOrAdmin && <ExerciseActions exercise={exercise} />}
                   </div>
                   <CardDescription className="pt-2">{exercise.description}</CardDescription>
                 </CardHeader>

@@ -89,7 +89,7 @@ export default function ProjectsPage() {
                       <CardTitle>{project.title}</CardTitle>
                       {isTeacherOrAdmin && <Badge variant={project.targetGen === 'Everyone' ? 'destructive' : project.targetGen === 'All Students' ? 'default' : 'secondary'} className="mt-1">{project.targetGen}</Badge>}
                     </div>
-                    <ProjectActions project={project} />
+                    {isTeacherOrAdmin && <ProjectActions project={project} />}
                   </div>
                   <CardDescription className="pt-2">{project.description}</CardDescription>
                 </CardHeader>
