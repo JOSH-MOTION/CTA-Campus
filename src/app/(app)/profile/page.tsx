@@ -45,6 +45,16 @@ export default function ProfilePage() {
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
+    defaultValues: {
+      displayName: '',
+      bio: '',
+      gen: '',
+      lessonDay: '',
+      lessonType: '',
+      gensTaught: '',
+      linkedin: '',
+      github: '',
+    }
   });
 
   useEffect(() => {
