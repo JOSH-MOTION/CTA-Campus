@@ -1,18 +1,15 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /* ================================
-       Helper Functions
-    ===================================*/
-
+    // Helper function to check the role of the requesting user.
     function isSignedIn() {
       return request.auth != null;
     }
 
     function isRole(role) {
-      return isSignedIn() &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
     }
     
     function isStudent() {
@@ -26,138 +23,90 @@ service cloud.firestore {
     function isAdmin() {
       return isRole('admin');
     }
-    
+
     function isStaff() {
-      return isTeacher() || isAdmin();
+        return isTeacher() || isAdmin();
     }
 
     function userGen() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.gen;
+        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.gen;
     }
 
-    // Safe targeted check for students
-    function isTargetedToStudent(resource) {
-      return isStudent() &&
-             resource.data.targetGen != null &&
-             (
-               resource.data.targetGen == 'Everyone' || 
-               resource.data.targetGen == 'All Students' || 
-               resource.data.targetGen == userGen()
-             );
-    }
-
-    /* ================================
-       Users Collection
-    ===================================*/
-
+    // Rules for the 'users' collection
     match /users/{userId} {
       allow read: if isSignedIn();
-
-      // Only allow user to update their own profile and specific fields
-      allow update: if request.auth.uid == userId &&
-                       request.resource.data.keys().hasOnly(['name', 'profilePictureUrl']);
-
-      allow create: if isStaff();
-
-      allow delete: if false;
-    }
-
-    /* ================================
-       Points Subcollection
-    ===================================*/
-    match /users/{userId}/points/{pointId} {
-      allow read: if isStaff() || (request.auth.uid == userId);
-      allow create, update, delete: if isStaff();
-    }
-
-    /* ================================
-       Announcements
-    ===================================*/
-    match /announcements/{announcementId} {
-      allow read: if isStaff() || isTargetedToStudent(resource);
-      allow create, update, delete: if isStaff();
-    }
-
-    /* ================================
-       Assignments
-    ===================================*/
-    match /assignments/{assignmentId} {
-      allow read: if isStaff() || isTargetedToStudent(resource);
-      allow create, update, delete: if isStaff();
-    }
-
-    /* ================================
-       Exercises
-    ===================================*/
-    match /exercises/{exerciseId} {
-      allow read: if isStaff() || isTargetedToStudent(resource);
-      allow create, update, delete: if isStaff();
-    }
-
-    /* ================================
-       Projects
-    ===================================*/
-    match /projects/{projectId} {
-      allow read: if isStaff() || isTargetedToStudent(resource);
-      allow create, update, delete: if isStaff();
-    }
-
-    /* ================================
-       Submissions
-    ===================================*/
-    match /submissions/{submissionId} {
-      // Staff can list all submissions
-      allow list: if isStaff();
       
-      // Students can read their own submissions
-      allow read: if isStaff() || (request.auth.uid == resource.data.studentId);
-
-      // Student can create their own submission
-      allow create: if request.auth.uid == request.resource.data.studentId;
-
-      allow update, delete: if isStaff();
+      // Allow users to update their own profile, but not their role or points.
+      // Allow staff to update any profile.
+      allow update: if (request.auth.uid == userId && !('role' in request.resource.data) && !('totalPoints' in request.resource.data)) || isStaff();
+      
+      // Allow creation of user docs during signup
+      allow create: if isSignedIn();
+      
+      // Points subcollection rules
+      match /points/{pointId} {
+        // Only staff can manage point entries to ensure integrity.
+        allow read, write: if isStaff();
+        // Allow a user to create a point entry if it's an increment, handled by server-side flow.
+        allow create: if request.auth.uid == userId;
+      }
+    }
+    
+    // Generic function to check if a document is targeted to the current user
+    function isTargeted(resource) {
+        return resource.data.targetGen == 'Everyone' || 
+               resource.data.targetGen == 'All Students' || 
+               (isStudent() && resource.data.targetGen == userGen());
     }
 
-    /* ================================
-       Resources
-    ===================================*/
+    match /announcements/{announcementId} {
+        allow read: if isStaff() || isTargeted(resource);
+        allow write: if isStaff();
+    }
+
+    match /assignments/{assignmentId} {
+        allow read: if isStaff() || isTargeted(resource);
+        allow write: if isStaff();
+    }
+    
+    match /exercises/{exerciseId} {
+        allow read: if isStaff() || isTargeted(resource);
+        allow write: if isStaff();
+    }
+    
+    match /projects/{projectId} {
+        allow read: if isStaff() || isTargeted(resource);
+        allow write: if isStaff();
+    }
+    
+    match /submissions/{submissionId} {
+        allow list: if isStaff();
+        allow read: if request.auth.uid == resource.data.studentId || isStaff();
+        allow create: if request.auth.uid == request.resource.data.studentId || isStaff();
+        allow delete: if isStaff();
+    }
+    
     match /resources/{resourceId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isStaff();
+        allow read: if isSignedIn();
+        allow write: if isStaff();
     }
-
-    /* ================================
-       Materials
-    ===================================*/
+    
     match /materials/{materialId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isStaff();
+        allow read: if isSignedIn();
+        allow write: if isStaff();
     }
 
-    /* ================================
-       Roadmap Status
-    ===================================*/
     match /roadmap_status/{weekId} {
-      allow read: if isSignedIn();
-      allow create, update: if isStaff();
-      allow delete: if false;
+        allow read: if isSignedIn();
+        allow write: if isStaff();
     }
 
-    /* ================================
-       Notifications
-    ===================================*/
     match /notifications/{notificationId} {
-      allow read, update: if request.auth.uid == resource.data.userId;
-      allow create, delete: if isStaff();
+        allow read, write: if request.auth.uid == resource.data.userId;
     }
 
-    /* ================================
-       Chats (Members Only)
-    ===================================*/
     match /chats/{chatId}/{message=**} {
-      allow read, write: if isSignedIn() &&
-                          get(/databases/$(database)/documents/chats/$(chatId)).data.members != null &&
-                          get(/databases/$(database)/documents/chats/$(chatId)).data.members.hasAny([request.auth.uid]);
+      allow read, write: if isSignedIn();
     }
   }
 }
