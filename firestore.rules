@@ -23,9 +23,9 @@ service cloud.firestore {
     function isAdmin() {
       return isRole('admin');
     }
-
+    
     function isStaff() {
-      return isTeacher() || isAdmin();
+        return isTeacher() || isAdmin();
     }
 
     function userGen() {
@@ -35,27 +35,13 @@ service cloud.firestore {
     // Rules for the 'users' collection
     match /users/{userId} {
       allow read: if isSignedIn();
+      allow update: if request.auth.uid == userId && !(request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'totalPoints']));
+      allow write: if isStaff(); // Allow staff to update anything
+    }
 
-      // Allow users to update their own profile, but NOT their role or totalPoints.
-      allow update: if request.auth.uid == userId &&
-                      request.resource.data.role == resource.data.role &&
-                      (!request.resource.data.keys().hasAll(['totalPoints']) ||
-                       request.resource.data.totalPoints >= resource.data.totalPoints);
-
-
-      // Allow a user to create their own document (on sign up)
-      allow create: if request.auth.uid == userId;
-
-      // Staff can update any user profile fully.
-      allow write: if isStaff();
-
-    // Rules for the 'points' subcollection within each user document.
-      match /points/{pointId} {
-        // A user can create point entries for themselves. This is required for the flow.
-        allow create: if request.auth.uid == userId;
-        // Staff can create, read, update, or delete any point entry.
-        allow read, write: if isStaff();
-      }
+    match /users/{userId}/points/{pointId} {
+      // Only staff can create point logs to ensure data integrity
+      allow read, write, delete: if isStaff();
     }
     
     // Rules for top-level collections (announcements, assignments, etc.)
@@ -88,8 +74,10 @@ service cloud.firestore {
     }
     
     match /submissions/{submissionId} {
-        // A user can read their own submission. Teachers/admins can read any submission.
-        allow read: if request.auth.uid == resource.data.studentId || isStaff();
+        // A user can read their own submission.
+        allow read: if request.auth.uid == resource.data.studentId;
+        // Staff can list all submissions
+        allow list, read: if isStaff();
         // A user can create a submission for themselves.
         allow create: if request.auth.uid == request.resource.data.studentId;
         // Staff can delete submissions.
