@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -24,9 +23,9 @@ service cloud.firestore {
     function isAdmin() {
       return isRole('admin');
     }
-    
+
     function isStaff() {
-        return isTeacher() || isAdmin();
+      return isTeacher() || isAdmin();
     }
 
     function userGen() {
@@ -36,22 +35,26 @@ service cloud.firestore {
     // Rules for the 'users' collection
     match /users/{userId} {
       allow read: if isSignedIn();
-      // Students can update their own profile, but not their role or totalPoints.
-      // Staff can update any user document.
-      allow update: if (request.auth.uid == userId && 
-                       request.resource.data.role == resource.data.role &&
-                       request.resource.data.totalPoints == resource.data.totalPoints) || isStaff();
-                       
+
+      // Allow users to update their own profile, but NOT their role or totalPoints.
+      allow update: if request.auth.uid == userId &&
+                      request.resource.data.role == resource.data.role &&
+                      (!request.resource.data.keys().hasAll(['totalPoints']) ||
+                       request.resource.data.totalPoints >= resource.data.totalPoints);
+
+
+      // Allow a user to create their own document (on sign up)
       allow create: if request.auth.uid == userId;
 
-      // Rules for the 'points' subcollection within each user document.
+      // Staff can update any user profile fully.
+      allow write: if isStaff();
+
+    // Rules for the 'points' subcollection within each user document.
       match /points/{pointId} {
-        // Only staff can write to the points subcollection.
-        // The awardPointsFlow is a server-side operation which has admin-like privileges
-        // and is not restricted by these client-side rules for writes.
-        // Students can read their own points history.
-        allow read: if request.auth.uid == userId || isStaff();
-        allow write, delete: if isStaff();
+        // A user can create point entries for themselves. This is required for the flow.
+        allow create: if request.auth.uid == userId;
+        // Staff can create, read, update, or delete any point entry.
+        allow read, write: if isStaff();
       }
     }
     
@@ -65,30 +68,31 @@ service cloud.firestore {
     }
 
     match /announcements/{announcementId} {
-        allow read: if isTeacher() || isAdmin() || isTargeted(resource);
-        allow write, delete: if isTeacher() || isAdmin();
+        allow read: if isStaff() || isTargeted(resource);
+        allow write, delete: if isStaff();
     }
 
     match /assignments/{assignmentId} {
-        allow read: if isTeacher() || isAdmin() || isTargeted(resource);
-        allow write, delete: if isTeacher() || isAdmin();
+        allow read: if isStaff() || isTargeted(resource);
+        allow write, delete: if isStaff();
     }
     
     match /exercises/{exerciseId} {
-        allow read: if isTeacher() || isAdmin() || isTargeted(resource);
-        allow write, delete: if isTeacher() || isAdmin();
+        allow read: if isStaff() || isTargeted(resource);
+        allow write, delete: if isStaff();
     }
     
     match /projects/{projectId} {
-        allow read: if isTeacher() || isAdmin() || isTargeted(resource);
-        allow write, delete: if isTeacher() || isAdmin();
+        allow read: if isStaff() || isTargeted(resource);
+        allow write, delete: if isStaff();
     }
     
     match /submissions/{submissionId} {
         // A user can read their own submission. Teachers/admins can read any submission.
         allow read: if request.auth.uid == resource.data.studentId || isStaff();
-        // A user can create a submission for themselves. Teachers/admins can delete them.
+        // A user can create a submission for themselves.
         allow create: if request.auth.uid == request.resource.data.studentId;
+        // Staff can delete submissions.
         allow delete: if isStaff();
     }
     
@@ -108,10 +112,7 @@ service cloud.firestore {
     }
 
     match /notifications/{notificationId} {
-        allow read: if request.auth.uid == resource.data.userId || isStaff();
-        allow write: if isStaff(); // Only staff can create/update notifications directly
-        allow create: if request.auth.uid == request.resource.data.userId; // user can trigger creation for self
-        allow update: if request.auth.uid == resource.data.userId; // user can update (e.g. mark as read)
+        allow read, write: if request.auth.uid == resource.data.userId;
     }
 
     // Rules for chat collections
