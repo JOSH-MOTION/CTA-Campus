@@ -6,7 +6,7 @@ import {ThemeProvider} from '@/components/ThemeProvider';
 import {AuthProvider} from '@/contexts/AuthContext';
 
 export const metadata: Metadata = {
-  title: 'CTA Portal',
+  title: 'Coderain Campus',
   description: 'A modern school management app.',
 };
 

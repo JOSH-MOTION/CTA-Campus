@@ -24,7 +24,7 @@ import { onSubmissionsForStudent, Submission } from '@/services/submissions';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { formatDistanceToNow } from 'date-fns';
 import Link from 'next/link';
-import { Alert, AlertTitle } from '../ui/alert';
+import { Alert, AlertTitle, AlertDescription } from '../ui/alert';
 
 interface StudentCardProps {
   student: UserData;

@@ -53,7 +53,7 @@ export default function LoginPage() {
     <div className="flex flex-col items-center justify-center space-y-6 py-8">
       <div className="flex items-center gap-3 text-primary">
         <Compass className="h-10 w-10" />
-        <h1 className="text-4xl font-bold">Campus Compass</h1>
+        <h1 className="text-4xl font-bold">Coderain Campus</h1>
       </div>
       <Card className="w-full max-w-md">
         <CardHeader>

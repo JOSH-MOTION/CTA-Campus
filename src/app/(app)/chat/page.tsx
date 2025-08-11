@@ -294,7 +294,7 @@ export default function ChatPage() {
                 <Loader2 className="h-8 w-8 animate-spin" />
             ) : (
                 <div className="text-center text-gray-500">
-                    <h2 className="text-2xl font-semibold">Campus Connect</h2>
+                    <h2 className="text-2xl font-semibold">Coderain Campus</h2>
                     <p>Select a chat to start messaging</p>
                     <Button onClick={() => setIsContactListOpen(true)} className="mt-4">
                         <Users className="mr-2 h-4 w-4" />

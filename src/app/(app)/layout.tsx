@@ -113,7 +113,7 @@ const MemoizedProtectedLayout = memo(function ProtectedLayout({children}: {child
                               <path d="M12 22c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8Z"></path>
                               <path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z"></path>
                             </svg>
-                            <h1 className="text-xl font-semibold">Campus Compass</h1>
+                            <h1 className="text-xl font-semibold">Coderain Campus</h1>
                           </div>
                         </div>
                         <SidebarNav />
