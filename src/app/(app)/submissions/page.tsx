@@ -123,7 +123,8 @@ export default function AllSubmissionsPage() {
             points: points,
             reason: submission.pointCategory,
             activityId,
-            action: 'award'
+            action: 'award',
+            assignmentTitle: submission.assignmentTitle,
         });
         if (!result.success) throw new Error(result.message);
 
@@ -155,7 +156,8 @@ export default function AllSubmissionsPage() {
           points: points,
           reason: submission.pointCategory,
           activityId,
-          action: 'revoke'
+          action: 'revoke',
+          assignmentTitle: submission.assignmentTitle,
       });
        if (!result.success) throw new Error(result.message);
 

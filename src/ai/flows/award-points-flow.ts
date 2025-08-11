@@ -21,6 +21,7 @@ const AwardPointsFlowInputSchema = z.object({
     reason: z.string().describe("A short description of why the points are being awarded."),
     activityId: z.string().describe("A unique ID for the specific activity."),
     action: z.enum(['award', 'revoke']).describe("Whether to award or revoke the points."),
+    assignmentTitle: z.string().optional().describe("The title of the assignment or activity."),
 });
 export type AwardPointsFlowInput = z.infer<typeof AwardPointsFlowInputSchema>;
 
@@ -38,7 +39,7 @@ export const awardPointsFlow = ai.defineFlow(
     outputSchema: AwardPointsFlowOutputSchema,
   },
   async (input) => {
-    const { studentId, points, reason, activityId, action } = input;
+    const { studentId, points, reason, activityId, action, assignmentTitle } = input;
     const userDocRef = doc(db, 'users', studentId);
     
     try {
@@ -54,6 +55,7 @@ export const awardPointsFlow = ai.defineFlow(
         await setDoc(pointDocRef, {
             points,
             reason,
+            assignmentTitle: assignmentTitle || reason, // Fallback to reason if title not provided
             activityId,
             awardedAt: serverTimestamp(),
         });
