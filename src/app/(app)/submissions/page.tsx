@@ -15,7 +15,7 @@ import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { clearAllSubmissionsFlow } from '@/ai/flows/clear-all-submissions-flow';
 import { hasPointBeenAwarded } from '@/services/points';
 import { awardPointsFlow } from '@/ai/flows/award-points-flow';
@@ -23,6 +23,24 @@ import { cn } from '@/lib/utils';
 import Papa from 'papaparse';
 
 const submissionCategories = ['All', 'Class Assignments', 'Class Exercises', 'Weekly Projects', '100 Days of Code'];
+
+// Helper to generate the correct activity ID based on submission type
+const getActivityIdForSubmission = (submission: Submission): string => {
+    switch (submission.pointCategory) {
+        case 'Class Assignments':
+            return `graded-submission-${submission.id}`;
+        case 'Class Exercises':
+            return `graded-exercise-${submission.id}`;
+        case 'Weekly Projects':
+            return `graded-project-${submission.id}`;
+        case '100 Days of Code':
+            // This format must exactly match the one used when submitting
+            return `100-days-of-code-${submission.assignmentTitle.replace('100 Days of Code - ', '')}`;
+        default:
+            // Fallback, though should not be reached with current categories
+            return `graded-submission-${submission.id}`;
+    }
+};
 
 export default function AllSubmissionsPage() {
   const router = useRouter();
@@ -49,11 +67,9 @@ export default function AllSubmissionsPage() {
 
       const initialGradingState: { [submissionId: string]: 'idle' | 'loading' | 'graded' } = {};
       for (const s of fetchedSubmissions) {
-          const activityId = s.assignmentId === '100-days-of-code'
-            ? `100-days-of-code-${s.assignmentTitle.replace('100 Days of Code - ', '')}`
-            : `graded-submission-${s.id}`;
-        const isGraded = await hasPointBeenAwarded(s.studentId, activityId);
-        initialGradingState[s.id] = isGraded ? 'graded' : 'idle';
+          const activityId = getActivityIdForSubmission(s);
+          const isGraded = await hasPointBeenAwarded(s.studentId, activityId);
+          initialGradingState[s.id] = isGraded ? 'graded' : 'idle';
       }
       setGradingState(initialGradingState);
 
@@ -98,12 +114,8 @@ export default function AllSubmissionsPage() {
   const handleGrade = async (submission: Submission) => {
     setGradingState(prev => ({ ...prev, [submission.id]: 'loading' }));
 
-    const is100Days = submission.assignmentId === '100-days-of-code';
-    const activityId = is100Days
-        ? `100-days-of-code-${submission.assignmentTitle.replace('100 Days of Code - ', '')}`
-        : `graded-submission-${submission.id}`;
-    
-    const points = is100Days ? 0.5 : 1;
+    const activityId = getActivityIdForSubmission(submission);
+    const points = submission.pointCategory === '100 Days of Code' ? 0.5 : 1;
     
     try {
         const result = await awardPointsFlow({
@@ -134,11 +146,8 @@ export default function AllSubmissionsPage() {
   const handleRevoke = async (submission: Submission) => {
     setGradingState(prev => ({ ...prev, [submission.id]: 'loading' }));
 
-     const is100Days = submission.assignmentId === '100-days-of-code';
-    const activityId = is100Days
-        ? `100-days-of-code-${submission.assignmentTitle.replace('100 Days of Code - ', '')}`
-        : `graded-submission-${submission.id}`;
-    const points = is100Days ? 0.5 : 1;
+    const activityId = getActivityIdForSubmission(submission);
+    const points = submission.pointCategory === '100 Days of Code' ? 0.5 : 1;
 
     try {
       const result = await awardPointsFlow({
