@@ -45,13 +45,6 @@ export const awardPointsFlow = ai.defineFlow(
       if (action === 'award') {
         const pointDocRef = doc(db, 'users', studentId, 'points', activityId);
 
-        const docSnap = await getDoc(pointDocRef);
-        // This check prevents awarding points for the same non-manual activity twice.
-        // It's crucial for submissions and attendance.
-        if (docSnap.exists()) {
-            return { success: false, message: 'duplicate' };
-        }
-
         // Atomically increment the totalPoints on the user document
         await updateDoc(userDocRef, {
             totalPoints: increment(points)
