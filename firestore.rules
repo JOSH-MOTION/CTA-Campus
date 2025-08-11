@@ -2,98 +2,86 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // Helper functions
+
+    // Helper functions to check user roles
     function isStaff() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['teacher', 'admin'];
     }
-    
+
     function isStudent() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'student';
     }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
 
-    // Rules for the 'users' collection
     match /users/{userId} {
-      // Any authenticated user can read any other user's profile (for directory, chat, etc.)
-      allow read: if request.auth != null;
-      
-      // Allow users to create their own user document upon signup
-      allow create: if request.auth.uid == userId;
-      
-      // Allow users to update their own document, but not change their role or points
-      allow update: if request.auth.uid == userId && !('role' in request.resource.data) && !('totalPoints' in request.resource.data);
-
-      // Admins and teachers can update any user document
-      allow update: if isStaff();
-      
-      // Only admins should be able to delete users
-      allow delete: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-
-      // Rules for the 'points' subcollection
-      match /points/{pointId} {
-        // Only staff can read point entries for other users
-        allow read: if isStaff();
-        // Allow a user to read their own point entries
-        allow read: if request.auth.uid == userId;
-        // Points should only be created/deleted via the secure awardPointsFlow.
-        // Direct creation/deletion is disallowed for security.
-        // A student can create a point log for themselves.
-        allow create: if request.auth.uid == userId;
-        // Only staff can manage points directly.
-        allow write: if isStaff();
-      }
+      allow read: if true;
+      allow create: if request.auth != null;
+      // Allow user to update their own profile, but not their role or points.
+      // Allow staff to update any profile.
+      allow update: if (isOwner(userId) && !('role' in request.resource.data) && !('totalPoints' in request.resource.data)) || isStaff();
     }
     
-    // Rules for collections accessible to teachers/admins
+    match /users/{userId}/points/{pointId} {
+        // Points can only be written by staff, or by a student creating a log for themselves.
+        // Students cannot update or delete points once created.
+        allow read: if isOwner(userId) || isStaff();
+        allow create: if isOwner(userId) || isStaff();
+        allow update, delete: if isStaff();
+    }
+
+    match /submissions/{submissionId} {
+      allow read, list: if isStaff() || (request.auth.uid == resource.data.studentId);
+      // Students can create submissions for themselves. Staff can create submissions too.
+      allow create: if (request.auth.uid == request.resource.data.studentId) || isStaff();
+      // Only staff can delete submissions.
+      allow delete: if isStaff();
+      allow update: if isStaff(); // Allow staff to update submissions if needed
+    }
+
     match /announcements/{announcementId} {
       allow read: if request.auth != null;
       allow write: if isStaff();
     }
-    
+
     match /assignments/{assignmentId} {
       allow read: if request.auth != null;
       allow write: if isStaff();
     }
 
     match /exercises/{exerciseId} {
-        allow read: if request.auth != null;
-        allow write: if isStaff();
-    }
-
-    match /projects/{projectId} {
-        allow read: if request.auth != null;
-        allow write: if isStaff();
+      allow read: if request.auth != null;
+      allow write: if isStaff();
     }
     
+    match /projects/{projectId} {
+      allow read: if request.auth != null;
+      allow write: if isStaff();
+    }
+
     match /resources/{resourceId} {
-        allow read: if request.auth != null;
-        allow write: if isStaff();
+      allow read: if request.auth != null;
+      allow write: if isStaff();
     }
 
     match /materials/{materialId} {
         allow read: if request.auth != null;
         allow write: if isStaff();
     }
-    
-    match /submissions/{submissionId} {
-      allow get: if request.auth.uid == resource.data.studentId || isStaff();
-      allow list: if isStaff();
-      allow create: if request.auth.uid == resource.data.studentId || isStaff();
-      allow update, delete: if isStaff();
+
+    match /roadmap_status/{weekId} {
+        allow read: if true;
+        allow write: if isStaff();
     }
     
     match /chats/{chatId}/{message=**} {
-        allow read, write: if request.auth != null; // Simplistic rule, can be refined based on chat type (DM vs group)
+      allow read, write: if request.auth != null;
     }
-
-    match /roadmap_status/{weekId} {
-        allow read: if request.auth != null;
-        allow write: if isStaff(); // Only staff can mark weeks as complete for a gen
-    }
-
+    
     match /notifications/{notificationId} {
-        allow read, write: if request.auth.uid == resource.data.userId;
-        allow create: if isStaff(); // Staff can create notifications for users
+      allow read, write: if request.auth.uid == resource.data.userId;
     }
   }
 }
