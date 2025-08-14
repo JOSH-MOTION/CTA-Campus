@@ -27,9 +27,11 @@ import {
     submissionNotes: string;
     submittedAt: Timestamp;
     pointCategory: string;
+    grade?: string;
+    feedback?: string;
   }
   
-  export interface NewSubmissionData extends Omit<Submission, 'id' | 'submittedAt'> {
+  export interface NewSubmissionData extends Omit<Submission, 'id' | 'submittedAt' | 'grade' | 'feedback'> {
       pointsToAward?: number;
   }
   

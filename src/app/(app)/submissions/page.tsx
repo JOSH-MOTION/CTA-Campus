@@ -17,7 +17,6 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { clearAllSubmissionsFlow } from '@/ai/flows/clear-all-submissions-flow';
-import { hasPointBeenAwarded } from '@/services/points';
 import { awardPointsFlow } from '@/ai/flows/award-points-flow';
 import { cn } from '@/lib/utils';
 import Papa from 'papaparse';
@@ -66,11 +65,11 @@ export default function AllSubmissionsPage() {
       setSubmissions(fetchedSubmissions);
       setAllStudents(fetchedUsers.filter(u => u.role === 'student'));
 
+      // Simplify grading state check
       const initialGradingState: { [submissionId: string]: 'idle' | 'loading' | 'graded' } = {};
       for (const s of fetchedSubmissions) {
-          const activityId = getActivityIdForSubmission(s);
-          const isGraded = await hasPointBeenAwarded(s.studentId, activityId);
-          initialGradingState[s.id] = isGraded ? 'graded' : 'idle';
+          // @ts-ignore
+          initialGradingState[s.id] = s.grade ? 'graded' : 'idle';
       }
       setGradingState(initialGradingState);
 

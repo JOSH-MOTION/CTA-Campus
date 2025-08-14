@@ -21,19 +21,6 @@ export interface PointEntry {
 }
 
 /**
- * Checks if a point has already been awarded for a specific activity.
- * @param userId The user's ID
- * @param activityId The unique ID of the activity
- * @returns true if the point has been awarded, false otherwise
- */
-export const hasPointBeenAwarded = async (userId: string, activityId: string): Promise<boolean> => {
-    const pointDocRef = doc(db, 'users', userId, 'points', activityId);
-    const docSnap = await getDoc(pointDocRef);
-    return docSnap.exists();
-};
-
-
-/**
  * Retrieves the total points for a single user by reading the totalPoints field.
  * @param userId - The UID of the user.
  * @returns The total points for the user.
