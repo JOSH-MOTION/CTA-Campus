@@ -43,17 +43,17 @@ service cloud.firestore {
       allow read: if isSignedIn();
       // Allow a user to update their own profile, but not change their role or total points directly.
       allow update: if request.auth.uid == userId &&
-                       request.resource.data.role == resource.data.role &&
-                       request.resource.data.totalPoints == resource.data.totalPoints;
-      // Allow a staff member to update a user's total points (for grading).
-      allow update: if isStaff() &&
-                       'totalPoints' in request.resource.data.diff(resource.data).affectedKeys();
+                       request.resource.data.role == resource.data.role;
+      // Allow staff to update any user profile, including grade and feedback.
+      allow update: if isStaff();
 
       match /points/{pointId} {
-        // Only staff can create/modify point entries.
-        allow write: if isStaff();
+        // Only the server flow or staff can create point entries.
+        allow create: if isStaff();
         // Students can read their own points, staff can read any.
         allow read: if request.auth.uid == userId || isStaff();
+        // Only staff can update/delete point entries.
+        allow update, delete: if isStaff();
       }
     }
 
@@ -83,6 +83,8 @@ service cloud.firestore {
       allow list: if isStaff();
       // A user can create a submission for themselves, or a staff member can create one.
       allow create: if isStaff() || request.auth.uid == request.resource.data.studentId;
+      // Staff can update submissions with grades/feedback
+      allow update: if isStaff();
       allow delete: if isStaff();
     }
     
