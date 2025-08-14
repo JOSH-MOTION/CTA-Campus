@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -41,11 +42,12 @@ service cloud.firestore {
     // Collection Rules
     match /users/{userId} {
       allow read: if isSignedIn();
-      // A user can update their own profile (but not role/points), OR a staff member can update anything.
+      // Allow a user to update their own profile, but not change their role or points.
+      // Allow staff to update any user profile, including incrementing points.
       allow update: if (request.auth.uid == userId && request.resource.data.role == resource.data.role && request.resource.data.totalPoints == resource.data.totalPoints) || isStaff();
 
       match /points/{pointId} {
-        // Only the server flow or staff can create point entries.
+        // Only staff can create point entries.
         allow create: if isStaff();
         // Students can read their own points, staff can read any.
         allow read: if request.auth.uid == userId || isStaff();
