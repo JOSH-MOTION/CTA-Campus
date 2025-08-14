@@ -37,7 +37,7 @@ import {
    * Creates a new submission for an assignment.
    */
   export const addSubmission = async (submissionData: NewSubmissionData): Promise<{ id: string }> => {
-    const { pointsToAward, pointCategory, ...restOfSubmissionData } = submissionData;
+    const { pointsToAward, ...restOfSubmissionData } = submissionData;
     
     const is100Days = submissionData.assignmentId === '100-days-of-code';
 
@@ -61,38 +61,28 @@ import {
       
     const docRef = await addDoc(collection(db, 'submissions'), {
         ...restOfSubmissionData,
-        pointCategory, // Make sure to save the original point category
         submittedAt: serverTimestamp(),
     });
 
-    if (pointsToAward && pointCategory) {
-        // For "100 Days of Code", the reason in the points system needs to be exactly "100 Days of Code"
-        const reasonForPoints = is100Days ? '100 Days of Code' : pointCategory;
-
-        const activityId = is100Days 
-            ? `100-days-of-code-${submissionData.assignmentTitle.replace('100 Days of Code - ', '')}`
-            : `graded-submission-${docRef.id}`;
-        
+    // NOTE: Automatic point awarding has been removed to align with security rules.
+    // Points are now only awarded when a teacher grades the submission.
+    if (pointsToAward && is100Days) {
+        // "100 Days of Code" is a special case that still awards points immediately.
+        const activityId = `100-days-of-code-${submissionData.assignmentTitle.replace('100 Days of Code - ', '')}`;
         try {
-            const result = await awardPointsFlow({
+            await awardPointsFlow({
                 studentId: submissionData.studentId,
                 points: pointsToAward,
-                reason: reasonForPoints,
+                reason: '100 Days of Code',
                 activityId: activityId,
-                action: 'award'
+                action: 'award',
+                assignmentTitle: submissionData.assignmentTitle
             });
-            if(result.message === 'duplicate' && is100Days) {
-                // If it's a duplicate for 100 days, we don't want to throw an error to the user
-                // as the submission itself might have been deleted but the point wasn't.
-                console.log(`Duplicate point award prevented for ${activityId}`);
-            } else if (!result.success) {
-                 throw new Error(result.message || 'Failed to award points in flow.');
-            }
         } catch(e) {
-            console.error(`Failed to award points for submission ${docRef.id}:`, e);
-            // Optionally, you could try to revert the submission or add a flag for failed point awards
+            console.error(`Failed to award points for 100 Days of Code submission ${docRef.id}:`, e);
         }
     }
+
 
     return { id: docRef.id };
   };

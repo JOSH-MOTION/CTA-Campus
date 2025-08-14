@@ -76,13 +76,12 @@ export function SubmitAssignmentDialog({ children, assignment, onSubmissionSucce
         assignmentTitle: assignment.title,
         submissionLink: data.submissionLink,
         submissionNotes: data.submissionNotes || '',
-        pointsToAward: 1,
         pointCategory: 'Class Assignments',
       });
 
       toast({
         title: 'Assignment Submitted!',
-        description: 'Your work has been sent to your teacher. You have been awarded 1 point.',
+        description: 'Your work has been sent to your teacher for grading.',
       });
       onSubmissionSuccess();
       setSubmittedData(data);

@@ -75,13 +75,12 @@ export function SubmitExerciseDialog({ children, exercise, onSubmissionSuccess }
         assignmentTitle: exercise.title,
         submissionLink: data.submissionLink,
         submissionNotes: data.submissionNotes || '',
-        pointsToAward: 1,
         pointCategory: 'Class Exercises'
       });
 
       toast({
         title: 'Exercise Submitted!',
-        description: 'Your work has been sent to your teacher. You have earned 1 point.',
+        description: 'Your work has been sent to your teacher for grading.',
       });
       onSubmissionSuccess();
       setSubmittedData(data);
