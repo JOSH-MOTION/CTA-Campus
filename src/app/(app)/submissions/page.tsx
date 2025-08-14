@@ -21,6 +21,7 @@ import { hasPointBeenAwarded } from '@/services/points';
 import { awardPointsFlow } from '@/ai/flows/award-points-flow';
 import { cn } from '@/lib/utils';
 import Papa from 'papaparse';
+import { GradeSubmissionDialog } from '@/components/submissions/GradeSubmissionDialog';
 
 const submissionCategories = ['All', 'Class Assignments', 'Class Exercises', 'Weekly Projects', '100 Days of Code'];
 
@@ -111,38 +112,6 @@ export default function AllSubmissionsPage() {
     });
   }, [submissions, allStudents, searchTerm, selectedGen, selectedCategory]);
 
-  const handleGrade = async (submission: Submission) => {
-    setGradingState(prev => ({ ...prev, [submission.id]: 'loading' }));
-
-    const activityId = getActivityIdForSubmission(submission);
-    const points = submission.pointCategory === '100 Days of Code' ? 0.5 : 1;
-    
-    try {
-        const result = await awardPointsFlow({
-            studentId: submission.studentId,
-            points: points,
-            reason: submission.pointCategory,
-            activityId,
-            action: 'award',
-            assignmentTitle: submission.assignmentTitle,
-        });
-        if (!result.success) throw new Error(result.message);
-
-        setGradingState(prev => ({ ...prev, [submission.id]: 'graded' }));
-        toast({
-            title: 'Submission Graded',
-            description: `${submission.studentName} has been awarded ${points} point(s).`,
-        });
-
-    } catch (error: any) {
-        toast({
-            variant: 'destructive',
-            title: 'Error',
-            description: error.message === 'duplicate' ? 'This submission has already been graded.' : 'Could not award points.',
-        });
-        setGradingState(prev => ({ ...prev, [submission.id]: error.message === 'duplicate' ? 'graded' : 'idle' }));
-    }
-  };
   
   const handleRevoke = async (submission: Submission) => {
     setGradingState(prev => ({ ...prev, [submission.id]: 'loading' }));
@@ -346,17 +315,32 @@ export default function AllSubmissionsPage() {
                                 </Button>
                             </TableCell>
                             <TableCell className="text-right space-x-2">
-                                <Button
-                                    size="sm"
-                                    variant={currentGradeState === 'graded' ? 'default' : 'outline'}
-                                    onClick={() => currentGradeState === 'graded' ? handleRevoke(submission) : handleGrade(submission)}
-                                    disabled={currentGradeState === 'loading'}
-                                    className={cn(currentGradeState === 'graded' && 'bg-green-600 hover:bg-green-700')}
-                                >
-                                    {currentGradeState === 'loading' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    {currentGradeState === 'graded' ? <XCircle className="mr-2 h-4 w-4" /> : <CheckCircle className="mr-2 h-4 w-4" />}
-                                    {currentGradeState === 'graded' ? 'Revoke' : 'Grade'}
-                                </Button>
+                                {currentGradeState === 'graded' ? (
+                                     <Button
+                                        size="sm"
+                                        variant="default"
+                                        onClick={() => handleRevoke(submission)}
+                                        disabled={currentGradeState === 'loading'}
+                                        className="bg-green-600 hover:bg-green-700"
+                                    >
+                                        {currentGradeState === 'loading' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                        <XCircle className="mr-2 h-4 w-4" />
+                                        Revoke
+                                    </Button>
+                                ) : (
+                                    <GradeSubmissionDialog
+                                        submission={submission}
+                                        onGraded={() => {
+                                            setGradingState(prev => ({...prev, [submission.id]: 'graded'}));
+                                            fetchData();
+                                        }}
+                                    >
+                                        <Button size="sm" variant="outline" disabled={currentGradeState === 'loading'}>
+                                          {currentGradeState === 'loading' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+                                          Grade
+                                        </Button>
+                                    </GradeSubmissionDialog>
+                                )}
                             </TableCell>
                         </TableRow>
                     )
