@@ -19,12 +19,13 @@ import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, CheckCircle, ExternalLink } from 'lucide-react';
+import { Loader2, CheckCircle, ExternalLink, Award } from 'lucide-react';
 import { type Submission } from '@/services/submissions';
 import { gradeSubmissionFlow } from '@/ai/flows/grade-submission-flow';
 import { Alert, AlertTitle, AlertDescription } from '../ui/alert';
 import Link from 'next/link';
 import { Input } from '../ui/input';
+import { awardPointsFlow } from '@/ai/flows/award-points-flow';
 
 const gradingSchema = z.object({
   feedback: z.string().optional(),
@@ -37,6 +38,21 @@ interface GradeSubmissionDialogProps {
   submission: Submission;
   onGraded: () => void;
 }
+
+const getActivityIdForSubmission = (submission: Submission): string => {
+    switch (submission.pointCategory) {
+        case 'Class Assignments':
+            return `graded-submission-${submission.id}`;
+        case 'Class Exercises':
+            return `graded-exercise-${submission.id}`;
+        case 'Weekly Projects':
+            return `graded-project-${submission.id}`;
+        case '100 Days of Code':
+            return `100-days-of-code-${submission.assignmentTitle.replace('100 Days of Code - ', '')}`;
+        default:
+            return `graded-submission-${submission.id}`;
+    }
+};
 
 export function GradeSubmissionDialog({ children, submission, onGraded }: GradeSubmissionDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -58,26 +74,46 @@ export function GradeSubmissionDialog({ children, submission, onGraded }: GradeS
     }
   }
 
+  const pointsToAward = submission.pointCategory === '100 Days of Code' ? 0.5 : 1;
+
   const onSubmit = async (data: GradingFormValues) => {
     setIsSubmitting(true);
     try {
-      const result = await gradeSubmissionFlow({
-        submissionId: submission.id,
-        studentId: submission.studentId,
-        grade: 'Complete', // Grade is now automated
-        feedback: data.feedback,
-      });
+        const activityId = getActivityIdForSubmission(submission);
+        
+        // Award points first
+        const awardResult = await awardPointsFlow({
+            studentId: submission.studentId,
+            points: pointsToAward,
+            reason: submission.pointCategory,
+            activityId,
+            action: 'award',
+            assignmentTitle: submission.assignmentTitle,
+        });
 
-      if (!result.success) {
-          throw new Error(result.message);
-      }
+        if (!awardResult.success && awardResult.message !== 'duplicate') {
+            throw new Error(awardResult.message);
+        }
 
-      toast({
-        title: 'Submission Graded!',
-        description: 'The grade and feedback have been saved.',
-      });
-      onGraded(); // Callback to refresh the parent component's data
-      setIsOpen(false);
+        // Then, update the submission document with grade and feedback
+        const gradeResult = await gradeSubmissionFlow({
+            submissionId: submission.id,
+            studentId: submission.studentId,
+            grade: 'Complete',
+            feedback: data.feedback,
+        });
+
+        if (!gradeResult.success) {
+            throw new Error(gradeResult.message);
+        }
+
+        toast({
+            title: 'Submission Graded!',
+            description: `Awarded ${pointsToAward} points and saved feedback.`,
+        });
+        onGraded();
+        setIsOpen(false);
+
     } catch (error: any) {
       toast({
         variant: 'destructive',
@@ -121,6 +157,13 @@ export function GradeSubmissionDialog({ children, submission, onGraded }: GradeS
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <Alert>
+                <Award className="h-4 w-4" />
+                <AlertTitle>Points to Award</AlertTitle>
+                <AlertDescription>
+                    This will award <span className="font-bold">{pointsToAward} point(s)</span> to the student.
+                </AlertDescription>
+            </Alert>
             <FormField
               control={form.control}
               name="feedback"
