@@ -9,17 +9,13 @@ import { Submission, deleteSubmission, fetchSubmissions } from '@/services/submi
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
-import { ArrowLeft, ExternalLink, Loader2, CheckCircle, Trash2, XCircle } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Loader2, Trash2 } from 'lucide-react';
 import Link from 'next/link';
-import { hasPointBeenAwarded } from '@/services/points';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { useNotifications } from '@/contexts/NotificationsContext';
-import { cn } from '@/lib/utils';
-import { awardPointsFlow } from '@/ai/flows/award-points-flow';
+import { GradeSubmissionDialog } from '@/components/submissions/GradeSubmissionDialog';
 
 export default function ExerciseSubmissionsPage() {
   const { id: exerciseId } = useParams();
@@ -28,134 +24,45 @@ export default function ExerciseSubmissionsPage() {
   const { exercises, loading: exercisesLoading } = useExercises();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
-  const [gradingState, setGradingState] = useState<{[submissionId: string]: 'idle' | 'loading' | 'graded'}>({});
   const { toast } = useToast();
   const [submissionToDelete, setSubmissionToDelete] = useState<Submission | null>(null);
-  const { addNotificationForUser } = useNotifications();
 
   const exercise = exercises.find(a => a.id === exerciseId);
+  
+  const refreshSubmissions = async () => {
+      if (typeof exerciseId !== 'string') return;
+      setLoading(true);
+      try {
+          const newSubmissions = await fetchSubmissions(exerciseId);
+          setSubmissions(newSubmissions);
+      } catch (error) {
+           toast({
+              variant: "destructive",
+              title: "Error",
+              description: "Could not load submissions."
+          });
+      } finally {
+          setLoading(false);
+      }
+  }
 
   useEffect(() => {
-    if (typeof exerciseId !== 'string') return;
-    
-    const getSubmissions = async () => {
-        setLoading(true);
-        try {
-            const newSubmissions = await fetchSubmissions(exerciseId);
-            setSubmissions(newSubmissions);
-
-            const initialGradingState: {[submissionId: string]: 'idle' | 'loading' | 'graded'} = {};
-            for (const s of newSubmissions) {
-                const activityId = `graded-exercise-${s.id}`;
-                const isGraded = await hasPointBeenAwarded(s.studentId, activityId);
-                initialGradingState[s.id] = isGraded ? 'graded' : 'idle';
-            }
-            setGradingState(initialGradingState);
-
-        } catch (error) {
-             toast({
-                variant: "destructive",
-                title: "Error",
-                description: "Could not load submissions."
-            });
-        } finally {
-            setLoading(false);
-        }
-    }
-    getSubmissions();
-
+    refreshSubmissions();
   }, [exerciseId, toast]);
+
 
   if (role === 'student') {
     router.push('/exercises');
     return null;
   }
 
-  const handleGrade = async (submission: Submission) => {
-    setGradingState(prev => ({ ...prev, [submission.id]: 'loading' }));
-    const activityId = `graded-exercise-${submission.id}`;
-    try {
-      const result = await awardPointsFlow({
-          studentId: submission.studentId,
-          points: 1,
-          reason: 'Class Exercises',
-          activityId,
-          action: 'award'
-      });
-      if (!result.success) throw new Error(result.message);
-
-      setGradingState(prev => ({ ...prev, [submission.id]: 'graded' }));
-      toast({
-        title: 'Submission Graded',
-        description: `${submission.studentName} has been awarded 1 point.`,
-      });
-      
-      await addNotificationForUser(submission.studentId, {
-        title: `Your exercise "${submission.assignmentTitle}" has been graded!`,
-        description: 'You have been awarded 1 point.',
-        href: '/exercises',
-      });
-
-    } catch (error: any) {
-       toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error.message === 'duplicate' ? 'This submission has already been graded.' : 'Could not award points.',
-      });
-       if(error.message === 'duplicate') {
-        setGradingState(prev => ({ ...prev, [submission.id]: 'graded' }));
-       } else {
-        setGradingState(prev => ({ ...prev, [submission.id]: 'idle' }));
-       }
-    }
-  };
-
-  const unGrade = async (submission: Submission) => {
-    setGradingState(prev => ({ ...prev, [submission.id]: 'loading' }));
-    const activityId = `graded-exercise-${submission.id}`;
-    try {
-      const result = await awardPointsFlow({
-          studentId: submission.studentId,
-          points: 1,
-          reason: 'Class Exercises',
-          activityId,
-          action: 'revoke'
-      });
-      if (!result.success) throw new Error(result.message);
-
-      setGradingState(prev => ({ ...prev, [submission.id]: 'idle' }));
-      toast({
-        title: 'Points Revoked',
-        description: `Points for ${submission.studentName} have been revoked.`,
-      });
-    } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Could not revoke points.',
-      });
-      setGradingState(prev => ({ ...prev, [submission.id]: 'graded' }));
-    }
-  };
-
-
   const handleDeleteSubmission = async () => {
     if (!submissionToDelete) return;
     try {
-        const activityId = `graded-exercise-${submissionToDelete.id}`;
         await deleteSubmission(submissionToDelete.id);
-        if (gradingState[submissionToDelete.id] === 'graded') {
-            await awardPointsFlow({
-                studentId: submissionToDelete.studentId,
-                points: 1,
-                reason: 'Class Exercises',
-                activityId,
-                action: 'revoke'
-            });
-        }
         toast({
             title: 'Submission Deleted',
-            description: `The submission from ${submissionToDelete?.studentName} has been removed and points have been revoked.`,
+            description: `The submission from ${submissionToDelete?.studentName} has been removed.`,
         });
         setSubmissions(prev => prev.filter(s => s.id !== submissionToDelete.id));
     } catch (error) {
@@ -211,43 +118,32 @@ export default function ExerciseSubmissionsPage() {
                 </TableHeader>
                 <TableBody>
                     {submissions.length > 0 ? (
-                        submissions.map(submission => {
-                            const currentGradeState = gradingState[submission.id] || 'idle';
-                            return (
-                                <TableRow key={submission.id}>
-                                    <TableCell className="font-medium">{submission.studentName}</TableCell>
-                                    <TableCell><Badge variant="secondary">{submission.studentGen}</Badge></TableCell>
-                                    <TableCell>{formatDistanceToNow(submission.submittedAt.toDate(), { addSuffix: true })}</TableCell>
-                                    <TableCell>
-                                        <Button variant="link" asChild className="p-0 h-auto">
-                                            <Link href={submission.submissionLink} target="_blank" rel="noopener noreferrer">
-                                                View Work <ExternalLink className="ml-2 h-3 w-3" />
-                                            </Link>
-                                        </Button>
-                                    </TableCell>
-                                    <TableCell className="text-right space-x-2">
-                                         <Button 
-                                            size="sm"
-                                            variant={currentGradeState === 'graded' ? 'default' : 'outline'}
-                                            onClick={() => currentGradeState === 'graded' ? unGrade(submission) : handleGrade(submission)}
-                                            disabled={currentGradeState === 'loading'}
-                                            className={cn(currentGradeState === 'graded' && 'bg-green-600 hover:bg-green-700 text-white')}
-                                        >
-                                            {currentGradeState === 'loading' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                            {currentGradeState === 'graded' ? <XCircle className="mr-2 h-4 w-4" /> : <CheckCircle className="mr-2 h-4 w-4" />}
-                                            {currentGradeState === 'graded' ? 'Revoke Point' : 'Grade (1 pt)'}
-                                        </Button>
-                                        <Button 
-                                            variant="destructive"
-                                            size="icon"
-                                            onClick={() => setSubmissionToDelete(submission)}
-                                        >
-                                           <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
-                            )
-                        })
+                        submissions.map(submission => (
+                            <TableRow key={submission.id}>
+                                <TableCell className="font-medium">{submission.studentName}</TableCell>
+                                <TableCell><Badge variant="secondary">{submission.studentGen}</Badge></TableCell>
+                                <TableCell>{formatDistanceToNow(submission.submittedAt.toDate(), { addSuffix: true })}</TableCell>
+                                <TableCell>
+                                    <Button variant="link" asChild className="p-0 h-auto">
+                                        <Link href={submission.submissionLink} target="_blank" rel="noopener noreferrer">
+                                            View Work <ExternalLink className="ml-2 h-3 w-3" />
+                                        </Link>
+                                    </Button>
+                                </TableCell>
+                                <TableCell className="text-right space-x-2">
+                                     <GradeSubmissionDialog submission={submission} onGraded={refreshSubmissions}>
+                                        <Button size="sm">Grade</Button>
+                                     </GradeSubmissionDialog>
+                                    <Button 
+                                        variant="destructive"
+                                        size="icon"
+                                        onClick={() => setSubmissionToDelete(submission)}
+                                    >
+                                       <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </TableCell>
+                            </TableRow>
+                        ))
                     ) : (
                         <TableRow>
                             <TableCell colSpan={5} className="h-24 text-center">
