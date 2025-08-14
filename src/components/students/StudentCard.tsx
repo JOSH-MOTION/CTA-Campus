@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Mail, MessageSquare, Info, GraduationCap, FileText, ExternalLink, Loader2, AlertTriangle } from 'lucide-react';
+import { Mail, MessageSquare, Info, GraduationCap, FileText, ExternalLink, Loader2, AlertTriangle, Award } from 'lucide-react';
 import { UserData } from '@/contexts/AuthContext';
 import {
   Dialog,
@@ -25,6 +25,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { formatDistanceToNow } from 'date-fns';
 import Link from 'next/link';
 import { Alert, AlertTitle, AlertDescription } from '../ui/alert';
+import { AwardPointsDialog } from './AwardPointsDialog';
 
 interface StudentCardProps {
   student: UserData;
@@ -151,75 +152,83 @@ export function StudentCard({ student }: StudentCardProps) {
           <span>{student.schoolId}</span>
         </div>
       </CardContent>
-      <CardFooter className="grid grid-cols-2 gap-2">
-        <Button variant="outline" onClick={handleSendMessage}>
-          <MessageSquare className="mr-2 h-4 w-4" />
-          Message
-        </Button>
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button>
-                <Info className="mr-2 h-4 w-4" />
-                Details
+      <CardFooter className="grid grid-cols-1 gap-2">
+        <div className="grid grid-cols-2 gap-2">
+            <Button variant="outline" onClick={handleSendMessage}>
+                <MessageSquare className="mr-2 h-4 w-4" />
+                Message
             </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-6xl h-[90vh]">
-            <DialogHeader>
-              <DialogTitle>{student.displayName}'s Details</DialogTitle>
-              <DialogDescription>
-                Viewing performance and personal information for {student.displayName}.
-              </DialogDescription>
-            </DialogHeader>
-            <Tabs defaultValue="overview" className="flex-grow flex flex-col overflow-hidden">
-                <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="overview">Overview</TabsTrigger>
-                    <TabsTrigger value="performance">Performance</TabsTrigger>
-                    <TabsTrigger value="submissions">Submissions</TabsTrigger>
-                </TabsList>
-                <div className="flex-grow overflow-y-auto mt-4 pr-4">
-                    <TabsContent value="overview">
-                         <Card>
-                            <CardHeader>
-                                <CardTitle>Personal Info</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="flex items-center gap-6">
-                                    <Avatar className="h-28 w-28 border-4 border-background shadow-md">
-                                        <AvatarImage src={student.photoURL} alt={student.displayName} />
-                                        <AvatarFallback className="text-4xl">
-                                            {student.displayName ? student.displayName.charAt(0).toUpperCase() : 'U'}
-                                        </AvatarFallback>
-                                    </Avatar>
-                                    <div className="space-y-4 flex-1">
-                                        <InfoItem icon={GraduationCap} label="Generation" value={student.gen} />
-                                        <InfoItem icon={Mail} label="Email" value={student.email} />
-                                        <InfoItem icon={Info} label="School ID" value={student.schoolId} />
-                                        <InfoItem icon={Info} label="Lesson Day" value={student.lessonDay} />
-                                        <InfoItem icon={Info} label="Lesson Type" value={student.lessonType} />
+            <Dialog>
+            <DialogTrigger asChild>
+                <Button>
+                    <Info className="mr-2 h-4 w-4" />
+                    Details
+                </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-6xl h-[90vh]">
+                <DialogHeader>
+                <DialogTitle>{student.displayName}'s Details</DialogTitle>
+                <DialogDescription>
+                    Viewing performance and personal information for {student.displayName}.
+                </DialogDescription>
+                </DialogHeader>
+                <Tabs defaultValue="overview" className="flex-grow flex flex-col overflow-hidden">
+                    <TabsList className="grid w-full grid-cols-3">
+                        <TabsTrigger value="overview">Overview</TabsTrigger>
+                        <TabsTrigger value="performance">Performance</TabsTrigger>
+                        <TabsTrigger value="submissions">Submissions</TabsTrigger>
+                    </TabsList>
+                    <div className="flex-grow overflow-y-auto mt-4 pr-4">
+                        <TabsContent value="overview">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Personal Info</CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="flex items-center gap-6">
+                                        <Avatar className="h-28 w-28 border-4 border-background shadow-md">
+                                            <AvatarImage src={student.photoURL} alt={student.displayName} />
+                                            <AvatarFallback className="text-4xl">
+                                                {student.displayName ? student.displayName.charAt(0).toUpperCase() : 'U'}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                        <div className="space-y-4 flex-1">
+                                            <InfoItem icon={GraduationCap} label="Generation" value={student.gen} />
+                                            <InfoItem icon={Mail} label="Email" value={student.email} />
+                                            <InfoItem icon={Info} label="School ID" value={student.schoolId} />
+                                            <InfoItem icon={Info} label="Lesson Day" value={student.lessonDay} />
+                                            <InfoItem icon={Info} label="Lesson Type" value={student.lessonType} />
+                                        </div>
                                     </div>
-                                </div>
-                                {student.bio && (
-                                    <>
-                                    <Separator className="my-4"/>
-                                    <div className="space-y-1 pt-2">
-                                        <p className="text-sm text-muted-foreground">Bio</p>
-                                        <p className="font-medium italic text-sm">"{student.bio}"</p>
-                                    </div>
-                                    </>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-                    <TabsContent value="performance">
-                        <PerformanceHub key={student.uid} studentId={student.uid} />
-                    </TabsContent>
-                     <TabsContent value="submissions">
-                        <StudentSubmissions studentId={student.uid} />
-                    </TabsContent>
-                </div>
-            </Tabs>
-          </DialogContent>
-        </Dialog>
+                                    {student.bio && (
+                                        <>
+                                        <Separator className="my-4"/>
+                                        <div className="space-y-1 pt-2">
+                                            <p className="text-sm text-muted-foreground">Bio</p>
+                                            <p className="font-medium italic text-sm">"{student.bio}"</p>
+                                        </div>
+                                        </>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+                        <TabsContent value="performance">
+                            <PerformanceHub key={student.uid} studentId={student.uid} />
+                        </TabsContent>
+                        <TabsContent value="submissions">
+                            <StudentSubmissions studentId={student.uid} />
+                        </TabsContent>
+                    </div>
+                </Tabs>
+            </DialogContent>
+            </Dialog>
+        </div>
+        <AwardPointsDialog student={student}>
+            <Button variant="secondary" className="w-full">
+                <Award className="mr-2 h-4 w-4" />
+                Award Points
+            </Button>
+        </AwardPointsDialog>
       </CardFooter>
     </Card>
   );

@@ -37,6 +37,14 @@ export const awardPointsFlow = ai.defineFlow(
     name: 'awardPointsFlow',
     inputSchema: AwardPointsFlowInputSchema,
     outputSchema: AwardPointsFlowOutputSchema,
+    auth: (auth, input) => {
+        if (!auth) {
+            throw new Error("Authentication is required.");
+        }
+        if (auth.role !== 'teacher' && auth.role !== 'admin') {
+            throw new Error("You do not have permission to award points.");
+        }
+    }
   },
   async (input) => {
     const { studentId, points, reason, activityId, action, assignmentTitle } = input;
