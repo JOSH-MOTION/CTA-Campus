@@ -27,7 +27,6 @@ import Link from 'next/link';
 import { Input } from '../ui/input';
 
 const gradingSchema = z.object({
-  grade: z.string().min(1, 'Please enter a grade.'),
   feedback: z.string().optional(),
 });
 
@@ -48,8 +47,6 @@ export function GradeSubmissionDialog({ children, submission, onGraded }: GradeS
     resolver: zodResolver(gradingSchema),
     defaultValues: {
       // @ts-ignore
-      grade: submission.grade || '',
-      // @ts-ignore
       feedback: submission.feedback || '',
     },
   });
@@ -67,7 +64,7 @@ export function GradeSubmissionDialog({ children, submission, onGraded }: GradeS
       const result = await gradeSubmissionFlow({
         submissionId: submission.id,
         studentId: submission.studentId,
-        grade: data.grade,
+        grade: 'Complete', // Grade is now automated
         feedback: data.feedback,
       });
 
@@ -124,19 +121,6 @@ export function GradeSubmissionDialog({ children, submission, onGraded }: GradeS
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="grade"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Grade</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., A+, 95%, Complete" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
             <FormField
               control={form.control}
               name="feedback"

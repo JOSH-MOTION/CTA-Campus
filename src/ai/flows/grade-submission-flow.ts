@@ -15,7 +15,7 @@ import { doc, updateDoc } from 'firebase/firestore';
 const GradeSubmissionInputSchema = z.object({
   submissionId: z.string().describe("The ID of the submission document to grade."),
   studentId: z.string().describe("The UID of the student who made the submission."),
-  grade: z.string().min(1, "Grade cannot be empty.").describe("The grade to award for the submission."),
+  grade: z.string().default('Complete').describe("The grade to award for the submission."),
   feedback: z.string().optional().describe("Optional feedback for the student."),
 });
 export type GradeSubmissionInput = z.infer<typeof GradeSubmissionInputSchema>;
