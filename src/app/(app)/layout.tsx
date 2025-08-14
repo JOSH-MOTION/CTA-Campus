@@ -56,6 +56,14 @@ const MemoizedProtectedLayout = memo(function ProtectedLayout({children}: {child
           allowedPaths = adminNavItems.map(item => item.href);
           break;
       }
+      
+      // Allow access to grading page for teachers and admins
+      if (role === 'teacher' || role === 'admin') {
+          if (!allowedPaths.includes('/grading')) {
+              allowedPaths.push('/grading');
+          }
+      }
+
       // Allow access to profile page for all roles
       if (!allowedPaths.includes('/profile')) {
         allowedPaths.push('/profile');
