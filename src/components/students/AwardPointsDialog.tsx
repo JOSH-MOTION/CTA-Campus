@@ -39,13 +39,20 @@ interface AwardPointsDialogProps {
 }
 
 const pointReasons = [
+    "Class Attendance",
+    "Class Assignments",
+    "Class Exercises",
+    "Weekly Projects",
+    "Monthly Personal Projects",
+    "Soft Skills & Product Training",
+    "Mini Demo Days",
+    "100 Days of Code",
+    "Code Review",
+    "Final Project Completion",
     "Bonus Points",
-    "Class Participation",
-    "Event Attendance",
-    "Competition Winner",
-    "Helping Others",
     "Other"
 ];
+
 
 export function AwardPointsDialog({ children, student }: AwardPointsDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
