@@ -292,10 +292,20 @@ const roadmapData: RoadmapSubject[] = [
     duration: '3 weeks',
     weeks: [
       {
-        title: 'Week 1-3',
+        title: 'Week 1',
         topics: [
             {id: 'firebase-1-1', title: 'Firebase connection'}, 
+        ],
+      },
+      {
+        title: 'Week 2',
+        topics: [
             {id: 'firebase-1-2', title: 'Firebase database / cloud firestore (CRUD)'}, 
+        ],
+      },
+      {
+        title: 'Week 3',
+        topics: [
             {id: 'firebase-1-3', title: 'Firebase authentication'}
         ],
       },
