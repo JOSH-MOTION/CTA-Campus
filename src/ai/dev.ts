@@ -2,17 +2,9 @@
 import { config } from 'dotenv';
 config();
 
-// Initialize Firebase Admin SDK first
-import * as admin from 'firebase-admin';
-if (!admin.apps.length) {
-  try {
-    admin.initializeApp({
-      credential: admin.credential.applicationDefault(),
-    });
-  } catch (error) {
-    console.error('Firebase Admin initialization error in dev.ts:', error);
-  }
-}
+// IMPORTANT: Initialize Firebase Admin SDK first by importing it.
+// This ensures that the admin app is initialized before any other flows that might use it.
+import '@/lib/firebase-admin';
 
 import '@/ai/flows/resource-summarizer.ts';
 import '@/ai/flows/faq-chatbot.ts';

@@ -6,8 +6,9 @@ if (!admin.apps.length) {
         admin.initializeApp({
             credential: admin.credential.applicationDefault(),
         });
+        console.log('Firebase Admin SDK initialized successfully.');
     } catch (error) {
-        console.error('Firebase Admin initialization error:', error);
+        console.error('Firebase Admin initialization error in firebase-admin.ts:', error);
     }
 }
 
