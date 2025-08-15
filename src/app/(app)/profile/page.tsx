@@ -116,17 +116,24 @@ export default function ProfilePage() {
   };
 
   const handleUpdateProfile = async (data: ProfileFormValues) => {
-    if (!user) return;
+    if (!user || !userData) return;
     form.clearErrors();
-    const updateData: Partial<ProfileFormValues> = {
+    const updateData: any = { // Use 'any' to dynamically add properties
         displayName: data.displayName,
         bio: data.bio
     };
 
+    let lessonDetailsChanged = false;
     if (role === 'student') {
         updateData.gen = data.gen;
+        if (userData.lessonDay !== data.lessonDay || userData.lessonType !== data.lessonType) {
+            lessonDetailsChanged = true;
+        }
         updateData.lessonDay = data.lessonDay;
         updateData.lessonType = data.lessonType;
+        if(lessonDetailsChanged && !userData.hasEditedLessonDetails) {
+            updateData.hasEditedLessonDetails = true;
+        }
     }
     if (role === 'teacher' || role === 'admin') {
         updateData.gensTaught = data.gensTaught;
@@ -168,6 +175,8 @@ export default function ProfilePage() {
       case 'admin': return 'System-wide administrative profile.';
     }
   };
+  
+  const lessonDetailsLocked = role === 'student' && userData.hasEditedLessonDetails;
 
   return (
     <div className="container mx-auto max-w-2xl space-y-6 py-8">
@@ -258,7 +267,7 @@ export default function ProfilePage() {
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Lesson Day</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={lessonDetailsLocked}>
                                             <FormControl>
                                                 <SelectTrigger>
                                                     <SelectValue placeholder="Select a day" />
@@ -272,6 +281,7 @@ export default function ProfilePage() {
                                                 <SelectItem value="friday">Friday</SelectItem>
                                             </SelectContent>
                                         </Select>
+                                        {lessonDetailsLocked && <p className="text-xs text-muted-foreground pt-1">Lesson details can only be set once.</p>}
                                         <FormMessage />
                                     </FormItem>
                                 )}

@@ -11,8 +11,12 @@ import {
     doc,
     updateDoc,
     deleteDoc,
+    getDocs,
+    where,
+    writeBatch
   } from 'firebase/firestore';
   import { db } from '@/lib/firebase';
+  import { UserData } from '@/contexts/AuthContext';
   
   export interface Message {
     id: string;
@@ -49,10 +53,43 @@ import {
   export const sendMessage = async (chatId: string, message: NewMessage) => {
     try {
       const messagesCol = collection(db, 'chats', chatId, 'messages');
-      await addDoc(messagesCol, {
+      const messageDocRef = await addDoc(messagesCol, {
         ...message,
         timestamp: serverTimestamp(),
       });
+
+      // Send notifications
+      const notificationsBatch = writeBatch(db);
+      const notificationsCol = collection(db, 'notifications');
+      const newNotification = {
+          title: `New Message from ${message.senderName}`,
+          description: message.text.substring(0, 50) + (message.text.length > 50 ? '...' : ''),
+          href: `/chat?dm=${message.senderId}`,
+          read: false,
+          date: serverTimestamp(),
+      };
+
+      if (chatId.startsWith('group-')) {
+          const gen = chatId.replace('group-', '');
+          const usersQuery = query(collection(db, 'users'), where('gen', '==', gen));
+          const querySnapshot = await getDocs(usersQuery);
+          querySnapshot.forEach(userDoc => {
+              const userId = userDoc.id;
+              if (userId !== message.senderId) {
+                  const notificationRef = doc(notificationsCol);
+                  notificationsBatch.set(notificationRef, { ...newNotification, userId, href: `/chat?group=${gen}` });
+              }
+          });
+      } else {
+          const recipientId = chatId.split('-').find(id => id !== message.senderId);
+          if (recipientId) {
+            const notificationRef = doc(notificationsCol);
+            notificationsBatch.set(notificationRef, { ...newNotification, userId: recipientId });
+          }
+      }
+      await notificationsBatch.commit();
+
+
     } catch (error) {
       console.error('Error sending message:', error);
       throw error;

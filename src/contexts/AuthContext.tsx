@@ -19,6 +19,7 @@ export interface UserData {
   schoolId?: string;
   lessonDay?: string;
   lessonType?: string;
+  hasEditedLessonDetails?: boolean; // New flag
   bio?: string;
   photoURL?: string;
   totalPoints?: number;
