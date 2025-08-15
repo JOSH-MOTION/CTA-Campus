@@ -27,6 +27,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { formatDistanceToNow } from 'date-fns';
 import Link from 'next/link';
 import { GradeSubmissionDialog } from '../submissions/GradeSubmissionDialog';
+import WeeklyFocus from './WeeklyFocus';
 
 interface TeacherDashboardProps {
   user: User | null;
@@ -39,6 +40,15 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+
+  const refreshSubmissions = async () => {
+    try {
+        const subs = await getAllSubmissions();
+        setSubmissions(subs);
+    } catch (error) {
+        console.error("Failed to refresh submissions:", error);
+    }
+  }
 
   useEffect(() => {
     async function loadData() {
@@ -68,7 +78,6 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
 
   const recentSubmissions = useMemo(() => {
     return submissions
-      // @ts-ignore
       .filter(s => !s.grade)
       .slice(0, 5);
   }, [submissions]);
@@ -192,10 +201,7 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
                           <TableCell className="text-right">
                              <GradeSubmissionDialog
                                 submission={sub}
-                                onGraded={() => {
-                                  // Refresh data after grading
-                                  getAllSubmissions().then(setSubmissions);
-                                }}
+                                onGraded={refreshSubmissions}
                               >
                                 <Button size="sm">Grade</Button>
                               </GradeSubmissionDialog>
@@ -216,18 +222,19 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
           </Card>
         </div>
         <div className="space-y-6">
-          <Card className="flex flex-col items-center justify-center bg-secondary/50">
-            <CardHeader className="items-center pb-2">
-            <CardTitle className="text-base font-medium">Group Chat</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col items-center">
-            <Group className="h-8 w-8 text-muted-foreground mb-2" />
-            <Button onClick={handleOpenChat} disabled={!selectedGen}>
-                <MessageSquare className="mr-2 h-4 w-4" />
-                Open {selectedGen || '...'} Chat
-            </Button>
-            </CardContent>
-          </Card>
+            <WeeklyFocus />
+            <Card className="flex flex-col items-center justify-center bg-secondary/50">
+                <CardHeader className="items-center pb-2">
+                <CardTitle className="text-base font-medium">Group Chat</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col items-center">
+                <Group className="h-8 w-8 text-muted-foreground mb-2" />
+                <Button onClick={handleOpenChat} disabled={!selectedGen}>
+                    <MessageSquare className="mr-2 h-4 w-4" />
+                    Open {selectedGen || '...'} Chat
+                </Button>
+                </CardContent>
+            </Card>
         </div>
       </div>
     </div>
