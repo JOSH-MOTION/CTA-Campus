@@ -12,13 +12,14 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, deleteDoc, serverTimestamp, updateDoc, increment } from 'firebase/firestore';
-
+import { v4 as uuidv4 } from 'uuid';
 
 const AwardPointsFlowInputSchema = z.object({
     studentId: z.string().describe("The UID of the student to award points to."),
     points: z.number().describe("The number of points to award. Can be negative to revoke."),
     reason: z.string().describe("A short description of why the points are being awarded."),
     activityId: z.string().describe("A unique ID for the specific activity."),
+    pointLogId: z.string().optional().describe("The unique ID of the point log entry to revoke."),
     action: z.enum(['award', 'revoke']).describe("Whether to award or revoke the points."),
     assignmentTitle: z.string().optional().describe("The title of the assignment or activity."),
 });
@@ -38,62 +39,64 @@ export const awardPointsFlow = ai.defineFlow(
     outputSchema: AwardPointsFlowOutputSchema,
   },
   async (input) => {
-    const { studentId, points, reason, activityId, action, assignmentTitle } = input;
+    const { studentId, points, reason, activityId, pointLogId, action, assignmentTitle } = input;
     const userDocRef = doc(db, 'users', studentId);
     
     try {
       const userDoc = await getDoc(userDocRef);
       if (!userDoc.exists() && action === 'award') {
-          // If user doc doesn't exist, we can't award points.
-          // For revoke, we might still need to delete the point log.
           return { success: false, message: 'User not found.' };
       }
       
-      const pointDocRef = doc(db, 'users', studentId, 'points', activityId);
-
       if (action === 'award') {
-        const pointDocSnap = await getDoc(pointDocRef);
+        const pointDocRefForCheck = doc(db, 'users', studentId, 'points', activityId);
+        const pointDocSnap = await getDoc(pointDocRefForCheck);
+        
         if (pointDocSnap.exists()) {
             return { success: true, message: 'duplicate' };
         }
 
-        // Initialize totalPoints if it doesn't exist
+        const newPointLogId = uuidv4();
+        const pointDocRef = doc(db, 'users', studentId, 'points', newPointLogId);
+
         if (!userDoc.data()?.totalPoints) {
             await setDoc(userDocRef, { totalPoints: 0 }, { merge: true });
         }
 
-        // Atomically increment the totalPoints on the user document
         await updateDoc(userDocRef, {
             totalPoints: increment(points)
         });
 
-        // Create a log entry in the subcollection
         await setDoc(pointDocRef, {
             points,
             reason,
             assignmentTitle: assignmentTitle || reason,
-            activityId,
+            activityId, // Keep original activityId for lookup if needed
+            pointLogId: newPointLogId,
             awardedAt: serverTimestamp(),
         });
         
         return { success: true, message: 'Points awarded successfully.' };
 
       } else { // action === 'revoke'
+        if (!pointLogId) {
+            return { success: false, message: "pointLogId is required to revoke points." };
+        }
+        
+        const pointDocRef = doc(db, 'users', studentId, 'points', pointLogId);
         const docSnap = await getDoc(pointDocRef);
+
         if (docSnap.exists()) {
             const pointsToRevoke = docSnap.data().points || 0;
             
-             // Initialize totalPoints if it doesn't exist to prevent decrementing a non-existent field
             if (!userDoc.data()?.totalPoints) {
                 await setDoc(userDocRef, { totalPoints: 0 }, { merge: true });
             }
 
-            // Atomically decrement the totalPoints on the user document
             await updateDoc(userDocRef, {
                 totalPoints: increment(-pointsToRevoke)
             });
 
-            // Delete the log entry
             await deleteDoc(pointDocRef);
             return { success: true, message: "Points revoked successfully." };
         }
