@@ -50,7 +50,11 @@ export default function ProjectsPage() {
     }
   }, [user, role, loading, projects]);
   
-  const sortedProjects = [...projects].sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+  const sortedProjects = [...projects].sort((a, b) => {
+    const aTime = a.createdAt?.toMillis() || 0;
+    const bTime = b.createdAt?.toMillis() || 0;
+    return bTime - aTime;
+  });
 
   const isLoading = loading || (role === 'student' && checkingSubmissions);
 
