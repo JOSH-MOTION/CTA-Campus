@@ -46,6 +46,12 @@ export const awardPointsFlow = ai.defineFlow(
       if (action === 'award') {
         const pointDocRef = adminDb.collection('users').doc(studentId).collection('points').doc(activityId);
 
+        // Check if the point entry already exists to prevent duplicate awards
+        const pointDocSnap = await pointDocRef.get();
+        if (pointDocSnap.exists) {
+            return { success: false, message: 'duplicate' };
+        }
+
         // Atomically increment the totalPoints on the user document
         await userDocRef.update({
             totalPoints: FieldValue.increment(points)
@@ -83,10 +89,6 @@ export const awardPointsFlow = ai.defineFlow(
       }
     } catch (error: any) {
       console.error("Error processing points in flow:", error);
-      // Firestore permission errors have a specific code.
-      if (error.code === 'permission-denied') {
-          return { success: false, message: "Server error: Could not process points. Reason: Missing or insufficient permissions." };
-      }
       const errorMessage = error.message || "An unexpected error occurred.";
       return { success: false, message: `Server error: Could not process points. Reason: ${errorMessage}` };
     }
