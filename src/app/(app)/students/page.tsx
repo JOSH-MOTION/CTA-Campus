@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Cell } from 'recharts';
 import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
+import { StudentCard } from '@/components/students/StudentCard';
+
 
 interface StudentDetail extends UserData {
   totalPoints: number;
@@ -74,8 +76,8 @@ export default function StudentsPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-3xl font-bold tracking-tight">Student Rankings</h1>
-        <p className="text-muted-foreground">Leaderboard of student performance based on total points.</p>
+        <h1 className="text-3xl font-bold tracking-tight">Student Management</h1>
+        <p className="text-muted-foreground">Oversee student progress and manage their details.</p>
       </div>
       
       <div className="flex flex-col gap-4 md:flex-row">
@@ -103,81 +105,57 @@ export default function StudentsPage() {
           </div>
       </div>
 
-      {loading ? (
-        <div className="flex justify-center items-center h-96">
-          <Loader2 className="h-8 w-8 animate-spin" />
-        </div>
-      ) : (
-        <Card>
-            <CardHeader>
-                <CardTitle>Student Performance</CardTitle>
-                <CardDescription>Bar chart showing all students based on total points. Filter by generation or search by name.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                {chartData.length > 0 ? (
-                    <ChartContainer config={{}} className="w-full h-[500px]">
-                        <ResponsiveContainer width="99%">
-                            <BarChart
-                                data={chartData}
-                                layout="vertical"
-                                margin={{ left: 10, right: 10, top: 10, bottom: 10 }}
-                            >
-                                <XAxis type="number" hide />
-                                <YAxis
-                                    dataKey="name"
-                                    type="category"
-                                    tickLine={false}
-                                    axisLine={false}
-                                    tick={{ fontSize: 12 }}
-                                    interval={0}
-                                    width={120}
-                                />
-                                <Tooltip
-                                    cursor={{ fill: 'hsl(var(--muted))' }}
-                                    content={({ active, payload }) => {
-                                        if (active && payload && payload.length) {
-                                            return (
-                                                <div className="rounded-lg border bg-background p-2 shadow-sm">
-                                                    <div className="grid grid-cols-2 gap-2">
-                                                        <div className="flex flex-col">
-                                                            <span className="text-[0.70rem] uppercase text-muted-foreground">
-                                                                Student
-                                                            </span>
-                                                            <span className="font-bold text-muted-foreground">
-                                                                {payload[0].payload.name}
-                                                            </span>
-                                                        </div>
-                                                        <div className="flex flex-col">
-                                                            <span className="text-[0.70rem] uppercase text-muted-foreground">
-                                                                Points
-                                                            </span>
-                                                            <span className="font-bold">
-                                                                {payload[0].value}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )
-                                        }
-                                        return null;
-                                    }}
-                                />
-                                <Bar dataKey="value" background={{ fill: 'hsl(var(--muted) / 0.5)' }} radius={4}>
-                                    {chartData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                    ))}
-                                </Bar>
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </ChartContainer>
-                ) : (
-                    <div className="flex h-48 items-center justify-center text-muted-foreground">
-                        No students found for the current filter.
-                    </div>
-                )}
-            </CardContent>
-        </Card>
-      )}
+      <Card>
+        <CardHeader>
+            <CardTitle>Student Performance Chart</CardTitle>
+            <CardDescription>A visual overview of student rankings based on total points earned.</CardDescription>
+        </CardHeader>
+        <CardContent>
+            {loading ? (
+                 <div className="flex justify-center items-center h-96"><Loader2 className="h-8 w-8 animate-spin" /></div>
+            ) : chartData.length > 0 ? (
+                <ChartContainer config={{}} className="w-full h-[500px]">
+                    <ResponsiveContainer width="99%">
+                        <BarChart
+                            data={chartData}
+                            layout="vertical"
+                            margin={{ left: 20, right: 10, top: 10, bottom: 10 }}
+                        >
+                            <XAxis type="number" hide />
+                            <YAxis
+                                dataKey="name"
+                                type="category"
+                                tickLine={false}
+                                axisLine={false}
+                                tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                                interval={0}
+                                width={150}
+                            />
+                            <Tooltip
+                                cursor={{ fill: 'hsl(var(--muted))' }}
+                                content={<ChartTooltipContent />}
+                            />
+                            <Bar dataKey="value" background={{ fill: 'hsl(var(--muted) / 0.5)' }} radius={4}>
+                                {chartData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                ))}
+                            </Bar>
+                        </BarChart>
+                    </ResponsiveContainer>
+                </ChartContainer>
+            ) : (
+                <div className="flex h-48 items-center justify-center text-muted-foreground">
+                    No students found for the current filter.
+                </div>
+            )}
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {rankedStudents.map(student => (
+            <StudentCard key={student.uid} student={student} />
+        ))}
+      </div>
     </div>
   );
 }
