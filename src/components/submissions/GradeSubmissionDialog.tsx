@@ -99,6 +99,7 @@ export function GradeSubmissionDialog({ children, submission, onGraded }: GradeS
         const gradeResult = await gradeSubmissionFlow({
             submissionId: submission.id,
             studentId: submission.studentId,
+            assignmentTitle: submission.assignmentTitle,
             grade: 'Complete',
             feedback: data.feedback,
         });
