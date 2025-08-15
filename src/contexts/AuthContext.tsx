@@ -19,6 +19,7 @@ export interface UserData {
   schoolId?: string;
   lessonDay?: string;
   lessonType?: string;
+  lessonTime?: string; // New field for class time
   hasEditedLessonDetails?: boolean; // New flag
   bio?: string;
   photoURL?: string;

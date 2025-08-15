@@ -12,12 +12,13 @@ import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
 import {useToast} from '@/hooks/use-toast';
 import {useAuth} from '@/contexts/AuthContext';
-import {Camera, Compass} from 'lucide-react';
+import {Camera, Clock, Compass} from 'lucide-react';
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select';
 import {Textarea} from '@/components/ui/textarea';
 import {RadioGroup, RadioGroupItem} from '@/components/ui/radio-group';
 import {Avatar, AvatarImage, AvatarFallback} from '@/components/ui/avatar';
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 const availableGens = ['Gen 28', 'Gen 29', 'Gen 30', 'Gen 31', 'Gen 32'];
 
@@ -29,6 +30,7 @@ export default function StudentSignupPage() {
   const [schoolId, setSchoolId] = useState('');
   const [lessonDay, setLessonDay] = useState('');
   const [lessonType, setLessonType] = useState('online');
+  const [lessonTime, setLessonTime] = useState('');
   const [bio, setBio] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -65,6 +67,18 @@ export default function StudentSignupPage() {
     e.preventDefault();
     setLoading(true);
 
+    const finalLessonTime = lessonType === 'online' ? '6:00 PM' : lessonTime;
+
+    if (lessonType === 'in-person' && !finalLessonTime) {
+      toast({
+        variant: 'destructive',
+        title: 'Missing Information',
+        description: 'Please select a time for your in-person lesson.',
+      });
+      setLoading(false);
+      return;
+    }
+
     try {
       localStorage.setItem('userRole', 'student');
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -81,6 +95,7 @@ export default function StudentSignupPage() {
         schoolId,
         lessonDay,
         lessonType,
+        lessonTime: finalLessonTime,
         bio,
       });
 
@@ -172,18 +187,19 @@ export default function StudentSignupPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Lesson Day</Label>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Label>Lesson Day & Time</Label>
+              <div className={cn("grid grid-cols-1 gap-4", lessonType === 'in-person' ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>
                 <Select onValueChange={setLessonDay} value={lessonDay} required>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a day" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="monday">Monday</SelectItem>
-                    <SelectItem value="tuesday">Tuesday</SelectItem>
-                    <SelectItem value="wednesday">Wednesday</SelectItem>
-                    <SelectItem value="thursday">Thursday</SelectItem>
-                    <SelectItem value="friday">Friday</SelectItem>
+                    <SelectItem value="Monday">Monday</SelectItem>
+                    <SelectItem value="Tuesday">Tuesday</SelectItem>
+                    <SelectItem value="Wednesday">Wednesday</SelectItem>
+                    <SelectItem value="Thursday">Thursday</SelectItem>
+                    <SelectItem value="Friday">Friday</SelectItem>
+                    <SelectItem value="Saturday">Saturday</SelectItem>
                   </SelectContent>
                 </Select>
                 <RadioGroup defaultValue="online" className="flex items-center space-x-4" onValueChange={setLessonType}>
@@ -196,6 +212,18 @@ export default function StudentSignupPage() {
                     <Label htmlFor="in-person">In-person</Label>
                   </div>
                 </RadioGroup>
+                {lessonType === 'in-person' && (
+                    <Select onValueChange={setLessonTime} value={lessonTime}>
+                        <SelectTrigger>
+                             <Clock className="mr-2 h-4 w-4" />
+                            <SelectValue placeholder="Select a time" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="10:30 AM">10:30 AM</SelectItem>
+                            <SelectItem value="12:30 PM">12:30 PM</SelectItem>
+                        </SelectContent>
+                    </Select>
+                )}
               </div>
             </div>
             <div className="space-y-2">
