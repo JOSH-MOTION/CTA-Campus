@@ -11,13 +11,13 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, deleteDoc, serverTimestamp, updateDoc, increment, runTransaction } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, serverTimestamp, updateDoc, increment, runTransaction, DocumentReference, collection } from 'firebase/firestore';
 
 const AwardPointsFlowInputSchema = z.object({
     studentId: z.string().describe("The UID of the student to award points to."),
     points: z.number().describe("The number of points to award. Can be negative to revoke."),
     reason: z.string().describe("A short description of why the points are being awarded."),
-    activityId: z.string().describe("A unique ID for the specific activity."),
+    activityId: z.string().describe("A unique ID for the specific activity (e.g., submission ID or manual award ID)."),
     action: z.enum(['award', 'revoke']).describe("Whether to award or revoke the points."),
     assignmentTitle: z.string().optional().describe("The title of the assignment or activity."),
 });
@@ -38,28 +38,25 @@ export const awardPointsFlow = ai.defineFlow(
   },
   async (input) => {
     const { studentId, points, reason, activityId, action, assignmentTitle } = input;
-    
+
     try {
         await runTransaction(db, async (transaction) => {
             const userDocRef = doc(db, 'users', studentId);
             const pointDocRef = doc(db, 'users', studentId, 'points', activityId);
-
+            
             if (action === 'award') {
                 const pointDocSnap = await transaction.get(pointDocRef);
                 if (pointDocSnap.exists()) {
                     console.log(`Duplicate award attempt for activityId: ${activityId}, action will be skipped.`);
-                    return; // Gracefully exit if points already awarded
+                    // This is not an error, just means it's already done.
+                    return; 
                 }
 
-                // Get the user document to check if totalPoints exists
                 const userDoc = await transaction.get(userDocRef);
-                if (!userDoc.exists() || !userDoc.data()?.hasOwnProperty('totalPoints')) {
-                    // If the user doc or totalPoints field doesn't exist, set it.
-                    transaction.set(userDocRef, { totalPoints: points }, { merge: true });
-                } else {
-                    // Otherwise, increment it.
-                    transaction.update(userDocRef, { totalPoints: increment(points) });
-                }
+                const currentPoints = userDoc.data()?.totalPoints || 0;
+                
+                // Set or Update the totalPoints field.
+                transaction.set(userDocRef, { totalPoints: currentPoints + points }, { merge: true });
 
                 // Create the point log entry
                 transaction.set(pointDocRef, {
@@ -69,7 +66,7 @@ export const awardPointsFlow = ai.defineFlow(
                     activityId,
                     awardedAt: serverTimestamp(),
                 });
-
+                
             } else { // action === 'revoke'
                 const pointDocSnap = await transaction.get(pointDocRef);
                 if (!pointDocSnap.exists()) {
@@ -78,9 +75,11 @@ export const awardPointsFlow = ai.defineFlow(
                 }
 
                 const pointsToRevoke = pointDocSnap.data().points || 0;
-                
-                // Atomically decrement the totalPoints on the user document
-                transaction.update(userDocRef, { totalPoints: increment(-pointsToRevoke) });
+                const userDoc = await transaction.get(userDocRef);
+                const currentPoints = userDoc.data()?.totalPoints || 0;
+
+                // Set or Update the totalPoints field.
+                transaction.set(userDocRef, { totalPoints: Math.max(0, currentPoints - pointsToRevoke) }, { merge: true });
 
                 // Delete the log entry
                 transaction.delete(pointDocRef);
