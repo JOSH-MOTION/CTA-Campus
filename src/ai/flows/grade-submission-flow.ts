@@ -10,9 +10,12 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { adminDb } from '@/lib/firebase-admin';
+// IMPORTANT: Call the initializer function before using adminDb or adminAuth.
+import { initializeAdmin, adminDb } from '@/lib/firebase-admin'; 
 import { FieldValue } from 'firebase-admin/firestore';
 
+// Ensure Firebase Admin is initialized before defining the flow.
+initializeAdmin();
 
 const GradeSubmissionInputSchema = z.object({
   submissionId: z.string().describe("The ID of the submission document to grade."),
