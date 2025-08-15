@@ -78,6 +78,7 @@ export const NotificationsProvider: FC<{children: ReactNode}> = ({children}) => 
 
     const targetUsers = users.filter(u => {
         if (targetGen === 'Everyone') return true;
+        if (targetGen === 'All Staff' && (u.role === 'teacher' || u.role === 'admin')) return true;
         if (targetGen === 'All Students' && u.role === 'student') return true;
         if (u.gen === targetGen) return true;
         return false;

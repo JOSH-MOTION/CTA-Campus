@@ -15,6 +15,7 @@ import {
   } from 'firebase/firestore';
   import { db } from '@/lib/firebase';
   import { awardPointsFlow } from '@/ai/flows/award-points-flow';
+import { addNotificationForGen } from '@/services/notifications';
   
   export interface Submission {
     id: string;
@@ -66,13 +67,11 @@ import {
         submittedAt: serverTimestamp(),
     });
 
-    // NOTE: Automatic point awarding has been removed to align with security rules.
-    // Points are now only awarded when a teacher grades the submission.
+    // Award points for 100 Days of Code immediately
     if (pointsToAward && is100Days) {
-        // "100 Days of Code" is a special case that still awards points immediately.
         const activityId = `100-days-of-code-${submissionData.assignmentTitle.replace('100 Days of Code - ', '')}`;
         try {
-            await awardPointsFlow({
+             await awardPointsFlow({
                 studentId: submissionData.studentId,
                 points: pointsToAward,
                 reason: '100 Days of Code',
@@ -83,6 +82,17 @@ import {
         } catch(e) {
             console.error(`Failed to award points for 100 Days of Code submission ${docRef.id}:`, e);
         }
+    }
+
+    // Send notification to all staff
+    try {
+        await addNotificationForGen('All Staff', {
+            title: `New Submission: ${submissionData.assignmentTitle}`,
+            description: `From ${submissionData.studentName} (${submissionData.studentGen})`,
+            href: `/submissions`,
+        });
+    } catch (e) {
+        console.error(`Failed to send notification for new submission ${docRef.id}:`, e);
     }
 
 
