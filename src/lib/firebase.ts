@@ -2,7 +2,7 @@
 import {initializeApp, getApps, getApp} from 'firebase/app';
 import {getStorage} from 'firebase/storage';
 import {getAuth} from 'firebase/auth';
-import {getFirestore, initializeFirestore, CACHE_SIZE_UNLIMITED} from 'firebase/firestore';
+import {getFirestore} from 'firebase/firestore';
 
 const firebaseConfig = {
   projectId: 'campus-compass-ug6bc',
@@ -17,9 +17,6 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
 const storage = getStorage(app);
-const db = initializeFirestore(app, {
-  cacheSizeBytes: CACHE_SIZE_UNLIMITED,
-  experimentalForceLongPolling: true,
-});
+const db = getFirestore(app);
 
 export {app, auth, storage, db};
