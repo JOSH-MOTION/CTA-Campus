@@ -47,7 +47,9 @@ export const awardPointsFlow = ai.defineFlow(
 
         const pointDocSnap = await getDoc(pointDocRef);
         if (pointDocSnap.exists()) {
-            return { success: false, message: 'duplicate' };
+            // Points already awarded for this activity, so it's a "success" in that the desired state is met.
+            // The frontend can interpret the 'duplicate' message to avoid showing an error.
+            return { success: true, message: 'duplicate' };
         }
 
         // Atomically increment the totalPoints on the user document
