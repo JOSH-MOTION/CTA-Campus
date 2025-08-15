@@ -12,14 +12,12 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, deleteDoc, serverTimestamp, updateDoc, increment } from 'firebase/firestore';
-import { v4 as uuidv4 } from 'uuid';
 
 const AwardPointsFlowInputSchema = z.object({
     studentId: z.string().describe("The UID of the student to award points to."),
     points: z.number().describe("The number of points to award. Can be negative to revoke."),
     reason: z.string().describe("A short description of why the points are being awarded."),
     activityId: z.string().describe("A unique ID for the specific activity."),
-    pointLogId: z.string().optional().describe("The unique ID of the point log entry to revoke."),
     action: z.enum(['award', 'revoke']).describe("Whether to award or revoke the points."),
     assignmentTitle: z.string().optional().describe("The title of the assignment or activity."),
 });
@@ -28,7 +26,6 @@ export type AwardPointsFlowInput = z.infer<typeof AwardPointsFlowInputSchema>;
 const AwardPointsFlowOutputSchema = z.object({
   success: z.boolean(),
   message: z.string(),
-  pointLogId: z.string().optional(),
 });
 export type AwardPointsFlowOutput = z.infer<typeof AwardPointsFlowOutputSchema>;
 
@@ -40,70 +37,64 @@ export const awardPointsFlow = ai.defineFlow(
     outputSchema: AwardPointsFlowOutputSchema,
   },
   async (input) => {
-    const { studentId, points, reason, activityId, pointLogId, action, assignmentTitle } = input;
+    const { studentId, points, reason, activityId, action, assignmentTitle } = input;
     const userDocRef = doc(db, 'users', studentId);
     
     try {
-        const userDoc = await getDoc(userDocRef);
-        if (!userDoc.exists() && action === 'award') {
-            return { success: false, message: 'User not found.' };
+      if (action === 'award') {
+        const pointDocRef = doc(db, 'users', studentId, 'points', activityId);
+        const pointDocSnap = await getDoc(pointDocRef);
+
+        if (pointDocSnap.exists()) {
+          return { success: true, message: 'duplicate' };
         }
 
-        if (action === 'award') {
-            const pointDocRefForCheck = doc(db, 'users', studentId, 'points', activityId);
-            const pointDocSnap = await getDoc(pointDocRefForCheck);
-
-            if (pointDocSnap.exists()) {
-                return { success: true, message: 'duplicate', pointLogId: pointDocSnap.id };
+        // Atomically increment the totalPoints on the user document
+        await updateDoc(userDocRef, {
+            totalPoints: increment(points)
+        }).catch(async (error) => {
+            // If the user document or totalPoints field doesn't exist, set it.
+            if (error.code === 'not-found' || (error.message && error.message.includes("No document to update"))) {
+                await setDoc(userDocRef, { totalPoints: points }, { merge: true });
+            } else {
+                throw error;
             }
+        });
 
-            if (!userDoc.data()?.totalPoints) {
-                await setDoc(userDocRef, { totalPoints: 0 }, { merge: true });
-            }
+        // Create a log entry in the subcollection
+        await setDoc(pointDocRef, {
+            points,
+            reason,
+            assignmentTitle: assignmentTitle || reason, // Fallback to reason if title not provided
+            activityId,
+            awardedAt: serverTimestamp(),
+        });
+        
+        return { success: true, message: 'Points awarded successfully.' };
 
+      } else { // action === 'revoke'
+        const pointToRevokeRef = doc(db, 'users', studentId, 'points', activityId);
+        
+        const docSnap = await getDoc(pointToRevokeRef);
+        if (docSnap.exists()) {
+            const pointsToRevoke = docSnap.data().points || 0;
+            
+            // Atomically decrement the totalPoints on the user document
             await updateDoc(userDocRef, {
-                totalPoints: increment(points)
+                totalPoints: increment(-pointsToRevoke)
             });
 
-            await setDoc(pointDocRefForCheck, {
-                points,
-                reason,
-                assignmentTitle: assignmentTitle || reason,
-                activityId,
-                awardedAt: serverTimestamp(),
-            });
-            
-            return { success: true, message: 'Points awarded successfully.', pointLogId: activityId };
-
-        } else { // action === 'revoke'
-            if (!pointLogId) {
-                return { success: false, message: "pointLogId is required to revoke points." };
-            }
-            
-            const pointDocRef = doc(db, 'users', studentId, 'points', pointLogId);
-            const docSnap = await getDoc(pointDocRef);
-
-            if (docSnap.exists()) {
-                const pointsToRevoke = docSnap.data().points || 0;
-                
-                if (!userDoc.data()?.totalPoints) {
-                    await setDoc(userDocRef, { totalPoints: 0 }, { merge: true });
-                }
-
-                await updateDoc(userDocRef, {
-                    totalPoints: increment(-pointsToRevoke)
-                });
-
-                await deleteDoc(pointDocRef);
-                return { success: true, message: "Points revoked successfully." };
-            }
-            
-            return { success: true, message: "Points already revoked or never existed." };
+            // Delete the log entry
+            await deleteDoc(pointToRevokeRef);
+            return { success: true, message: "Points revoked successfully." };
         }
+        
+        return { success: true, message: "Points already revoked or never existed." };
+      }
     } catch (error: any) {
-        console.error("Error processing points in flow:", error);
-        const errorMessage = error.message || "An unexpected error occurred.";
-        return { success: false, message: `Server error: Could not process points. Reason: ${errorMessage}` };
+      console.error("Error processing points in flow:", error);
+      const errorMessage = error.message || "An unexpected error occurred.";
+      return { success: false, message: `Server error: Could not process points. Reason: ${errorMessage}` };
     }
   }
 );

@@ -107,11 +107,10 @@ export default function AllSubmissionsPage() {
     try {
       const result = await awardPointsFlow({
           studentId: submission.studentId,
-          points: 0, // Not used, but required by schema
+          points: 0, // points are retrieved from the doc, so 0 is fine here.
           reason: submission.pointCategory,
-          activityId: activityId, // Not used for revoke, but required
+          activityId: activityId,
           action: 'revoke',
-          pointLogId: activityId, // Use the unique activity ID as the log ID to revoke
           assignmentTitle: submission.assignmentTitle,
       });
 

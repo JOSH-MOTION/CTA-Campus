@@ -58,9 +58,9 @@ export default function HundredDaysSubmissionsPage() {
         const activityId = `100-days-of-code-${submission.assignmentTitle.replace('100 Days of Code - ', '')}`;
         await awardPointsFlow({
             studentId: submission.studentId,
-            points: 0.5,
+            points: 0, // points are retrieved from the doc, so 0 is fine here.
             reason: '100 Days of Code',
-            activityId,
+            activityId: activityId,
             action: 'revoke'
         });
 
