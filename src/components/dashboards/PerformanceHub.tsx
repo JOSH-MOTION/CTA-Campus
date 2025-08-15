@@ -11,16 +11,76 @@ import { useAuth, UserData } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 
 const initialGradingData = [
-  {title: 'Class Attendance', icon: CheckCircle, current: 0, total: 50, description: '1 point per attendance'},
-  {title: 'Class Assignments', icon: Edit, current: 0, total: 50, description: '1 point per assignment'},
-  {title: 'Class Exercises', icon: Edit, current: 0, total: 50, description: '1 point per exercise'},
-  {title: 'Weekly Projects', icon: Projector, current: 0, total: 50, description: '1 point per project'},
-  {title: 'Monthly Personal Projects', icon: Projector, current: 0, total: 10, description: '1 point per project'},
-  {title: 'Soft Skills & Product Training', icon: Handshake, current: 0, total: 6, description: '1 point per attendance'},
-  {title: 'Mini Demo Days', icon: Presentation, current: 0, total: 5, description: '5 points per demo'},
-  {title: '100 Days of Code', icon: Code, current: 0, total: 50, description: '0.5 points per day'},
-  {title: 'Code Review', icon: GitBranch, current: 0, total: 5, description: '1 point per contribution'},
-  {title: 'Final Project Completion', icon: Award, current: 0, total: 10, description: 'Awarded upon completion'},
+    { 
+        title: "Class Attendance", 
+        icon: CheckCircle, 
+        current: 0, 
+        total: 50, 
+        description: "1 point per weekly class attendance"
+    },
+    { 
+        title: "Class Assignments", 
+        icon: Edit, 
+        current: 0, 
+        total: 50, 
+        description: "1 point per assignment"
+    },
+    { 
+        title: "Class Exercises", 
+        icon: Edit, 
+        current: 0, 
+        total: 50, 
+        description: "1 point per exercise"
+    },
+    { 
+        title: "Weekly Projects", 
+        icon: Projector, 
+        current: 0, 
+        total: 50, 
+        description: "1 point per project completion"
+    },
+    { 
+        title: "Monthly Personal Projects", 
+        icon: Projector, 
+        current: 0, 
+        total: 10, 
+        description: "1 point per project"
+    },
+    { 
+        title: "Soft Skills & Product Training", 
+        icon: Handshake, 
+        current: 0, 
+        total: 6, 
+        description: "1 point per attendance"
+    },
+    { 
+        title: "Mini Demo Days", 
+        icon: Presentation, 
+        current: 0, 
+        total: 5, 
+        description: "5 points per demo"
+    },
+    { 
+        title: "100 Days of Code", 
+        icon: Code, 
+        current: 0, 
+        total: 50, 
+        description: "0.5 points per day"
+    },
+    { 
+        title: "Code Review", 
+        icon: GitBranch, 
+        current: 0, 
+        total: 5, 
+        description: "1 point per contribution"
+    },
+    { 
+        title: "Final Project Completion", 
+        icon: Award, 
+        current: 0, 
+        total: 10, 
+        description: "Awarded upon completion"
+    },
 ];
 
 
