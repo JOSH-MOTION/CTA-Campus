@@ -10,8 +10,8 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { adminDb } from '@/lib/firebase-admin';
-import { FieldValue } from 'firebase-admin/firestore';
+import { db } from '@/lib/firebase';
+import { doc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 
 
 const GradeSubmissionInputSchema = z.object({
@@ -39,10 +39,10 @@ export const gradeSubmissionFlow = ai.defineFlow(
     const { submissionId, studentId, grade, feedback, assignmentTitle } = input;
     
     try {
-      const submissionRef = adminDb.collection('submissions').doc(submissionId);
+      const submissionRef = doc(db, 'submissions', submissionId);
 
       // Update the submission document with the grade and feedback
-      await submissionRef.update({
+      await updateDoc(submissionRef, {
         grade: grade,
         feedback: feedback || '',
       });
@@ -54,9 +54,9 @@ export const gradeSubmissionFlow = ai.defineFlow(
         description: "Your submission has been graded by your teacher.",
         href: `/submissions`, // Simple link, can be improved to point to the exact item
         read: false,
-        date: FieldValue.serverTimestamp(),
+        date: serverTimestamp(),
       };
-      await adminDb.collection('notifications').add(notification);
+      await addDoc(collection(db, 'notifications'), notification);
 
       return { success: true, message: 'Submission graded successfully.' };
     } catch (error: any) {

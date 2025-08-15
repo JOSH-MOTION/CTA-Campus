@@ -10,8 +10,8 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { adminDb } from '@/lib/firebase-admin';
-import { FieldValue } from 'firebase-admin/firestore';
+import { db } from '@/lib/firebase';
+import { doc, getDoc, setDoc, deleteDoc, serverTimestamp, updateDoc, increment } from 'firebase/firestore';
 
 
 const AwardPointsFlowInputSchema = z.object({
@@ -39,48 +39,47 @@ export const awardPointsFlow = ai.defineFlow(
   },
   async (input) => {
     const { studentId, points, reason, activityId, action, assignmentTitle } = input;
-    const userDocRef = adminDb.collection('users').doc(studentId);
+    const userDocRef = doc(db, 'users', studentId);
     
     try {
       if (action === 'award') {
-        const pointDocRef = adminDb.collection('users').doc(studentId).collection('points').doc(activityId);
+        const pointDocRef = doc(db, 'users', studentId, 'points', activityId);
 
-        // Check if the point entry already exists to prevent duplicate awards
-        const pointDocSnap = await pointDocRef.get();
-        if (pointDocSnap.exists) {
+        const pointDocSnap = await getDoc(pointDocRef);
+        if (pointDocSnap.exists()) {
             return { success: false, message: 'duplicate' };
         }
 
         // Atomically increment the totalPoints on the user document
-        await userDocRef.update({
-            totalPoints: FieldValue.increment(points)
+        await updateDoc(userDocRef, {
+            totalPoints: increment(points)
         });
 
         // Create a log entry in the subcollection
-        await pointDocRef.set({
+        await setDoc(pointDocRef, {
             points,
             reason,
             assignmentTitle: assignmentTitle || reason, // Fallback to reason if title not provided
             activityId,
-            awardedAt: FieldValue.serverTimestamp(),
+            awardedAt: serverTimestamp(),
         });
         
         return { success: true, message: 'Points awarded successfully.' };
 
       } else { // action === 'revoke'
-        const pointToRevokeRef = adminDb.collection('users').doc(studentId).collection('points').doc(activityId);
+        const pointToRevokeRef = doc(db, 'users', studentId, 'points', activityId);
         
-        const docSnap = await pointToRevokeRef.get();
-        if (docSnap.exists) {
-            const pointsToRevoke = docSnap.data()?.points || 0;
+        const docSnap = await getDoc(pointToRevokeRef);
+        if (docSnap.exists()) {
+            const pointsToRevoke = docSnap.data().points || 0;
             
             // Atomically decrement the totalPoints on the user document
-            await userDocRef.update({
-                totalPoints: FieldValue.increment(-pointsToRevoke)
+            await updateDoc(userDocRef, {
+                totalPoints: increment(-pointsToRevoke)
             });
 
             // Delete the log entry
-            await pointToRevokeRef.delete();
+            await deleteDoc(pointToRevokeRef);
             return { success: true, message: "Points revoked successfully." };
         }
         
