@@ -11,7 +11,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, deleteDoc, serverTimestamp, updateDoc, increment, runTransaction, DocumentReference, collection } from 'firebase/firestore';
+import { doc, runTransaction, serverTimestamp } from 'firebase/firestore';
 
 const AwardPointsFlowInputSchema = z.object({
     studentId: z.string().describe("The UID of the student to award points to."),
@@ -40,23 +40,21 @@ export const awardPointsFlow = ai.defineFlow(
     const { studentId, points, reason, activityId, action, assignmentTitle } = input;
 
     try {
-        await runTransaction(db, async (transaction) => {
+        const message = await runTransaction(db, async (transaction) => {
             const userDocRef = doc(db, 'users', studentId);
             const pointDocRef = doc(db, 'users', studentId, 'points', activityId);
+
+            const userDoc = await transaction.get(userDocRef);
+            const currentTotalPoints = userDoc.data()?.totalPoints || 0;
             
             if (action === 'award') {
                 const pointDocSnap = await transaction.get(pointDocRef);
                 if (pointDocSnap.exists()) {
-                    console.log(`Duplicate award attempt for activityId: ${activityId}, action will be skipped.`);
-                    // This is not an error, just means it's already done.
-                    return; 
+                    return `Points for this activity have already been awarded.`;
                 }
 
-                const userDoc = await transaction.get(userDocRef);
-                const currentPoints = userDoc.data()?.totalPoints || 0;
-                
                 // Set or Update the totalPoints field.
-                transaction.set(userDocRef, { totalPoints: currentPoints + points }, { merge: true });
+                transaction.set(userDocRef, { totalPoints: currentTotalPoints + points }, { merge: true });
 
                 // Create the point log entry
                 transaction.set(pointDocRef, {
@@ -66,27 +64,26 @@ export const awardPointsFlow = ai.defineFlow(
                     activityId,
                     awardedAt: serverTimestamp(),
                 });
+                return `Points awarded successfully.`;
                 
             } else { // action === 'revoke'
                 const pointDocSnap = await transaction.get(pointDocRef);
                 if (!pointDocSnap.exists()) {
-                    console.log(`Point log not found for revocation: ${activityId}, action will be skipped.`);
-                    return; // The point to revoke doesn't exist, so we're done.
+                    return `Cannot revoke points that were not awarded.`;
                 }
 
                 const pointsToRevoke = pointDocSnap.data().points || 0;
-                const userDoc = await transaction.get(userDocRef);
-                const currentPoints = userDoc.data()?.totalPoints || 0;
-
+                
                 // Set or Update the totalPoints field.
-                transaction.set(userDocRef, { totalPoints: Math.max(0, currentPoints - pointsToRevoke) }, { merge: true });
+                transaction.set(userDocRef, { totalPoints: Math.max(0, currentTotalPoints - pointsToRevoke) }, { merge: true });
 
                 // Delete the log entry
                 transaction.delete(pointDocRef);
+                return 'Points revoked successfully.';
             }
         });
 
-        return { success: true, message: `Points ${action === 'award' ? 'awarded' : 'revoked'} successfully.` };
+        return { success: true, message };
 
     } catch (error: any) {
       console.error("Error processing points in transaction:", error);
