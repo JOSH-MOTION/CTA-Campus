@@ -50,7 +50,7 @@ const StatCard = ({ title, value, icon: Icon, description }: { title: string; va
 );
 
 export default function TeacherDashboard({user}: TeacherDashboardProps) {
-  const {userData, fetchAllUsers} = useAuth();
+  const {userData, fetchAllUsers, role} = useAuth();
   const { setTeacherViewingGen } = useRoadmap();
   const [selectedGen, setSelectedGen] = useState<string>('');
   const [allUsers, setAllUsers] = useState<UserData[]>([]);
@@ -87,11 +87,20 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
   }, [fetchAllUsers]);
 
   const availableGens = useMemo(() => {
+    const studentGens = allUsers
+        .filter(u => u.role === 'student' && u.gen)
+        .map(u => u.gen!);
+    
+    // For admins, show all available student generations.
+    if (role === 'admin') {
+      return [...new Set(studentGens)].sort();
+    }
+
+    // For teachers, show their taught gens plus any other student gens.
     const taughtGens = userData?.gensTaught?.split(',').map(g => g.trim()).filter(Boolean) || [];
-    const studentGens = allUsers.filter(u => u.role === 'student' && u.gen).map(u => u.gen!);
     const allGens = [...new Set([...taughtGens, ...studentGens])];
     return allGens.sort();
-  }, [userData?.gensTaught, allUsers]);
+  }, [userData?.gensTaught, allUsers, role]);
 
   useEffect(() => {
     if (availableGens.length > 0 && !selectedGen) {
@@ -115,7 +124,7 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
     const avgPoints = genStudents.length > 0 ? (totalPoints / genStudents.length).toFixed(1) : '0';
     
     const sortedStudents = [...genStudents].sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
-    const topStudents = sortedStudents.slice(0, 3);
+    const topStudents = sortedStudents.filter(s => (s.totalPoints || 0) > 0).slice(0, 3);
     
     const genStudentIds = new Set(genStudents.map(s => s.uid));
     const recentSubmissions = submissions
@@ -247,7 +256,7 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
                                         <p className="text-sm text-muted-foreground">{student.totalPoints || 0} points</p>
                                     </div>
                                 </div>
-                            )) : <p className="text-sm text-muted-foreground text-center py-4">No student data to display.</p>}
+                            )) : <p className="text-sm text-muted-foreground text-center py-4">No students have earned points yet.</p>}
                         </CardContent>
                          <CardFooter>
                             <Button variant="outline" className="w-full" asChild>
