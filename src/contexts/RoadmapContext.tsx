@@ -1,7 +1,7 @@
 // src/contexts/RoadmapContext.tsx
 'use client';
 
-import {createContext, useContext, useState, ReactNode, FC, useEffect} from 'react';
+import {createContext, useContext, useState, ReactNode, FC, useEffect, useMemo} from 'react';
 import { useAuth } from './AuthContext';
 import { onRoadmapStatus, setWeekCompletion, WeekCompletionStatusMap } from '@/services/roadmap';
 
@@ -24,12 +24,20 @@ export interface RoadmapSubject {
   weeks: Week[];
 }
 
+export interface WeekWithSubject extends Week {
+    subjectTitle: string;
+    weekTitle: string;
+}
+
 interface RoadmapContextType {
   completedWeeks: Set<string>;
   completionMap: WeekCompletionStatusMap;
   toggleWeekCompletion: (weekId: string, gen: string, currentStatus: boolean) => void;
   roadmapData: RoadmapSubject[];
   loading: boolean;
+  currentWeek: WeekWithSubject | null;
+  nextWeek: WeekWithSubject | null;
+  allWeeksCompleted: boolean;
 }
 
 const roadmapData: RoadmapSubject[] = [
@@ -451,7 +459,6 @@ const RoadmapContext = createContext<RoadmapContextType | undefined>(undefined);
 
 export const RoadmapProvider: FC<{children: ReactNode}> = ({children}) => {
   const [completionMap, setCompletionMap] = useState<WeekCompletionStatusMap>({});
-  const [completedWeeks, setCompletedWeeks] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const { user, userData } = useAuth();
 
@@ -462,31 +469,72 @@ export const RoadmapProvider: FC<{children: ReactNode}> = ({children}) => {
     }
     const unsubscribe = onRoadmapStatus((statusMap) => {
         setCompletionMap(statusMap);
-        
-        // For students, calculate their specific completed weeks
-        if (userData?.gen) {
-            const userGen = userData.gen;
-            const completed = new Set<string>();
-            Object.entries(statusMap).forEach(([weekId, genMap]) => {
-                if (genMap[userGen]) {
-                    completed.add(weekId);
-                }
-            });
-            setCompletedWeeks(completed);
-        }
-      
         setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [user, userData?.gen]);
+  }, [user]);
+
+  const completedWeeks = useMemo(() => {
+      const completed = new Set<string>();
+      if (userData?.gen) {
+        const userGen = userData.gen;
+        Object.entries(completionMap).forEach(([weekId, genMap]) => {
+            if (genMap[userGen]) {
+                completed.add(weekId);
+            }
+        });
+      }
+      return completed;
+  }, [completionMap, userData?.gen]);
+
+
+  const allFlattenedWeeks = useMemo(() => {
+    return roadmapData.flatMap(subject => 
+        subject.weeks.map(week => ({
+            ...week,
+            subjectTitle: subject.title,
+            weekTitle: week.title
+        }))
+    );
+  }, []);
+
+  const { currentWeek, nextWeek, allWeeksCompleted } = useMemo(() => {
+    const lastCompletedIndex = allFlattenedWeeks.findLastIndex(week =>
+      completedWeeks.has(`${week.subjectTitle}-${week.weekTitle}`)
+    );
+
+    if (lastCompletedIndex === -1) {
+        return { currentWeek: allFlattenedWeeks[0] || null, nextWeek: allFlattenedWeeks[1] || null, allWeeksCompleted: false };
+    }
+    
+    if (lastCompletedIndex === allFlattenedWeeks.length - 1) {
+        return { currentWeek: allFlattenedWeeks[lastCompletedIndex], nextWeek: null, allWeeksCompleted: true };
+    }
+
+    return { 
+        currentWeek: allFlattenedWeeks[lastCompletedIndex], 
+        nextWeek: allFlattenedWeeks[lastCompletedIndex + 1],
+        allWeeksCompleted: false
+    };
+
+  }, [completedWeeks, allFlattenedWeeks]);
 
   const toggleWeekCompletion = (weekId: string, gen: string, currentStatus: boolean) => {
     setWeekCompletion(weekId, gen, !currentStatus);
   };
 
   return (
-    <RoadmapContext.Provider value={{roadmapData, completedWeeks, completionMap, toggleWeekCompletion, loading}}>
+    <RoadmapContext.Provider value={{
+      roadmapData, 
+      completedWeeks, 
+      completionMap, 
+      toggleWeekCompletion, 
+      loading,
+      currentWeek,
+      nextWeek,
+      allWeeksCompleted
+    }}>
       {children}
     </RoadmapContext.Provider>
   );

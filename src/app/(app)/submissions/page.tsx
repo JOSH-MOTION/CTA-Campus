@@ -48,7 +48,6 @@ export default function AllSubmissionsPage() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [allStudents, setAllStudents] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [gradingState, setGradingState] = useState<{ [submissionId: string]: 'idle' | 'loading' | 'graded' }>({});
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGen, setSelectedGen] = useState('all');
@@ -64,15 +63,6 @@ export default function AllSubmissionsPage() {
       ]);
       setSubmissions(fetchedSubmissions);
       setAllStudents(fetchedUsers.filter(u => u.role === 'student'));
-
-      // Simplify grading state check
-      const initialGradingState: { [submissionId: string]: 'idle' | 'loading' | 'graded' } = {};
-      for (const s of fetchedSubmissions) {
-          // @ts-ignore
-          initialGradingState[s.id] = s.grade ? 'graded' : 'idle';
-      }
-      setGradingState(initialGradingState);
-
     } catch (error) {
       console.error("Failed to fetch data:", error);
       toast({
@@ -111,9 +101,10 @@ export default function AllSubmissionsPage() {
     });
   }, [submissions, allStudents, searchTerm, selectedGen, selectedCategory]);
 
-  
   const handleRevoke = async (submission: Submission) => {
-    setGradingState(prev => ({ ...prev, [submission.id]: 'loading' }));
+    const originalGrade = submission.grade;
+    // Optimistically update UI
+    setSubmissions(prev => prev.map(s => s.id === submission.id ? { ...s, grade: undefined } : s));
 
     const activityId = getActivityIdForSubmission(submission);
     const points = submission.pointCategory === '100 Days of Code' ? 0.5 : 1;
@@ -128,8 +119,9 @@ export default function AllSubmissionsPage() {
           assignmentTitle: submission.assignmentTitle,
       });
        if (!result.success) throw new Error(result.message);
-
-      setGradingState(prev => ({ ...prev, [submission.id]: 'idle' }));
+       
+      await fetchData();
+      
       toast({
         title: 'Points Revoked',
         description: `Points for ${submission.studentName} have been revoked.`,
@@ -140,7 +132,8 @@ export default function AllSubmissionsPage() {
         title: 'Error',
         description: 'Could not revoke points.',
       });
-      setGradingState(prev => ({ ...prev, [submission.id]: 'graded' }));
+       // Revert optimistic update on failure
+      setSubmissions(prev => prev.map(s => s.id === submission.id ? { ...s, grade: originalGrade } : s));
     }
   };
 
@@ -182,7 +175,7 @@ export default function AllSubmissionsPage() {
         Category: s.pointCategory,
         Submitted: s.submittedAt.toDate().toLocaleString(),
         Link: s.submissionLink,
-        Graded: gradingState[s.id] === 'graded' ? 'Yes' : 'No'
+        Graded: s.grade ? 'Yes' : 'No'
     }));
 
     const csv = Papa.unparse(dataToExport);
@@ -296,7 +289,6 @@ export default function AllSubmissionsPage() {
               <TableBody>
                 {filteredSubmissions.length > 0 ? (
                   filteredSubmissions.map(submission => {
-                    const currentGradeState = gradingState[submission.id] || 'idle';
                     return (
                         <TableRow key={submission.id}>
                             <TableCell className="font-medium">{submission.studentName}</TableCell>
@@ -314,28 +306,22 @@ export default function AllSubmissionsPage() {
                                 </Button>
                             </TableCell>
                             <TableCell className="text-right space-x-2">
-                                {currentGradeState === 'graded' ? (
+                                {submission.grade ? (
                                      <Button
                                         size="sm"
-                                        variant="default"
+                                        variant="destructive"
                                         onClick={() => handleRevoke(submission)}
-                                        disabled={currentGradeState === 'loading'}
-                                        className="bg-green-600 hover:bg-green-700"
                                     >
-                                        {currentGradeState === 'loading' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                         <XCircle className="mr-2 h-4 w-4" />
                                         Revoke
                                     </Button>
                                 ) : (
                                     <GradeSubmissionDialog
                                         submission={submission}
-                                        onGraded={() => {
-                                            setGradingState(prev => ({...prev, [submission.id]: 'graded'}));
-                                            fetchData();
-                                        }}
+                                        onGraded={fetchData}
                                     >
-                                        <Button size="sm" variant="outline" disabled={currentGradeState === 'loading'}>
-                                          {currentGradeState === 'loading' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+                                        <Button size="sm" variant="outline">
+                                          <CheckCircle className="mr-2 h-4 w-4" />
                                           Grade
                                         </Button>
                                     </GradeSubmissionDialog>

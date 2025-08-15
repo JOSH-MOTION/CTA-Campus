@@ -21,12 +21,7 @@ import {Button} from '@/components/ui/button';
 import type {User} from 'firebase/auth';
 import {Progress} from '@/components/ui/progress';
 import PerformanceHub from '@/components/dashboards/PerformanceHub';
-
-const upcomingClasses = [
-  {time: '09:00 AM', course: 'CS101: Intro to Computer Science', room: 'Hall A', type: 'Lecture'},
-  {time: '11:00 AM', course: 'MA203: Linear Algebra', room: 'Room 301', type: 'Class'},
-  {time: '02:00 PM', course: 'PHY201: Classical Mechanics', room: 'Lab B', type: 'Lab'},
-];
+import WeeklyFocus from './WeeklyFocus';
 
 const recentResources = [
   {title: 'CS101 Syllabus', type: 'PDF', icon: FileText, course: 'Intro to CS'},
@@ -46,47 +41,12 @@ export default function StudentDashboard({user}: StudentDashboardProps) {
         <p className="text-muted-foreground">Here's your overview for today.</p>
       </div>
 
-      <PerformanceHub />
-
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Today's Schedule</CardTitle>
-            <CardDescription>Here are your upcoming classes for today.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[100px]">Time</TableHead>
-                  <TableHead>Course</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead className="text-right">Type</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {upcomingClasses.map(item => (
-                  <TableRow key={item.course}>
-                    <TableCell className="font-medium">{item.time}</TableCell>
-                    <TableCell>{item.course}</TableCell>
-                    <TableCell className="hidden sm:table-cell">{item.room}</TableCell>
-                    <TableCell className="text-right">
-                      <Badge variant="outline">{item.type}</Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-          <CardFooter>
-            <Button variant="outline" asChild>
-              <Link href="/timetable">
-                View Full Timetable <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </CardFooter>
-        </Card>
-
+      <WeeklyFocus />
+      
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+            <PerformanceHub />
+        </div>
         <Card className="flex flex-col">
           <CardHeader>
             <CardTitle>Recent Resources</CardTitle>
