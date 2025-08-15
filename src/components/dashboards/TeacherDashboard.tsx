@@ -188,6 +188,8 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
                 <StatCard title="Class Average" value={avgPoints} icon={BarChart2} description="Average points per student" />
             </div>
 
+            <WeeklyFocus />
+
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
                 <div className="lg:col-span-2">
                     <Card>
@@ -264,8 +266,6 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
                             </Button>
                         </CardFooter>
                     </Card>
-
-                    <WeeklyFocus />
 
                     <Card>
                         <CardHeader>
