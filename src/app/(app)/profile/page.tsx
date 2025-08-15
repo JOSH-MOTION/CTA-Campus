@@ -1,3 +1,4 @@
+
 // src/app/(app)/profile/page.tsx
 'use client';
 
@@ -26,6 +27,7 @@ const profileSchema = z.object({
   // student specific
   gen: z.string().optional(),
   lessonDay: z.string().optional(),
+  lessonTime: z.string().optional(),
   // teacher specific
   gensTaught: z.string().optional(),
   linkedin: z.string().url("Please enter a valid URL.").optional().or(z.literal('')),
@@ -33,6 +35,15 @@ const profileSchema = z.object({
 });
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
+
+const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const timeSlots = Array.from({ length: 24 * 2 }, (_, i) => {
+    const hour = Math.floor(i / 2);
+    const minute = i % 2 === 0 ? '00' : '30';
+    const formattedHour = hour.toString().padStart(2, '0');
+    return `${formattedHour}:${minute}`;
+});
+
 
 export default function ProfilePage() {
   const {user, userData, role, loading, setUserData} = useAuth();
@@ -49,6 +60,7 @@ export default function ProfilePage() {
       bio: '',
       gen: '',
       lessonDay: '',
+      lessonTime: '',
       gensTaught: '',
       linkedin: '',
       github: '',
@@ -65,6 +77,7 @@ export default function ProfilePage() {
         bio: userData.bio || '',
         gen: userData.gen || '',
         lessonDay: userData.lessonDay || '',
+        lessonTime: userData.lessonTime || '',
         gensTaught: userData.gensTaught || '',
         linkedin: userData.linkedin || '',
         github: userData.github || '',
@@ -123,10 +136,11 @@ export default function ProfilePage() {
     let lessonDetailsChanged = false;
     if (role === 'student') {
         updateData.gen = data.gen;
-        if (userData.lessonDay !== data.lessonDay) {
+        if (userData.lessonDay !== data.lessonDay || userData.lessonTime !== data.lessonTime) {
             lessonDetailsChanged = true;
         }
         updateData.lessonDay = data.lessonDay;
+        updateData.lessonTime = data.lessonTime;
         if(lessonDetailsChanged && !userData.hasEditedLessonDetails) {
             updateData.hasEditedLessonDetails = true;
         }
@@ -271,12 +285,9 @@ export default function ProfilePage() {
                                                 </SelectTrigger>
                                             </FormControl>
                                             <SelectContent>
-                                                <SelectItem value="monday">Monday</SelectItem>
-                                                <SelectItem value="tuesday">Tuesday</SelectItem>
-                                                <SelectItem value="wednesday">Wednesday</SelectItem>
-                                                <SelectItem value="thursday">Thursday</SelectItem>
-                                                <SelectItem value="friday">Friday</SelectItem>
-                                                <SelectItem value="saturday">Saturday</SelectItem>
+                                                {daysOfWeek.map(day => (
+                                                    <SelectItem key={day} value={day.toLowerCase()}>{day}</SelectItem>
+                                                ))}
                                             </SelectContent>
                                         </Select>
                                         <FormMessage />
@@ -284,6 +295,29 @@ export default function ProfilePage() {
                                 )}
                             />
                         </div>
+                        <FormField
+                            control={form.control}
+                            name="lessonTime"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Lesson Time</FormLabel>
+                                    <Select onValueChange={field.onChange} value={field.value} disabled={lessonDetailsLocked}>
+                                        <FormControl>
+                                            <SelectTrigger>
+                                                <Clock className="mr-2 h-4 w-4" />
+                                                <SelectValue placeholder="Select a time" />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            {timeSlots.map(time => (
+                                                <SelectItem key={time} value={time}>{time}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
                         {lessonDetailsLocked && <p className="text-xs text-muted-foreground pt-1">Lesson details can only be set once. Please contact an admin to make changes.</p>}
                         </>
                     )}

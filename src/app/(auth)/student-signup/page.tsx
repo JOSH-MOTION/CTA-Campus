@@ -1,3 +1,4 @@
+
 // src/app/(auth)/student-signup/page.tsx
 'use client';
 
@@ -21,6 +22,14 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
 const availableGens = ['Gen 28', 'Gen 29', 'Gen 30', 'Gen 31', 'Gen 32'];
+const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const timeSlots = Array.from({ length: 24 * 2 }, (_, i) => {
+    const hour = Math.floor(i / 2);
+    const minute = i % 2 === 0 ? '00' : '30';
+    const formattedHour = hour.toString().padStart(2, '0');
+    return `${formattedHour}:${minute}`;
+});
+
 
 export default function StudentSignupPage() {
   const [email, setEmail] = useState('');
@@ -47,14 +56,6 @@ export default function StudentSignupPage() {
     }
   }, [user, router]);
   
-  useEffect(() => {
-      if (lessonType === 'online') {
-          setLessonTime('6:00 PM');
-      } else {
-          setLessonTime('');
-      }
-  }, [lessonType]);
-
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -75,11 +76,11 @@ export default function StudentSignupPage() {
     e.preventDefault();
     setLoading(true);
 
-    if (lessonType === 'in-person' && !lessonTime) {
+    if (!lessonTime) {
       toast({
         variant: 'destructive',
         title: 'Missing Information',
-        description: 'Please select a time for your in-person lesson.',
+        description: 'Please select a time for your lesson.',
       });
       setLoading(false);
       return;
@@ -194,47 +195,41 @@ export default function StudentSignupPage() {
             </div>
             <div className="space-y-2">
               <Label>Lesson Day & Time</Label>
-              <div className={cn("grid grid-cols-1 gap-4", lessonType === 'in-person' ? 'sm:grid-cols-3' : 'sm:grid-cols-2')}>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Select onValueChange={setLessonDay} value={lessonDay} required>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a day" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Monday">Monday</SelectItem>
-                    <SelectItem value="Tuesday">Tuesday</SelectItem>
-                    <SelectItem value="Wednesday">Wednesday</SelectItem>
-                    <SelectItem value="Thursday">Thursday</SelectItem>
-                    <SelectItem value="Friday">Friday</SelectItem>
-                    <SelectItem value="Saturday">Saturday</SelectItem>
+                     {daysOfWeek.map(day => (
+                        <SelectItem key={day} value={day.toLowerCase()}>{day}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-                <RadioGroup defaultValue="online" className="flex items-center space-x-4" onValueChange={setLessonType}>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="online" id="online" />
-                    <Label htmlFor="online">Online</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="in-person" id="in-person" />
-                    <Label htmlFor="in-person">In-person</Label>
-                  </div>
-                </RadioGroup>
-                {lessonType === 'in-person' ? (
-                    <Select onValueChange={setLessonTime} value={lessonTime}>
-                        <SelectTrigger>
-                             <Clock className="mr-2 h-4 w-4" />
-                            <SelectValue placeholder="Select a time" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="10:30 AM">10:30 AM</SelectItem>
-                            <SelectItem value="12:30 PM">12:30 PM</SelectItem>
-                        </SelectContent>
-                    </Select>
-                ) : (
-                    <div className="flex items-center space-x-2 rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground">
+                 <Select onValueChange={setLessonTime} value={lessonTime} required>
+                    <SelectTrigger>
                         <Clock className="mr-2 h-4 w-4" />
-                        <span>6:00 PM</span>
+                        <SelectValue placeholder="Select a time" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {timeSlots.map(time => (
+                            <SelectItem key={time} value={time}>{time}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+              </div>
+              <div className='pt-2'>
+                 <Label>Lesson Type</Label>
+                 <RadioGroup defaultValue="online" className="flex items-center space-x-4 pt-2" onValueChange={setLessonType}>
+                    <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="online" id="online" />
+                        <Label htmlFor="online">Online</Label>
                     </div>
-                )}
+                    <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="in-person" id="in-person" />
+                        <Label htmlFor="in-person">In-person</Label>
+                    </div>
+                </RadioGroup>
               </div>
             </div>
             <div className="space-y-2">
