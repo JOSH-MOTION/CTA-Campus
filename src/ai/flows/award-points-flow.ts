@@ -47,10 +47,8 @@ export const awardPointsFlow = ai.defineFlow(
             if (action === 'award') {
                 const pointDocSnap = await transaction.get(pointDocRef);
                 if (pointDocSnap.exists()) {
-                    // To prevent re-running a successful transaction, we don't throw an error here.
-                    // The calling client will see success and know the operation is complete.
-                    console.log(`Duplicate award attempt for activityId: ${activityId}`);
-                    return; 
+                    console.log(`Duplicate award attempt for activityId: ${activityId}, action will be skipped.`);
+                    return; // Gracefully exit if points already awarded
                 }
 
                 // Get the user document to check if totalPoints exists
@@ -75,7 +73,7 @@ export const awardPointsFlow = ai.defineFlow(
             } else { // action === 'revoke'
                 const pointDocSnap = await transaction.get(pointDocRef);
                 if (!pointDocSnap.exists()) {
-                    console.log(`Point log not found for revocation: ${activityId}`);
+                    console.log(`Point log not found for revocation: ${activityId}, action will be skipped.`);
                     return; // The point to revoke doesn't exist, so we're done.
                 }
 
@@ -92,7 +90,7 @@ export const awardPointsFlow = ai.defineFlow(
         return { success: true, message: `Points ${action === 'award' ? 'awarded' : 'revoked'} successfully.` };
 
     } catch (error: any) {
-      console.error("Error processing points in flow:", error);
+      console.error("Error processing points in transaction:", error);
       const errorMessage = error.message || "An unexpected error occurred.";
       // Check for specific Firestore error codes if needed
       if (error.code === 'permission-denied') {
