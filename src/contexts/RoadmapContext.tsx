@@ -38,6 +38,7 @@ interface RoadmapContextType {
   currentWeek: WeekWithSubject | null;
   nextWeek: WeekWithSubject | null;
   allWeeksCompleted: boolean;
+  setTeacherViewingGen: (gen: string) => void; // New function
 }
 
 const roadmapData: RoadmapSubject[] = [
@@ -448,7 +449,8 @@ const RoadmapContext = createContext<RoadmapContextType | undefined>(undefined);
 export const RoadmapProvider: FC<{children: ReactNode}> = ({children}) => {
   const [completionMap, setCompletionMap] = useState<WeekCompletionStatusMap>({});
   const [loading, setLoading] = useState(true);
-  const { user, userData } = useAuth();
+  const [teacherViewingGen, setTeacherViewingGen] = useState<string>(''); // New state
+  const { user, userData, role } = useAuth();
 
   useEffect(() => {
     if (!user) {
@@ -465,16 +467,18 @@ export const RoadmapProvider: FC<{children: ReactNode}> = ({children}) => {
 
   const completedWeeks = useMemo(() => {
       const completed = new Set<string>();
-      if (userData?.gen) {
-        const userGen = userData.gen;
+      // Determine which generation's progress to view
+      const genToView = role === 'student' ? userData?.gen : teacherViewingGen;
+
+      if (genToView) {
         Object.entries(completionMap).forEach(([weekId, genMap]) => {
-            if (genMap[userGen]) {
+            if (genMap[genToView]) {
                 completed.add(weekId);
             }
         });
       }
       return completed;
-  }, [completionMap, userData?.gen]);
+  }, [completionMap, userData?.gen, role, teacherViewingGen]);
 
 
   const allFlattenedWeeks = useMemo(() => {
@@ -488,23 +492,39 @@ export const RoadmapProvider: FC<{children: ReactNode}> = ({children}) => {
   }, []);
 
   const { currentWeek, nextWeek, allWeeksCompleted } = useMemo(() => {
-    // Find the first week in the flattened list that is NOT completed.
-    const firstUncompletedIndex = allFlattenedWeeks.findIndex(
-        week => !completedWeeks.has(`${week.subjectTitle}-${week.weekTitle}`)
-    );
+    if (allFlattenedWeeks.length === 0) {
+        return { currentWeek: null, nextWeek: null, allWeeksCompleted: false };
+    }
+    
+    // Find the index of the last completed week in the flattened list.
+    let lastCompletedIndex = -1;
+    allFlattenedWeeks.forEach((week, index) => {
+        if(completedWeeks.has(`${week.subjectTitle}-${week.weekTitle}`)){
+            lastCompletedIndex = index;
+        }
+    });
 
-    // If all weeks are completed, the index will be -1.
-    if (firstUncompletedIndex === -1 && allFlattenedWeeks.length > 0) {
+    // If no weeks are completed, the current week is the first one.
+    if (lastCompletedIndex === -1) {
         return {
-            currentWeek: allFlattenedWeeks[allFlattenedWeeks.length - 1], // Show the last week
+            currentWeek: allFlattenedWeeks[0],
+            nextWeek: allFlattenedWeeks[1] || null,
+            allWeeksCompleted: false
+        };
+    }
+
+    // If the last completed week is the last week of the whole curriculum.
+    if (lastCompletedIndex === allFlattenedWeeks.length - 1) {
+        return {
+            currentWeek: allFlattenedWeeks[lastCompletedIndex], // Show the last week
             nextWeek: null,
             allWeeksCompleted: true,
         };
     }
     
-    // If no weeks are completed (or the list is empty), the current week is the first one.
-    const currentFocusWeek = allFlattenedWeeks[firstUncompletedIndex] || null;
-    const nextFocusWeek = allFlattenedWeeks[firstUncompletedIndex + 1] || null;
+    // The current focus is the week right after the last completed one.
+    const currentFocusWeek = allFlattenedWeeks[lastCompletedIndex + 1];
+    const nextFocusWeek = allFlattenedWeeks[lastCompletedIndex + 2] || null;
 
     return {
         currentWeek: currentFocusWeek,
@@ -526,7 +546,8 @@ export const RoadmapProvider: FC<{children: ReactNode}> = ({children}) => {
       loading,
       currentWeek,
       nextWeek,
-      allWeeksCompleted
+      allWeeksCompleted,
+      setTeacherViewingGen,
     }}>
       {children}
     </RoadmapContext.Provider>

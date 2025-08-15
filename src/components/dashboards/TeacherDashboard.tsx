@@ -28,6 +28,7 @@ import { formatDistanceToNow } from 'date-fns';
 import Link from 'next/link';
 import { GradeSubmissionDialog } from '../submissions/GradeSubmissionDialog';
 import WeeklyFocus from './WeeklyFocus';
+import { useRoadmap } from '@/contexts/RoadmapContext';
 
 interface TeacherDashboardProps {
   user: User | null;
@@ -35,6 +36,7 @@ interface TeacherDashboardProps {
 
 export default function TeacherDashboard({user}: TeacherDashboardProps) {
   const {userData, fetchAllUsers} = useAuth();
+  const { setTeacherViewingGen } = useRoadmap();
   const [selectedGen, setSelectedGen] = useState<string>('');
   const [allUsers, setAllUsers] = useState<UserData[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -87,6 +89,12 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
       setSelectedGen(availableGens[0]);
     }
   }, [availableGens, selectedGen]);
+  
+  useEffect(() => {
+    if (selectedGen) {
+      setTeacherViewingGen(selectedGen);
+    }
+  }, [selectedGen, setTeacherViewingGen]);
   
   const handleOpenChat = () => {
     if (selectedGen) {
