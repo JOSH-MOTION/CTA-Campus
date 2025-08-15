@@ -1,3 +1,7 @@
+// src/components/dashboards/StudentDashboard.tsx
+'use client'
+
+import { useMemo } from 'react';
 import {
   Card,
   CardContent,
@@ -6,34 +10,34 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {Badge} from '@/components/ui/badge';
-import {FileText, BookOpen, ArrowRight, TrendingUp, CheckCircle, AlertCircle} from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { FileText, BookOpen, Video, Link as LinkIcon, Loader2, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
-import {Button} from '@/components/ui/button';
-import type {User} from 'firebase/auth';
-import {Progress} from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
+import type { User } from 'firebase/auth';
 import PerformanceHub from '@/components/dashboards/PerformanceHub';
 import WeeklyFocus from './WeeklyFocus';
+import { useResources } from '@/contexts/ResourcesContext';
+import type { Resource } from '@/contexts/ResourcesContext';
 
-const recentResources = [
-  {title: 'CS101 Syllabus', type: 'PDF', icon: FileText, course: 'Intro to CS'},
-  {title: 'Chapter 3 Reading', type: 'Document', icon: BookOpen, course: 'Linear Algebra'},
-  {title: 'Lab Safety Guidelines', type: 'PDF', icon: FileText, course: 'Classical Mechanics'},
-];
+const resourceIcons = {
+  Article: FileText,
+  Document: BookOpen,
+  Video: Video,
+  Link: LinkIcon,
+};
 
 interface StudentDashboardProps {
   user: User | null;
 }
 
 export default function StudentDashboard({user}: StudentDashboardProps) {
+  const { resources, loading: resourcesLoading } = useResources();
+
+  const recentResources = useMemo(() => {
+    return resources.slice(0, 3);
+  }, [resources]);
+
   return (
     <div className="space-y-6">
       <div className="space-y-1">
@@ -53,22 +57,37 @@ export default function StudentDashboard({user}: StudentDashboardProps) {
             <CardDescription>Quick access to recently added materials.</CardDescription>
           </CardHeader>
           <CardContent className="grid flex-1 gap-4">
-            {recentResources.map((resource, index) => (
-              <div key={index} className="flex items-center gap-4">
-                <div className="rounded-lg bg-muted p-3">
-                  <resource.icon className="h-6 w-6 text-muted-foreground" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium">{resource.title}</p>
-                  <p className="text-sm text-muted-foreground">{resource.course}</p>
-                </div>
+            {resourcesLoading ? (
+              <div className="flex items-center justify-center h-full">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
-            ))}
+            ) : recentResources.length > 0 ? (
+              recentResources.map((resource: Resource) => {
+                const Icon = resourceIcons[resource.type] || BookOpen;
+                return (
+                  <div key={resource.id} className="flex items-center gap-4">
+                    <div className="rounded-lg bg-muted p-3">
+                      <Icon className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium">{resource.title}</p>
+                      <p className="text-sm text-muted-foreground">
+                        <Badge variant="secondary">{resource.type}</Badge>
+                      </p>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <p className="text-center text-sm text-muted-foreground h-full flex items-center justify-center">
+                No resources have been added yet.
+              </p>
+            )}
           </CardContent>
           <CardFooter>
             <Button variant="outline" className="w-full" asChild>
               <Link href="/resources">
-                Go to Resource Center
+                Go to Resource Center <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
           </CardFooter>
