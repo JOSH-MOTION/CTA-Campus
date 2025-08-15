@@ -46,6 +46,14 @@ export default function StudentSignupPage() {
       router.push('/');
     }
   }, [user, router]);
+  
+  useEffect(() => {
+      if (lessonType === 'online') {
+          setLessonTime('6:00 PM');
+      } else {
+          setLessonTime('');
+      }
+  }, [lessonType]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -67,9 +75,7 @@ export default function StudentSignupPage() {
     e.preventDefault();
     setLoading(true);
 
-    const finalLessonTime = lessonType === 'online' ? '6:00 PM' : lessonTime;
-
-    if (lessonType === 'in-person' && !finalLessonTime) {
+    if (lessonType === 'in-person' && !lessonTime) {
       toast({
         variant: 'destructive',
         title: 'Missing Information',
@@ -95,7 +101,7 @@ export default function StudentSignupPage() {
         schoolId,
         lessonDay,
         lessonType,
-        lessonTime: finalLessonTime,
+        lessonTime: lessonTime,
         bio,
       });
 
@@ -212,7 +218,7 @@ export default function StudentSignupPage() {
                     <Label htmlFor="in-person">In-person</Label>
                   </div>
                 </RadioGroup>
-                {lessonType === 'in-person' && (
+                {lessonType === 'in-person' ? (
                     <Select onValueChange={setLessonTime} value={lessonTime}>
                         <SelectTrigger>
                              <Clock className="mr-2 h-4 w-4" />
@@ -223,6 +229,11 @@ export default function StudentSignupPage() {
                             <SelectItem value="12:30 PM">12:30 PM</SelectItem>
                         </SelectContent>
                     </Select>
+                ) : (
+                    <div className="flex items-center space-x-2 rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground">
+                        <Clock className="mr-2 h-4 w-4" />
+                        <span>6:00 PM</span>
+                    </div>
                 )}
               </div>
             </div>

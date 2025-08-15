@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Mail, MessageSquare, Info, GraduationCap, FileText, ExternalLink, Loader2, AlertTriangle, Award } from 'lucide-react';
+import { Mail, MessageSquare, Info, GraduationCap, FileText, ExternalLink, Loader2, AlertTriangle, Award, CalendarDays, Clock, Building, Computer } from 'lucide-react';
 import { UserData } from '@/contexts/AuthContext';
 import {
   Dialog,
@@ -185,19 +185,20 @@ export function StudentCard({ student }: StudentCardProps) {
                                     <CardTitle>Personal Info</CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
-                                    <div className="flex items-center gap-6">
+                                    <div className="flex items-start gap-6 flex-wrap">
                                         <Avatar className="h-28 w-28 border-4 border-background shadow-md">
                                             <AvatarImage src={student.photoURL} alt={student.displayName} />
                                             <AvatarFallback className="text-4xl">
                                                 {student.displayName ? student.displayName.charAt(0).toUpperCase() : 'U'}
                                             </AvatarFallback>
                                         </Avatar>
-                                        <div className="space-y-4 flex-1">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 flex-1">
                                             <InfoItem icon={GraduationCap} label="Generation" value={student.gen} />
                                             <InfoItem icon={Mail} label="Email" value={student.email} />
                                             <InfoItem icon={Info} label="School ID" value={student.schoolId} />
-                                            <InfoItem icon={Info} label="Lesson Day" value={student.lessonDay} />
-                                            <InfoItem icon={Info} label="Lesson Type" value={student.lessonType} />
+                                            <InfoItem icon={CalendarDays} label="Lesson Day" value={student.lessonDay} />
+                                            <InfoItem icon={Clock} label="Lesson Time" value={student.lessonTime} />
+                                            <InfoItem icon={student.lessonType === 'online' ? Computer : Building} label="Lesson Type" value={student.lessonType} />
                                         </div>
                                     </div>
                                     {student.bio && (
