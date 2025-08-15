@@ -500,40 +500,29 @@ export const RoadmapProvider: FC<{children: ReactNode}> = ({children}) => {
   }, []);
 
   const { currentWeek, nextWeek, allWeeksCompleted } = useMemo(() => {
-    // Find the index of the last completed week in the flattened list.
     const lastCompletedIndex = allFlattenedWeeks.findLastIndex(week =>
         completedWeeks.has(`${week.subjectTitle}-${week.weekTitle}`)
     );
 
-    // If no weeks are completed, the first week is the current focus.
     if (lastCompletedIndex === -1) {
         return { currentWeek: allFlattenedWeeks[0] || null, nextWeek: allFlattenedWeeks[1] || null, allWeeksCompleted: false };
     }
     
-    // If the last completed week is the very last week of the entire roadmap.
     if (lastCompletedIndex === allFlattenedWeeks.length - 1) {
         return { currentWeek: allFlattenedWeeks[lastCompletedIndex], nextWeek: null, allWeeksCompleted: true };
     }
 
-    const lastCompletedWeek = allFlattenedWeeks[lastCompletedIndex];
-    const potentialNextWeek = allFlattenedWeeks[lastCompletedIndex + 1];
+    // The next chronological week is the current focus
+    const currentFocusWeek = allFlattenedWeeks[lastCompletedIndex + 1];
+    // The week after that is the 'next week'
+    const nextFocusWeek = allFlattenedWeeks[lastCompletedIndex + 2] || null;
 
-    // Check if the next week is in the same subject.
-    if (potentialNextWeek && potentialNextWeek.subjectTitle === lastCompletedWeek.subjectTitle) {
-        // The next week is in the same subject, so it's the "next focus".
-        return { 
-            currentWeek: lastCompletedWeek, 
-            nextWeek: potentialNextWeek,
-            allWeeksCompleted: false
-        };
-    } else {
-        // The last completed week was the final week of its subject. The "next week" is null.
-        return {
-            currentWeek: lastCompletedWeek,
-            nextWeek: null,
-            allWeeksCompleted: false
-        }
+    return {
+        currentWeek: currentFocusWeek,
+        nextWeek: nextFocusWeek,
+        allWeeksCompleted: false
     }
+
   }, [completedWeeks, allFlattenedWeeks]);
 
   const toggleWeekCompletion = (weekId: string, gen: string, currentStatus: boolean) => {
