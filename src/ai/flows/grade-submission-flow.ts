@@ -13,7 +13,6 @@ import { z } from 'genkit';
 import { db } from '@/lib/firebase';
 import { doc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 
-
 const GradeSubmissionInputSchema = z.object({
   submissionId: z.string().describe("The ID of the submission document to grade."),
   studentId: z.string().describe("The UID of the student who made the submission."),
@@ -29,11 +28,20 @@ const GradeSubmissionOutputSchema = z.object({
 });
 export type GradeSubmissionOutput = z.infer<typeof GradeSubmissionOutputSchema>;
 
+// This flow is now secured by an auth policy.
 export const gradeSubmissionFlow = ai.defineFlow(
   {
     name: 'gradeSubmissionFlow',
     inputSchema: GradeSubmissionInputSchema,
     outputSchema: GradeSubmissionOutputSchema,
+    auth: (auth, input) => {
+        if (!auth) {
+            throw new Error('Authentication is required.');
+        }
+        if (auth.role !== 'teacher' && auth.role !== 'admin') {
+            throw new Error('You do not have permission to grade submissions.');
+        }
+    }
   },
   async (input) => {
     const { submissionId, studentId, grade, feedback, assignmentTitle } = input;
