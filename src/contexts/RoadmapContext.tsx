@@ -274,28 +274,16 @@ const roadmapData: RoadmapSubject[] = [
           {id: 'react-7-2', title: 'Kawolegal website project (assignment)'},
         ],
       },
-      {
-        title: 'Week 8',
-        topics: [{id: 'react-8-1', title: 'Making API requests (in functional components using fetch or axios)'}],
-      },
-      {
-        title: 'Week 9',
-        topics: [{id: 'react-9-1', title: 'Zustand intro (flux architecture, setup - store, reducers, actions )'}],
-      },
+      {title: 'Week 8', topics: [{id: 'react-8-1', title: 'Making API requests (in functional components using fetch or axios)'}]},
+      {title: 'Week 9', topics: [{id: 'react-9-1', title: 'Zustand intro (flux architecture, setup - store, reducers, actions )'}]},
       {
         title: 'Week 10',
         topics: [
           {id: 'react-10-1', title: 'Zustand (connect to components, mapStateToProps, MapDispatchToProps - create and retrieve) - Bank account project (assignment)'},
         ],
       },
-      {
-        title: 'Week 11',
-        topics: [{id: 'react-11-1', title: 'Zustand (edit and delete) - continue Bank account management project (assignment)'}],
-      },
-      {
-        title: 'Week 12',
-        topics: [{id: 'react-12-1', title: 'React Project(CRUD application with redux - Notes project)'}],
-      },
+      {title: 'Week 11', topics: [{id: 'react-11-1', title: 'Zustand (edit and delete) - continue Bank account management project (assignment)'}]},
+      {title: 'Week 12', topics: [{id: 'react-12-1', title: 'React Project(CRUD application with redux - Notes project)'}]},
     ],
   },
   {
@@ -500,29 +488,29 @@ export const RoadmapProvider: FC<{children: ReactNode}> = ({children}) => {
   }, []);
 
   const { currentWeek, nextWeek, allWeeksCompleted } = useMemo(() => {
-    const lastCompletedIndex = allFlattenedWeeks.findLastIndex(week =>
-        completedWeeks.has(`${week.subjectTitle}-${week.weekTitle}`)
+    // Find the first week in the flattened list that is NOT completed.
+    const firstUncompletedIndex = allFlattenedWeeks.findIndex(
+        week => !completedWeeks.has(`${week.subjectTitle}-${week.weekTitle}`)
     );
 
-    if (lastCompletedIndex === -1) {
-        return { currentWeek: allFlattenedWeeks[0] || null, nextWeek: allFlattenedWeeks[1] || null, allWeeksCompleted: false };
+    // If all weeks are completed, the index will be -1.
+    if (firstUncompletedIndex === -1 && allFlattenedWeeks.length > 0) {
+        return {
+            currentWeek: allFlattenedWeeks[allFlattenedWeeks.length - 1], // Show the last week
+            nextWeek: null,
+            allWeeksCompleted: true,
+        };
     }
     
-    if (lastCompletedIndex === allFlattenedWeeks.length - 1) {
-        return { currentWeek: allFlattenedWeeks[lastCompletedIndex], nextWeek: null, allWeeksCompleted: true };
-    }
-
-    // The next chronological week is the current focus
-    const currentFocusWeek = allFlattenedWeeks[lastCompletedIndex + 1];
-    // The week after that is the 'next week'
-    const nextFocusWeek = allFlattenedWeeks[lastCompletedIndex + 2] || null;
+    // If no weeks are completed (or the list is empty), the current week is the first one.
+    const currentFocusWeek = allFlattenedWeeks[firstUncompletedIndex] || null;
+    const nextFocusWeek = allFlattenedWeeks[firstUncompletedIndex + 1] || null;
 
     return {
         currentWeek: currentFocusWeek,
         nextWeek: nextFocusWeek,
-        allWeeksCompleted: false
-    }
-
+        allWeeksCompleted: false,
+    };
   }, [completedWeeks, allFlattenedWeeks]);
 
   const toggleWeekCompletion = (weekId: string, gen: string, currentStatus: boolean) => {
