@@ -16,7 +16,6 @@ import NextLink from 'next/link';
 import { Carousel, CarouselContent, CarouselItem } from '@/components/ui/carousel';
 
 const HUNDRED_DAYS_OF_CODE_ASSIGNMENT_ID = '100-days-of-code';
-const HUNDRED_DAYS_OF_CODE_POINTS = 0.5;
 const HUNDRED_DAYS_OF_CODE_CATEGORY = '100 Days of Code';
 
 const motivationalQuotes = [
@@ -97,12 +96,11 @@ export default function OneHundredDaysOfCodePage() {
         submissionLink: link,
         submissionNotes: `Submission for date: ${submissionDate}`,
         pointCategory: HUNDRED_DAYS_OF_CODE_CATEGORY,
-        pointsToAward: HUNDRED_DAYS_OF_CODE_POINTS,
       });
 
       toast({
         title: 'Progress Submitted!',
-        description: `You earned ${HUNDRED_DAYS_OF_CODE_POINTS} points for your daily post.`,
+        description: `Your submission is awaiting review from your teacher.`,
       });
       // Show summary for what was just submitted
       setLastSubmission({ link, date: submissionDate });

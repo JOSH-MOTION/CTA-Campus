@@ -1,7 +1,7 @@
 // src/app/(app)/100-days-of-code/submissions/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Submission, deleteSubmission, fetchSubmissions } from '@/services/submissions';
@@ -10,11 +10,12 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
-import { ArrowLeft, ExternalLink, Loader2, Trash2 } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Loader2, Trash2, CheckCircle, XCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { awardPointsFlow } from '@/ai/flows/award-points-flow';
+import { GradeSubmissionDialog } from '@/components/submissions/GradeSubmissionDialog';
 
 const HUNDRED_DAYS_OF_CODE_ASSIGNMENT_ID = '100-days-of-code';
 
@@ -26,39 +27,37 @@ export default function HundredDaysSubmissionsPage() {
   const { toast } = useToast();
   const [submissionToDelete, setSubmissionToDelete] = useState<Submission | null>(null);
 
-  useEffect(() => {
-    const getSubmissions = async () => {
-        setLoading(true);
-        try {
-            const newSubmissions = await fetchSubmissions(HUNDRED_DAYS_OF_CODE_ASSIGNMENT_ID);
-            setSubmissions(newSubmissions);
-        } catch (error) {
-            console.error("Error fetching submissions:", error);
-            toast({
-                variant: "destructive",
-                title: "Error",
-                description: "Could not load submissions."
-            });
-        } finally {
-            setLoading(false);
-        }
+  const getSubmissions = useCallback(async () => {
+    setLoading(true);
+    try {
+        const newSubmissions = await fetchSubmissions(HUNDRED_DAYS_OF_CODE_ASSIGNMENT_ID);
+        setSubmissions(newSubmissions);
+    } catch (error) {
+        console.error("Error fetching submissions:", error);
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Could not load submissions."
+        });
+    } finally {
+        setLoading(false);
     }
-    getSubmissions();
   }, [toast]);
+
+  useEffect(() => {
+    getSubmissions();
+  }, [getSubmissions]);
 
   if (role === 'student') {
     router.push('/100-days-of-code');
     return null;
   }
-
-  const handleDeleteSubmission = async () => {
-    if (!submissionToDelete) return;
+  
+  const handleRevoke = async (submission: Submission) => {
     try {
-        const activityId = `graded-submission-${submissionToDelete.id}`;
-        await deleteSubmission(submissionToDelete.id);
-        
+        const activityId = `100-days-of-code-${submission.assignmentTitle.replace('100 Days of Code - ', '')}`;
         await awardPointsFlow({
-            studentId: submissionToDelete.studentId,
+            studentId: submission.studentId,
             points: 0.5,
             reason: '100 Days of Code',
             activityId,
@@ -66,8 +65,31 @@ export default function HundredDaysSubmissionsPage() {
         });
 
         toast({
+            title: 'Points Revoked',
+            description: `The submission from ${submission?.studentName} has been updated and points revoked.`,
+        });
+        getSubmissions(); // Refresh submissions
+    } catch (error) {
+        toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: 'Could not revoke points for the submission.',
+        });
+    }
+  };
+
+
+  const handleDeleteSubmission = async () => {
+    if (!submissionToDelete) return;
+    try {
+        if (submissionToDelete.grade) {
+           await handleRevoke(submissionToDelete);
+        }
+        await deleteSubmission(submissionToDelete.id);
+        
+        toast({
             title: 'Submission Deleted',
-            description: `The submission from ${submissionToDelete?.studentName} has been removed and points have been revoked.`,
+            description: `The submission from ${submissionToDelete?.studentName} has been removed.`,
         });
         setSubmissions(prev => prev.filter(s => s.id !== submissionToDelete.id));
     } catch (error) {
@@ -136,8 +158,21 @@ export default function HundredDaysSubmissionsPage() {
                                     </Button>
                                 </TableCell>
                                 <TableCell className="text-right space-x-2">
+                                    {submission.grade ? (
+                                        <Button size="sm" variant="destructive" onClick={() => handleRevoke(submission)}>
+                                            <XCircle className="mr-2 h-4 w-4" />
+                                            Revoke
+                                        </Button>
+                                    ) : (
+                                        <GradeSubmissionDialog submission={submission} onGraded={getSubmissions}>
+                                            <Button size="sm">
+                                                <CheckCircle className="mr-2 h-4 w-4" />
+                                                Grade
+                                            </Button>
+                                        </GradeSubmissionDialog>
+                                    )}
                                     <Button 
-                                        variant="destructive"
+                                        variant="outline"
                                         size="icon"
                                         onClick={() => setSubmissionToDelete(submission)}
                                     >

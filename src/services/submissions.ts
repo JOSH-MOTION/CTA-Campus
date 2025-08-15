@@ -67,23 +67,6 @@ import { addNotificationForGen } from '@/services/notifications';
         submittedAt: serverTimestamp(),
     });
 
-    // Award points for 100 Days of Code immediately
-    if (pointsToAward && is100Days) {
-        const activityId = `100-days-of-code-${submissionData.assignmentTitle.replace('100 Days of Code - ', '')}`;
-        try {
-             await awardPointsFlow({
-                studentId: submissionData.studentId,
-                points: pointsToAward,
-                reason: '100 Days of Code',
-                activityId: activityId,
-                action: 'award',
-                assignmentTitle: submissionData.assignmentTitle
-            });
-        } catch(e) {
-            console.error(`Failed to award points for 100 Days of Code submission ${docRef.id}:`, e);
-        }
-    }
-
     // Send notification to all staff
     try {
         await addNotificationForGen('All Staff', {
