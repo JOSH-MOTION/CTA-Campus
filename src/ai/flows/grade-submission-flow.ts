@@ -10,8 +10,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-// IMPORTANT: The admin SDK is initialized in firebase-admin.ts
-import { adminDb } from '@/lib/firebase-admin'; 
+import { adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 
 
