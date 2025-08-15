@@ -10,8 +10,9 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { db } from '@/lib/firebase';
-import { doc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { adminDb } from '@/lib/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
+
 
 const GradeSubmissionInputSchema = z.object({
   submissionId: z.string().describe("The ID of the submission document to grade."),
@@ -28,7 +29,6 @@ const GradeSubmissionOutputSchema = z.object({
 });
 export type GradeSubmissionOutput = z.infer<typeof GradeSubmissionOutputSchema>;
 
-// This flow is now secured by an auth policy.
 export const gradeSubmissionFlow = ai.defineFlow(
   {
     name: 'gradeSubmissionFlow',
@@ -39,10 +39,10 @@ export const gradeSubmissionFlow = ai.defineFlow(
     const { submissionId, studentId, grade, feedback, assignmentTitle } = input;
     
     try {
-      const submissionRef = doc(db, 'submissions', submissionId);
+      const submissionRef = adminDb.collection('submissions').doc(submissionId);
 
       // Update the submission document with the grade and feedback
-      await updateDoc(submissionRef, {
+      await submissionRef.update({
         grade: grade,
         feedback: feedback || '',
       });
@@ -54,9 +54,9 @@ export const gradeSubmissionFlow = ai.defineFlow(
         description: "Your submission has been graded by your teacher.",
         href: `/submissions`, // Simple link, can be improved to point to the exact item
         read: false,
-        date: serverTimestamp(),
+        date: FieldValue.serverTimestamp(),
       };
-      await addDoc(collection(db, 'notifications'), notification);
+      await adminDb.collection('notifications').add(notification);
 
       return { success: true, message: 'Submission graded successfully.' };
     } catch (error: any) {
@@ -66,5 +66,3 @@ export const gradeSubmissionFlow = ai.defineFlow(
     }
   }
 );
-
-    

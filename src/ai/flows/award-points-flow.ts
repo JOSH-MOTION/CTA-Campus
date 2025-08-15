@@ -11,8 +11,8 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { v4 as uuidv4 } from 'uuid';
-import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, deleteDoc, serverTimestamp, updateDoc, increment } from 'firebase/firestore';
+import { adminDb } from '@/lib/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 
 
 const AwardPointsFlowInputSchema = z.object({
@@ -40,42 +40,42 @@ export const awardPointsFlow = ai.defineFlow(
   },
   async (input) => {
     const { studentId, points, reason, activityId, action, assignmentTitle } = input;
-    const userDocRef = doc(db, 'users', studentId);
+    const userDocRef = adminDb.collection('users').doc(studentId);
     
     try {
       if (action === 'award') {
-        const pointDocRef = doc(db, 'users', studentId, 'points', activityId);
+        const pointDocRef = adminDb.collection('users').doc(studentId).collection('points').doc(activityId);
 
         // Atomically increment the totalPoints on the user document
-        await updateDoc(userDocRef, {
-            totalPoints: increment(points)
+        await userDocRef.update({
+            totalPoints: FieldValue.increment(points)
         });
 
         // Create a log entry in the subcollection
-        await setDoc(pointDocRef, {
+        await pointDocRef.set({
             points,
             reason,
             assignmentTitle: assignmentTitle || reason, // Fallback to reason if title not provided
             activityId,
-            awardedAt: serverTimestamp(),
+            awardedAt: FieldValue.serverTimestamp(),
         });
         
         return { success: true, message: 'Points awarded successfully.' };
 
       } else { // action === 'revoke'
-        const pointToRevokeRef = doc(db, 'users', studentId, 'points', activityId);
+        const pointToRevokeRef = adminDb.collection('users').doc(studentId).collection('points').doc(activityId);
         
-        const docSnap = await getDoc(pointToRevokeRef);
-        if (docSnap.exists()) {
-            const pointsToRevoke = docSnap.data().points || 0;
+        const docSnap = await pointToRevokeRef.get();
+        if (docSnap.exists) {
+            const pointsToRevoke = docSnap.data()?.points || 0;
             
             // Atomically decrement the totalPoints on the user document
-            await updateDoc(userDocRef, {
-                totalPoints: increment(-pointsToRevoke)
+            await userDocRef.update({
+                totalPoints: FieldValue.increment(-pointsToRevoke)
             });
 
             // Delete the log entry
-            await deleteDoc(pointToRevokeRef);
+            await pointToRevokeRef.delete();
             return { success: true, message: "Points revoked successfully." };
         }
         
