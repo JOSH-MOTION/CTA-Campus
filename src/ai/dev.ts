@@ -2,7 +2,9 @@
 import { config } from 'dotenv';
 config();
 
-import '@/lib/firebase-admin'; // Ensures Firebase Admin is initialized first
+import { initializeAdmin } from '@/lib/firebase-admin'; // Ensures Firebase Admin is initialized first
+initializeAdmin();
+
 import '@/ai/flows/resource-summarizer.ts';
 import '@/ai/flows/faq-chatbot.ts';
 import '@/ai/flows/suggested-contact-method.ts';
