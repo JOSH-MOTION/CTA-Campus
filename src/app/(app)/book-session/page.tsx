@@ -59,9 +59,10 @@ export default function BookSessionPage() {
         const end = parse(slot.endTime, 'HH:mm', new Date());
         const slots = [];
         let current = start;
+        // Generate slots every 30 minutes
         while(current < end) {
             slots.push(format(current, 'HH:mm'));
-            current.setHours(current.getHours() + 1);
+            current.setMinutes(current.getMinutes() + 30);
         }
         return slots;
     });

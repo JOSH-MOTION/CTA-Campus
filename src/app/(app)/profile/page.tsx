@@ -26,8 +26,6 @@ const profileSchema = z.object({
   // student specific
   gen: z.string().optional(),
   lessonDay: z.string().optional(),
-  lessonType: z.string().optional(),
-  lessonTime: z.string().optional(),
   // teacher specific
   gensTaught: z.string().optional(),
   linkedin: z.string().url("Please enter a valid URL.").optional().or(z.literal('')),
@@ -51,15 +49,11 @@ export default function ProfilePage() {
       bio: '',
       gen: '',
       lessonDay: '',
-      lessonType: '',
-      lessonTime: '',
       gensTaught: '',
       linkedin: '',
       github: '',
     }
   });
-  
-  const lessonType = form.watch('lessonType');
 
   useEffect(() => {
     if (user?.photoURL) {
@@ -71,8 +65,6 @@ export default function ProfilePage() {
         bio: userData.bio || '',
         gen: userData.gen || '',
         lessonDay: userData.lessonDay || '',
-        lessonType: userData.lessonType || '',
-        lessonTime: userData.lessonTime || '',
         gensTaught: userData.gensTaught || '',
         linkedin: userData.linkedin || '',
         github: userData.github || '',
@@ -131,12 +123,10 @@ export default function ProfilePage() {
     let lessonDetailsChanged = false;
     if (role === 'student') {
         updateData.gen = data.gen;
-        if (userData.lessonDay !== data.lessonDay || userData.lessonType !== data.lessonType || userData.lessonTime !== data.lessonTime) {
+        if (userData.lessonDay !== data.lessonDay) {
             lessonDetailsChanged = true;
         }
         updateData.lessonDay = data.lessonDay;
-        updateData.lessonType = data.lessonType;
-        updateData.lessonTime = data.lessonType === 'online' ? '6:00 PM' : data.lessonTime;
         if(lessonDetailsChanged && !userData.hasEditedLessonDetails) {
             updateData.hasEditedLessonDetails = true;
         }
@@ -293,53 +283,6 @@ export default function ProfilePage() {
                                     </FormItem>
                                 )}
                             />
-                        </div>
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            <FormField
-                                control={form.control}
-                                name="lessonType"
-                                render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Lesson Type</FormLabel>
-                                    <Select onValueChange={field.onChange} value={field.value} disabled={lessonDetailsLocked}>
-                                        <FormControl>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select a type" />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            <SelectItem value="online">Online</SelectItem>
-                                            <SelectItem value="in-person">In-person</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                                )}
-                            />
-                             {lessonType === 'in-person' && (
-                                <FormField
-                                    control={form.control}
-                                    name="lessonTime"
-                                    render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Lesson Time</FormLabel>
-                                        <Select onValueChange={field.onChange} value={field.value} disabled={lessonDetailsLocked}>
-                                            <FormControl>
-                                                <SelectTrigger>
-                                                     <Clock className="mr-2 h-4 w-4" />
-                                                    <SelectValue placeholder="Select a time" />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                <SelectItem value="10:30 AM">10:30 AM</SelectItem>
-                                                <SelectItem value="12:30 PM">12:30 PM</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                    )}
-                                />
-                             )}
                         </div>
                         {lessonDetailsLocked && <p className="text-xs text-muted-foreground pt-1">Lesson details can only be set once. Please contact an admin to make changes.</p>}
                         </>

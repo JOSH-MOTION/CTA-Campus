@@ -17,7 +17,12 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-const timeSlots = Array.from({ length: 24 }, (_, i) => `${i.toString().padStart(2, '0')}:00`);
+const timeSlots = Array.from({ length: 24 * 2 }, (_, i) => {
+    const hour = Math.floor(i / 2);
+    const minute = i % 2 === 0 ? '00' : '30';
+    const formattedHour = hour.toString().padStart(2, '0');
+    return `${formattedHour}:${minute}`;
+});
 
 const availabilitySchema = z.object({
   availableDays: z.array(z.string()).refine(value => value.some(item => item), {
