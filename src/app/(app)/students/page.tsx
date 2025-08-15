@@ -11,6 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Cell } from 'recharts';
 import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 import { StudentCard } from '@/components/students/StudentCard';
+import { onSnapshot, collection, query, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 
 interface StudentDetail extends UserData {
@@ -20,30 +22,31 @@ interface StudentDetail extends UserData {
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
 export default function StudentsPage() {
-  const { fetchAllStudents } = useAuth();
   const [studentDetails, setStudentDetails] = useState<StudentDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGen, setSelectedGen] = useState('all');
 
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      try {
-        const students = await fetchAllStudents();
-        const details = students.map(student => ({
-            ...student,
-            totalPoints: student.totalPoints || 0
-        }));
-        setStudentDetails(details);
-      } catch (error) {
-        console.error("Failed to load rankings data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadData();
-  }, [fetchAllStudents]);
+    setLoading(true);
+    const usersCollection = collection(db, 'users');
+    const q = query(usersCollection, where('role', '==', 'student'));
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const students = querySnapshot.docs.map(doc => doc.data() as UserData);
+      const details = students.map(student => ({
+        ...student,
+        totalPoints: student.totalPoints || 0,
+      }));
+      setStudentDetails(details);
+      setLoading(false);
+    }, (error) => {
+      console.error("Failed to load rankings data:", error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe(); // Cleanup listener on component unmount
+  }, []);
 
   const availableGens = useMemo(() => {
     const gens = new Set(studentDetails.map(student => student.gen).filter(Boolean));
