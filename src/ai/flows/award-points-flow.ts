@@ -45,40 +45,49 @@ export const awardPointsFlow = ai.defineFlow(
     try {
       const userDoc = await getDoc(userDocRef);
       if (!userDoc.exists() && action === 'award') {
+          // If the user document doesn't exist, we can't award points to them.
+          // For revoking, we proceed because the doc might have been deleted, but points still need to be adjusted.
           return { success: false, message: 'User not found.' };
       }
       
       if (action === 'award') {
+        // Use a consistent ID for the check to prevent duplicates.
         const pointDocRefForCheck = doc(db, 'users', studentId, 'points', activityId);
         const pointDocSnap = await getDoc(pointDocRefForCheck);
         
         if (pointDocSnap.exists()) {
+            // Points for this specific activity have already been awarded.
             return { success: true, message: 'duplicate' };
         }
 
+        // Use a new unique ID for the actual log entry to support multiple manual awards for the same reason.
         const newPointLogId = uuidv4();
         const pointDocRef = doc(db, 'users', studentId, 'points', newPointLogId);
 
+        // Ensure totalPoints field exists before incrementing.
         if (!userDoc.data()?.totalPoints) {
             await setDoc(userDocRef, { totalPoints: 0 }, { merge: true });
         }
 
+        // Atomically increment the totalPoints on the user document
         await updateDoc(userDocRef, {
             totalPoints: increment(points)
         });
 
+        // Create a log entry in the subcollection
         await setDoc(pointDocRef, {
             points,
             reason,
             assignmentTitle: assignmentTitle || reason,
             activityId, // Keep original activityId for lookup if needed
-            pointLogId: newPointLogId,
+            pointLogId: newPointLogId, // Store the unique ID for potential revocation
             awardedAt: serverTimestamp(),
         });
         
         return { success: true, message: 'Points awarded successfully.' };
 
       } else { // action === 'revoke'
+        // Revoking requires a specific pointLogId to target the exact entry.
         if (!pointLogId) {
             return { success: false, message: "pointLogId is required to revoke points." };
         }
@@ -89,14 +98,17 @@ export const awardPointsFlow = ai.defineFlow(
         if (docSnap.exists()) {
             const pointsToRevoke = docSnap.data().points || 0;
             
+            // Ensure totalPoints field exists before decrementing.
             if (!userDoc.data()?.totalPoints) {
                 await setDoc(userDocRef, { totalPoints: 0 }, { merge: true });
             }
 
+            // Atomically decrement the totalPoints on the user document
             await updateDoc(userDocRef, {
                 totalPoints: increment(-pointsToRevoke)
             });
 
+            // Delete the log entry
             await deleteDoc(pointDocRef);
             return { success: true, message: "Points revoked successfully." };
         }
