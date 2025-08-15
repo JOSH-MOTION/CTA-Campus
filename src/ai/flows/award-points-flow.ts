@@ -42,14 +42,24 @@ export const awardPointsFlow = ai.defineFlow(
     const userDocRef = doc(db, 'users', studentId);
     
     try {
-      if (action === 'award') {
-        const pointDocRef = doc(db, 'users', studentId, 'points', activityId);
+      const userDoc = await getDoc(userDocRef);
+      if (!userDoc.exists() && action === 'award') {
+          // If user doc doesn't exist, we can't award points.
+          // For revoke, we might still need to delete the point log.
+          return { success: false, message: 'User not found.' };
+      }
+      
+      const pointDocRef = doc(db, 'users', studentId, 'points', activityId);
 
+      if (action === 'award') {
         const pointDocSnap = await getDoc(pointDocRef);
         if (pointDocSnap.exists()) {
-            // Points already awarded for this activity, so it's a "success" in that the desired state is met.
-            // The frontend can interpret the 'duplicate' message to avoid showing an error.
             return { success: true, message: 'duplicate' };
+        }
+
+        // Initialize totalPoints if it doesn't exist
+        if (!userDoc.data()?.totalPoints) {
+            await setDoc(userDocRef, { totalPoints: 0 }, { merge: true });
         }
 
         // Atomically increment the totalPoints on the user document
@@ -61,7 +71,7 @@ export const awardPointsFlow = ai.defineFlow(
         await setDoc(pointDocRef, {
             points,
             reason,
-            assignmentTitle: assignmentTitle || reason, // Fallback to reason if title not provided
+            assignmentTitle: assignmentTitle || reason,
             activityId,
             awardedAt: serverTimestamp(),
         });
@@ -69,19 +79,22 @@ export const awardPointsFlow = ai.defineFlow(
         return { success: true, message: 'Points awarded successfully.' };
 
       } else { // action === 'revoke'
-        const pointToRevokeRef = doc(db, 'users', studentId, 'points', activityId);
-        
-        const docSnap = await getDoc(pointToRevokeRef);
+        const docSnap = await getDoc(pointDocRef);
         if (docSnap.exists()) {
             const pointsToRevoke = docSnap.data().points || 0;
             
+             // Initialize totalPoints if it doesn't exist to prevent decrementing a non-existent field
+            if (!userDoc.data()?.totalPoints) {
+                await setDoc(userDocRef, { totalPoints: 0 }, { merge: true });
+            }
+
             // Atomically decrement the totalPoints on the user document
             await updateDoc(userDocRef, {
                 totalPoints: increment(-pointsToRevoke)
             });
 
             // Delete the log entry
-            await deleteDoc(pointToRevokeRef);
+            await deleteDoc(pointDocRef);
             return { success: true, message: "Points revoked successfully." };
         }
         
