@@ -62,7 +62,6 @@ export function GradeSubmissionDialog({ children, submission, onGraded }: GradeS
   const form = useForm<GradingFormValues>({
     resolver: zodResolver(gradingSchema),
     defaultValues: {
-      // @ts-ignore
       feedback: submission.feedback || '',
     },
   });
@@ -91,8 +90,11 @@ export function GradeSubmissionDialog({ children, submission, onGraded }: GradeS
             assignmentTitle: submission.assignmentTitle,
         });
 
-        if (!awardResult.success && awardResult.message !== 'duplicate') {
-            throw new Error(awardResult.message);
+        if (!awardResult.success) {
+            // Allow duplicates to proceed to grading without showing an error
+            if (awardResult.message !== 'duplicate') {
+                throw new Error(awardResult.message);
+            }
         }
 
         // Then, update the submission document with grade and feedback

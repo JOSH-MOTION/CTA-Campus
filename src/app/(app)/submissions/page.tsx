@@ -4,7 +4,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth, UserData } from '@/contexts/AuthContext';
-import { getAllSubmissions, Submission } from '@/services/submissions';
+import { getAllSubmissions, Submission, deleteSubmission } from '@/services/submissions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -21,6 +21,7 @@ import { awardPointsFlow } from '@/ai/flows/award-points-flow';
 import { cn } from '@/lib/utils';
 import Papa from 'papaparse';
 import { GradeSubmissionDialog } from '@/components/submissions/GradeSubmissionDialog';
+import { gradeSubmissionFlow } from '@/ai/flows/grade-submission-flow';
 
 const submissionCategories = ['All', 'Class Assignments', 'Class Exercises', 'Weekly Projects', '100 Days of Code'];
 
@@ -34,10 +35,8 @@ const getActivityIdForSubmission = (submission: Submission): string => {
         case 'Weekly Projects':
             return `graded-project-${submission.id}`;
         case '100 Days of Code':
-            // This format must exactly match the one used when submitting
             return `100-days-of-code-${submission.assignmentTitle.replace('100 Days of Code - ', '')}`;
         default:
-            // Fallback, though should not be reached with current categories
             return `graded-submission-${submission.id}`;
     }
 };
@@ -53,6 +52,7 @@ export default function AllSubmissionsPage() {
   const [selectedGen, setSelectedGen] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [isClearing, setIsClearing] = useState(false);
+  const [submissionToDelete, setSubmissionToDelete] = useState<Submission | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -102,40 +102,67 @@ export default function AllSubmissionsPage() {
   }, [submissions, allStudents, searchTerm, selectedGen, selectedCategory]);
 
   const handleRevoke = async (submission: Submission) => {
-    const originalGrade = submission.grade;
-    // Optimistically update UI
-    setSubmissions(prev => prev.map(s => s.id === submission.id ? { ...s, grade: undefined } : s));
-
     const activityId = getActivityIdForSubmission(submission);
-    const points = submission.pointCategory === '100 Days of Code' ? 0.5 : 1;
-
+    
     try {
       const result = await awardPointsFlow({
           studentId: submission.studentId,
-          points: points,
+          points: 0, // Not used, but required by schema
           reason: submission.pointCategory,
-          activityId,
+          activityId: activityId, // Not used for revoke, but required
           action: 'revoke',
+          pointLogId: activityId, // Use the unique activity ID as the log ID to revoke
           assignmentTitle: submission.assignmentTitle,
       });
+
        if (!result.success) throw new Error(result.message);
        
+      await gradeSubmissionFlow({
+            submissionId: submission.id,
+            studentId: submission.studentId,
+            assignmentTitle: submission.assignmentTitle,
+            grade: undefined, // Set grade to undefined to mark as not graded
+            feedback: "Points revoked.",
+      });
+
       await fetchData();
       
       toast({
         title: 'Points Revoked',
         description: `Points for ${submission.studentName} have been revoked.`,
       });
-    } catch (error) {
+    } catch (error: any) {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Could not revoke points.',
+        description: error.message || 'Could not revoke points.',
       });
-       // Revert optimistic update on failure
-      setSubmissions(prev => prev.map(s => s.id === submission.id ? { ...s, grade: originalGrade } : s));
     }
   };
+  
+  const handleDelete = async () => {
+      if (!submissionToDelete) return;
+
+      try {
+          if(submissionToDelete.grade) {
+              await handleRevoke(submissionToDelete);
+          }
+          await deleteSubmission(submissionToDelete.id);
+          toast({
+              title: 'Submission Deleted',
+              description: 'The submission has been permanently removed.'
+          });
+          fetchData();
+      } catch (error) {
+           toast({
+              variant: 'destructive',
+              title: 'Error',
+              description: 'Could not delete submission.'
+          });
+      } finally {
+          setSubmissionToDelete(null);
+      }
+  }
 
 
   if (role === 'student') {
@@ -192,6 +219,7 @@ export default function AllSubmissionsPage() {
 
 
   return (
+    <>
     <div className="space-y-6">
       <div className="space-y-1">
         <h1 className="text-3xl font-bold tracking-tight">All Submissions</h1>
@@ -275,6 +303,7 @@ export default function AllSubmissionsPage() {
               <Loader2 className="h-12 w-12 animate-spin text-muted-foreground" />
             </div>
           ) : (
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -294,8 +323,8 @@ export default function AllSubmissionsPage() {
                             <TableCell className="font-medium">{submission.studentName}</TableCell>
                             <TableCell><Badge variant="secondary">{submission.studentGen}</Badge></TableCell>
                             <TableCell>
-                                <p>{submission.assignmentTitle}</p>
-                                <Badge variant="outline">{submission.pointCategory}</Badge>
+                                <p className="font-medium">{submission.assignmentTitle}</p>
+                                <Badge variant="outline" className="mt-1">{submission.pointCategory}</Badge>
                             </TableCell>
                             <TableCell>{formatDistanceToNow(submission.submittedAt.toDate(), { addSuffix: true })}</TableCell>
                             <TableCell>
@@ -326,6 +355,13 @@ export default function AllSubmissionsPage() {
                                         </Button>
                                     </GradeSubmissionDialog>
                                 )}
+                                 <Button 
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => setSubmissionToDelete(submission)}
+                                >
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
                             </TableCell>
                         </TableRow>
                     )
@@ -339,9 +375,26 @@ export default function AllSubmissionsPage() {
                 )}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>
     </div>
+    <AlertDialog open={!!submissionToDelete} onOpenChange={(open) => !open && setSubmissionToDelete(null)}>
+        <AlertDialogContent>
+        <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the submission from{' '}
+                <span className="font-semibold">{submissionToDelete?.studentName}</span>. Any points awarded will be revoked.
+            </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+        </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

@@ -28,6 +28,7 @@ export type AwardPointsFlowInput = z.infer<typeof AwardPointsFlowInputSchema>;
 const AwardPointsFlowOutputSchema = z.object({
   success: z.boolean(),
   message: z.string(),
+  pointLogId: z.string().optional(),
 });
 export type AwardPointsFlowOutput = z.infer<typeof AwardPointsFlowOutputSchema>;
 
@@ -43,82 +44,66 @@ export const awardPointsFlow = ai.defineFlow(
     const userDocRef = doc(db, 'users', studentId);
     
     try {
-      const userDoc = await getDoc(userDocRef);
-      if (!userDoc.exists() && action === 'award') {
-          // If the user document doesn't exist, we can't award points to them.
-          // For revoking, we proceed because the doc might have been deleted, but points still need to be adjusted.
-          return { success: false, message: 'User not found.' };
-      }
-      
-      if (action === 'award') {
-        // Use a consistent ID for the check to prevent duplicates.
-        const pointDocRefForCheck = doc(db, 'users', studentId, 'points', activityId);
-        const pointDocSnap = await getDoc(pointDocRefForCheck);
-        
-        if (pointDocSnap.exists()) {
-            // Points for this specific activity have already been awarded.
-            return { success: true, message: 'duplicate' };
+        const userDoc = await getDoc(userDocRef);
+        if (!userDoc.exists() && action === 'award') {
+            return { success: false, message: 'User not found.' };
         }
 
-        // Use a new unique ID for the actual log entry to support multiple manual awards for the same reason.
-        const newPointLogId = uuidv4();
-        const pointDocRef = doc(db, 'users', studentId, 'points', newPointLogId);
+        if (action === 'award') {
+            const pointDocRefForCheck = doc(db, 'users', studentId, 'points', activityId);
+            const pointDocSnap = await getDoc(pointDocRefForCheck);
 
-        // Ensure totalPoints field exists before incrementing.
-        if (!userDoc.data()?.totalPoints) {
-            await setDoc(userDocRef, { totalPoints: 0 }, { merge: true });
-        }
+            if (pointDocSnap.exists()) {
+                return { success: true, message: 'duplicate', pointLogId: pointDocSnap.id };
+            }
 
-        // Atomically increment the totalPoints on the user document
-        await updateDoc(userDocRef, {
-            totalPoints: increment(points)
-        });
-
-        // Create a log entry in the subcollection
-        await setDoc(pointDocRef, {
-            points,
-            reason,
-            assignmentTitle: assignmentTitle || reason,
-            activityId, // Keep original activityId for lookup if needed
-            pointLogId: newPointLogId, // Store the unique ID for potential revocation
-            awardedAt: serverTimestamp(),
-        });
-        
-        return { success: true, message: 'Points awarded successfully.' };
-
-      } else { // action === 'revoke'
-        // Revoking requires a specific pointLogId to target the exact entry.
-        if (!pointLogId) {
-            return { success: false, message: "pointLogId is required to revoke points." };
-        }
-        
-        const pointDocRef = doc(db, 'users', studentId, 'points', pointLogId);
-        const docSnap = await getDoc(pointDocRef);
-
-        if (docSnap.exists()) {
-            const pointsToRevoke = docSnap.data().points || 0;
-            
-            // Ensure totalPoints field exists before decrementing.
             if (!userDoc.data()?.totalPoints) {
                 await setDoc(userDocRef, { totalPoints: 0 }, { merge: true });
             }
 
-            // Atomically decrement the totalPoints on the user document
             await updateDoc(userDocRef, {
-                totalPoints: increment(-pointsToRevoke)
+                totalPoints: increment(points)
             });
 
-            // Delete the log entry
-            await deleteDoc(pointDocRef);
-            return { success: true, message: "Points revoked successfully." };
+            await setDoc(pointDocRefForCheck, {
+                points,
+                reason,
+                assignmentTitle: assignmentTitle || reason,
+                activityId,
+                awardedAt: serverTimestamp(),
+            });
+            
+            return { success: true, message: 'Points awarded successfully.', pointLogId: activityId };
+
+        } else { // action === 'revoke'
+            if (!pointLogId) {
+                return { success: false, message: "pointLogId is required to revoke points." };
+            }
+            
+            const pointDocRef = doc(db, 'users', studentId, 'points', pointLogId);
+            const docSnap = await getDoc(pointDocRef);
+
+            if (docSnap.exists()) {
+                const pointsToRevoke = docSnap.data().points || 0;
+                
+                if (!userDoc.data()?.totalPoints) {
+                    await setDoc(userDocRef, { totalPoints: 0 }, { merge: true });
+                }
+
+                await updateDoc(userDocRef, {
+                    totalPoints: increment(-pointsToRevoke)
+                });
+
+                await deleteDoc(pointDocRef);
+                return { success: true, message: "Points revoked successfully." };
+            }
+            
+            return { success: true, message: "Points already revoked or never existed." };
         }
-        
-        return { success: true, message: "Points already revoked or never existed." };
-      }
     } catch (error: any) {
-      console.error("Error processing points in flow:", error);
-      const errorMessage = error.message || "An unexpected error occurred.";
-      return { success: false, message: `Server error: Could not process points. Reason: ${errorMessage}` };
+        console.error("Error processing points in flow:", error);
+        const errorMessage = error.message || "An unexpected error occurred.";
+        return { success: false, message: `Server error: Could not process points. Reason: ${errorMessage}` };
     }
   }
 );
