@@ -61,6 +61,11 @@ export function AwardPointsDialog({ children, student }: AwardPointsDialogProps)
 
   const form = useForm<AwardFormValues>({
     resolver: zodResolver(awardSchema),
+    defaultValues: {
+      points: 0,
+      reason: '',
+      notes: '',
+    }
   });
 
   const onSubmit = async (data: AwardFormValues) => {
