@@ -39,9 +39,14 @@ export const AssignmentsProvider: FC<{children: ReactNode}> = ({children}) => {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const { addNotificationForGen } = useNotifications();
-  const { user, userData, role } = useAuth();
+  const { user, userData, role, loading: authLoading } = useAuth();
 
   useEffect(() => {
+     if (authLoading) {
+      setLoading(true);
+      return;
+    }
+
     if (!user) {
         setAssignments([]);
         setLoading(false);
@@ -60,6 +65,10 @@ export const AssignmentsProvider: FC<{children: ReactNode}> = ({children}) => {
         where('targetGen', 'in', [userData.gen, 'All Students', 'Everyone']),
         orderBy('createdAt', 'desc')
       );
+    } else if (role === 'student' && !userData?.gen) {
+        // New student might not have a gen yet, prevent query from running
+        setLoading(false);
+        return;
     } else {
       q = query(
         assignmentsCol,
@@ -84,7 +93,7 @@ export const AssignmentsProvider: FC<{children: ReactNode}> = ({children}) => {
     });
 
     return () => unsubscribe();
-  }, [user, role, userData]);
+  }, [user, role, userData, authLoading]);
 
 
   const addAssignment = useCallback(async (assignment: AssignmentData) => {

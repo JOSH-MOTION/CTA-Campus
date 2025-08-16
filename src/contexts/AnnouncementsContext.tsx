@@ -33,14 +33,20 @@ export const AnnouncementsProvider: FC<{children: ReactNode}> = ({children}) => 
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const { addNotificationForGen } = useNotifications();
-  const { user, userData, role } = useAuth();
+  const { user, userData, role, loading: authLoading } = useAuth();
 
   useEffect(() => {
+    // Wait for auth to finish loading and user to be determined
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
+    
     if (!user) {
         setLoading(false);
         setAnnouncements([]);
         return;
-    };
+    }
 
     setLoading(true);
     const announcementsCol = collection(db, 'announcements');
@@ -57,6 +63,10 @@ export const AnnouncementsProvider: FC<{children: ReactNode}> = ({children}) => 
             where('targetGen', 'in', [userData.gen, 'All Students', 'Everyone']),
             orderBy('date', 'desc')
         );
+    } else if (role === 'student' && !userData?.gen) {
+      // New student might not have a gen yet, prevent query from running
+      setLoading(false);
+      return;
     } else {
         // Fallback for users without a specific role/gen, only see 'Everyone'
         q = query(
@@ -96,7 +106,7 @@ export const AnnouncementsProvider: FC<{children: ReactNode}> = ({children}) => 
     });
 
     return () => unsubscribe();
-  }, [user, role, userData]);
+  }, [user, role, userData, authLoading]);
 
   const addAnnouncement = useCallback(async (announcement: Omit<Announcement, 'id' | 'date'>) => {
     if (!user) throw new Error("User not authenticated");

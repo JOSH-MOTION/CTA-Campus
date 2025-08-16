@@ -32,9 +32,13 @@ export const ProjectsProvider: FC<{children: ReactNode}> = ({children}) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const { addNotificationForGen } = useNotifications();
-  const { user, userData, role } = useAuth();
+  const { user, userData, role, loading: authLoading } = useAuth();
 
   useEffect(() => {
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
     if (!user) {
         setProjects([]);
         setLoading(false);
@@ -52,6 +56,10 @@ export const ProjectsProvider: FC<{children: ReactNode}> = ({children}) => {
         where('targetGen', 'in', [userData.gen, 'All Students', 'Everyone']),
         orderBy('createdAt', 'desc')
       );
+    } else if (role === 'student' && !userData?.gen) {
+        // New student might not have a gen yet, prevent query from running
+        setLoading(false);
+        return;
     } else {
       q = query(
         projectsCol,
@@ -76,7 +84,7 @@ export const ProjectsProvider: FC<{children: ReactNode}> = ({children}) => {
     });
 
     return () => unsubscribe();
-  }, [user, role, userData]);
+  }, [user, role, userData, authLoading]);
 
   const addProject = useCallback(async (project: ProjectData) => {
     if(!user) throw new Error("User not authenticated");
