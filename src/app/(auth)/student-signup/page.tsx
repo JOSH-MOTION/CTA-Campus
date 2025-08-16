@@ -20,7 +20,6 @@ import {Textarea} from '@/components/ui/textarea';
 import {RadioGroup, RadioGroupItem} from '@/components/ui/radio-group';
 import {Avatar, AvatarImage, AvatarFallback} from '@/components/ui/avatar';
 import Link from 'next/link';
-import { cn } from '@/lib/utils';
 
 const availableGens = ['Gen 28', 'Gen 29', 'Gen 30', 'Gen 31', 'Gen 32'];
 const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -257,7 +256,7 @@ export default function StudentSignupPage() {
               <Textarea id="bio" placeholder="Tell us a little about yourself" value={bio} onChange={e => setBio(e.target.value)} />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {isSubmitting ? (
+              {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Creating Account...
