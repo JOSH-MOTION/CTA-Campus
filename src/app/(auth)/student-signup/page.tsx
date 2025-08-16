@@ -5,15 +5,16 @@
 import {useState, useEffect, useRef} from 'react';
 import {useRouter} from 'next/navigation';
 import {createUserWithEmailAndPassword, updateProfile} from 'firebase/auth';
-import {auth, db} from '@/lib/firebase';
+import {auth, db, storage} from '@/lib/firebase';
 import {doc, setDoc} from 'firebase/firestore';
+import {ref, uploadBytes, getDownloadURL} from 'firebase/storage';
 import {Button} from '@/components/ui/button';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
 import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
 import {useToast} from '@/hooks/use-toast';
 import {useAuth} from '@/contexts/AuthContext';
-import {Camera, Clock, Compass} from 'lucide-react';
+import {Camera, Clock, Compass, Loader2} from 'lucide-react';
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select';
 import {Textarea} from '@/components/ui/textarea';
 import {RadioGroup, RadioGroupItem} from '@/components/ui/radio-group';
@@ -76,11 +77,11 @@ export default function StudentSignupPage() {
     e.preventDefault();
     setLoading(true);
 
-    if (!lessonTime) {
+    if (!lessonTime || !lessonDay || !gen) {
       toast({
         variant: 'destructive',
         title: 'Missing Information',
-        description: 'Please select a time for your lesson.',
+        description: 'Please select a generation, lesson day, and time.',
       });
       setLoading(false);
       return;
@@ -91,7 +92,14 @@ export default function StudentSignupPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const {user} = userCredential;
 
-      await updateProfile(user, {displayName: fullName});
+      let photoURL = '';
+      if (selectedFile) {
+          const storageRef = ref(storage, `profile-pictures/${user.uid}/${selectedFile.name}`);
+          const snapshot = await uploadBytes(storageRef, selectedFile);
+          photoURL = await getDownloadURL(snapshot.ref);
+      }
+
+      await updateProfile(user, { displayName: fullName, photoURL });
       
       await setDoc(doc(db, 'users', user.uid), {
         uid: user.uid,
@@ -104,6 +112,8 @@ export default function StudentSignupPage() {
         lessonType,
         lessonTime,
         bio,
+        photoURL,
+        totalPoints: 0,
       });
 
       setRole('student');
@@ -247,7 +257,14 @@ export default function StudentSignupPage() {
               <Textarea id="bio" placeholder="Tell us a little about yourself" value={bio} onChange={e => setBio(e.target.value)} />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Loading...' : 'Sign Up'}
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating Account...
+                </>
+              ) : (
+                'Sign Up'
+              )}
             </Button>
           </form>
           <div className="mt-4 text-center text-sm">
