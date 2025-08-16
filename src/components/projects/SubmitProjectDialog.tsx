@@ -44,7 +44,7 @@ export function SubmitProjectDialog({ children, project, onSubmissionSuccess }: 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedData, setSubmittedData] = useState<SubmissionFormValues | null>(null);
   const { toast } = useToast();
-  const { user, userData } = useAuth();
+  const { user, userData, allUsers } = useAuth();
 
   const form = useForm<SubmissionFormValues>({
     resolver: zodResolver(submissionSchema),
@@ -76,7 +76,7 @@ export function SubmitProjectDialog({ children, project, onSubmissionSuccess }: 
         submissionLink: data.submissionLink,
         submissionNotes: data.submissionNotes || '',
         pointCategory: 'Weekly Projects',
-      });
+      }, allUsers);
 
       toast({
         title: 'Project Submitted!',

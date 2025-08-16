@@ -51,7 +51,7 @@ export default function OneHundredDaysOfCodePage() {
   const [link, setLink] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedDates, setSubmittedDates] = useState<Date[]>([]);
-  const {user, userData} = useAuth();
+  const {user, userData, allUsers} = useAuth();
   const {toast} = useToast();
   const [lastSubmission, setLastSubmission] = useState<{ link: string; date: string } | null>(null);
 
@@ -96,7 +96,7 @@ export default function OneHundredDaysOfCodePage() {
         submissionLink: link,
         submissionNotes: `Submission for date: ${submissionDate}`,
         pointCategory: HUNDRED_DAYS_OF_CODE_CATEGORY,
-      });
+      }, allUsers);
 
       toast({
         title: 'Progress Submitted!',

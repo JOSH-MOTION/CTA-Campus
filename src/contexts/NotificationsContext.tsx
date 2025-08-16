@@ -32,7 +32,7 @@ const NotificationsContext = createContext<NotificationsContextType | undefined>
 
 export const NotificationsProvider: FC<{children: ReactNode}> = ({children}) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const { user, fetchAllUsers } = useAuth();
+  const { user, allUsers } = useAuth();
 
   useEffect(() => {
     if (!user) {
@@ -73,10 +73,9 @@ export const NotificationsProvider: FC<{children: ReactNode}> = ({children}) => 
   }, []);
 
   const addNotificationForGen = useCallback(async (targetGen: string, notificationData: Omit<Notification, 'id' | 'date' | 'read' | 'userId'>) => {
-    const users = await fetchAllUsers();
     const batch = writeBatch(db);
 
-    const targetUsers = users.filter(u => {
+    const targetUsers = allUsers.filter(u => {
         if (targetGen === 'Everyone') return true;
         if (targetGen === 'All Staff' && (u.role === 'teacher' || u.role === 'admin')) return true;
         if (targetGen === 'All Students' && u.role === 'student') return true;
@@ -97,7 +96,7 @@ export const NotificationsProvider: FC<{children: ReactNode}> = ({children}) => 
 
     await batch.commit();
 
-  }, [fetchAllUsers]);
+  }, [allUsers]);
 
   const markAsRead = useCallback(async (notificationId: string) => {
       const notifDoc = doc(db, 'notifications', notificationId);

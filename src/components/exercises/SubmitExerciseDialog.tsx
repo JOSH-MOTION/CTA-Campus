@@ -44,7 +44,7 @@ export function SubmitExerciseDialog({ children, exercise, onSubmissionSuccess }
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedData, setSubmittedData] = useState<SubmissionFormValues | null>(null);
   const { toast } = useToast();
-  const { user, userData } = useAuth();
+  const { user, userData, allUsers } = useAuth();
 
   const form = useForm<SubmissionFormValues>({
     resolver: zodResolver(submissionSchema),
@@ -76,7 +76,7 @@ export function SubmitExerciseDialog({ children, exercise, onSubmissionSuccess }
         submissionLink: data.submissionLink,
         submissionNotes: data.submissionNotes || '',
         pointCategory: 'Class Exercises'
-      });
+      }, allUsers);
 
       toast({
         title: 'Exercise Submitted!',

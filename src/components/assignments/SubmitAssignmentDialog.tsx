@@ -44,7 +44,7 @@ export function SubmitAssignmentDialog({ children, assignment, onSubmissionSucce
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedData, setSubmittedData] = useState<SubmissionFormValues | null>(null);
   const { toast } = useToast();
-  const { user, userData } = useAuth();
+  const { user, userData, allUsers } = useAuth();
 
   const form = useForm<SubmissionFormValues>({
     resolver: zodResolver(submissionSchema),
@@ -77,7 +77,7 @@ export function SubmitAssignmentDialog({ children, assignment, onSubmissionSucce
         submissionLink: data.submissionLink,
         submissionNotes: data.submissionNotes || '',
         pointCategory: 'Class Assignments',
-      });
+      }, allUsers);
 
       toast({
         title: 'Assignment Submitted!',

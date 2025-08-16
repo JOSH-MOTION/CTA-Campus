@@ -12,10 +12,11 @@ import {
     doc,
     deleteDoc,
     getDocs,
+    writeBatch
   } from 'firebase/firestore';
   import { db } from '@/lib/firebase';
   import { awardPointsFlow } from '@/ai/flows/award-points-flow';
-import { addNotificationForGen } from '@/services/notifications';
+import type { UserData } from '@/contexts/AuthContext';
   
   export interface Submission {
     id: string;
@@ -39,7 +40,7 @@ import { addNotificationForGen } from '@/services/notifications';
   /**
    * Creates a new submission for an assignment.
    */
-  export const addSubmission = async (submissionData: NewSubmissionData): Promise<{ id: string }> => {
+  export const addSubmission = async (submissionData: NewSubmissionData, allUsers: UserData[]): Promise<{ id: string }> => {
     const { pointsToAward, ...restOfSubmissionData } = submissionData;
     
     const is100Days = submissionData.assignmentId === '100-days-of-code';
@@ -69,11 +70,20 @@ import { addNotificationForGen } from '@/services/notifications';
 
     // Send notification to all staff
     try {
-        await addNotificationForGen('All Staff', {
-            title: `New Submission: ${submissionData.assignmentTitle}`,
-            description: `From ${submissionData.studentName} (${submissionData.studentGen})`,
-            href: `/submissions`,
+        const staff = allUsers.filter(u => u.role === 'teacher' || u.role === 'admin');
+        const batch = writeBatch(db);
+        staff.forEach(staffMember => {
+            const notificationRef = doc(collection(db, 'notifications'));
+            batch.set(notificationRef, {
+                title: `New Submission: ${submissionData.assignmentTitle}`,
+                description: `From ${submissionData.studentName} (${submissionData.studentGen})`,
+                href: `/submissions`,
+                userId: staffMember.uid,
+                read: false,
+                date: serverTimestamp(),
+            });
         });
+        await batch.commit();
     } catch (e) {
         console.error(`Failed to send notification for new submission ${docRef.id}:`, e);
     }
