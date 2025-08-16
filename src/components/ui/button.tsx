@@ -53,8 +53,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         disabled={isDisabled}
         {...props}
       >
-       {isBusy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-       {isBusy && asChild ? null : children}
+        {isBusy && asChild ? <>{children}<Loader2 className="absolute h-4 w-4 animate-spin" /></> : isBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : children}
       </Comp>
     )
   }
