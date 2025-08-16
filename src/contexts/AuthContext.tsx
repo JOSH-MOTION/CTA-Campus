@@ -88,27 +88,38 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
   
     useEffect(() => {
     const authUnsubscribe = onAuthStateChanged(auth, async (user) => {
-      setLoading(true);
+      // Don't set loading to false immediately, wait for Firestore fetch.
       if (user) {
         setUser(user);
         const docRef = doc(db, 'users', user.uid);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data() as UserData;
-          setUserData(data);
-          setRole(data.role);
-          localStorage.setItem('userRole', data.role);
-        } else {
-            const storedRole = localStorage.getItem('userRole') as UserRole;
-            if(storedRole) setRole(storedRole);
+        try {
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data() as UserData;
+            setUserData(data);
+            setRole(data.role);
+            localStorage.setItem('userRole', data.role);
+          } else {
+              const storedRole = localStorage.getItem('userRole') as UserRole;
+              if(storedRole) setRole(storedRole);
+          }
+        } catch (error) {
+           console.error("Failed to fetch user data:", error);
+           // Handle case where user exists in Auth but not Firestore
+           setUser(null);
+           setUserData(null);
+           setRole(null);
+           localStorage.removeItem('userRole');
+        } finally {
+            setLoading(false);
         }
       } else {
         setUser(null);
         setUserData(null);
         setRole(null);
         localStorage.removeItem('userRole');
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => authUnsubscribe();
