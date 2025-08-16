@@ -1,3 +1,4 @@
+
 // src/contexts/AuthContext.tsx
 'use client';
 
@@ -19,8 +20,8 @@ export interface UserData {
   schoolId?: string;
   lessonDay?: string;
   lessonType?: string;
-  lessonTime?: string; // New field for class time
-  hasEditedLessonDetails?: boolean; // New flag
+  lessonTime?: string;
+  hasEditedLessonDetails?: boolean;
   bio?: string;
   photoURL?: string;
   totalPoints?: number;

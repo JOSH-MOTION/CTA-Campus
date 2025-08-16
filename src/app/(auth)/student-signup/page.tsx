@@ -102,7 +102,7 @@ export default function StudentSignupPage() {
         schoolId,
         lessonDay,
         lessonType,
-        lessonTime: lessonTime,
+        lessonTime,
         bio,
       });
 
