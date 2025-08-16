@@ -100,7 +100,7 @@ export default function StudentSignupPage() {
 
       await updateProfile(user, { displayName: fullName, photoURL });
       
-      await setDoc(doc(db, 'users', user.uid), {
+      const userDocData = {
         uid: user.uid,
         email: user.email,
         displayName: fullName,
@@ -113,7 +113,10 @@ export default function StudentSignupPage() {
         bio,
         photoURL,
         totalPoints: 0,
-      });
+      };
+
+      // Explicitly wait for the user document to be created.
+      await setDoc(doc(db, 'users', user.uid), userDocData);
 
       setRole('student');
       toast({title: 'Sign Up Successful', description: 'Your account has been created.'});
