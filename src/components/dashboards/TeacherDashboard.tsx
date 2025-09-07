@@ -156,11 +156,17 @@ export default function TeacherDashboard({user}: TeacherDashboardProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-bold tracking-tight">Welcome, {user?.displayName || 'Teacher'}!</h1>
-          <p className="text-muted-foreground">Manage your classes and students.</p>
-        </div>
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+         <div className="flex items-center gap-4">
+            <Avatar className="h-16 w-16 border-2 border-primary/10">
+                <AvatarImage src={userData?.photoURL || undefined} alt={user?.displayName || 'User'} />
+                <AvatarFallback>{user?.displayName?.charAt(0)}</AvatarFallback>
+            </Avatar>
+            <div>
+                <h1 className="text-3xl font-bold tracking-tight">Welcome, {user?.displayName || 'Teacher'}!</h1>
+                <p className="text-muted-foreground">Manage your classes and students.</p>
+            </div>
+         </div>
         {availableGens.length > 0 && (
           <div className="flex items-center gap-2">
             <p className="text-sm font-medium">Viewing:</p>

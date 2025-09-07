@@ -7,19 +7,28 @@ import {
 } from '@/components/ui/card';
 import {Users, UserCheck, Building} from 'lucide-react';
 import type {User} from 'firebase/auth';
+import { useAuth } from '@/contexts/AuthContext';
+import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar';
 
 interface AdminDashboardProps {
   user: User | null;
 }
 
 export default function AdminDashboard({user}: AdminDashboardProps) {
+  const { userData } = useAuth();
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-3xl font-bold tracking-tight">Welcome, {user?.displayName || 'Admin'}!</h1>
-        <p className="text-muted-foreground">
-          Oversee and manage the entire CTA Portal.
-        </p>
+      <div className="flex items-center gap-4">
+        <Avatar className="h-16 w-16 border-2 border-primary/10">
+            <AvatarImage src={userData?.photoURL || undefined} alt={user?.displayName || 'User'} />
+            <AvatarFallback>{user?.displayName?.charAt(0)}</AvatarFallback>
+        </Avatar>
+        <div>
+            <h1 className="text-3xl font-bold tracking-tight">Welcome, {user?.displayName || 'Admin'}!</h1>
+            <p className="text-muted-foreground">
+            Oversee and manage the entire CTA Portal.
+            </p>
+        </div>
       </div>
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card>

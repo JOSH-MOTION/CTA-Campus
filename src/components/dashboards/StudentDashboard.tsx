@@ -20,6 +20,7 @@ import WeeklyFocus from './WeeklyFocus';
 import { useResources } from '@/contexts/ResourcesContext';
 import type { Resource } from '@/contexts/ResourcesContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 
 const resourceIcons = {
   Article: FileText,
@@ -80,6 +81,7 @@ const ScheduleCard = () => {
 
 export default function StudentDashboard({user}: StudentDashboardProps) {
   const { resources, loading: resourcesLoading } = useResources();
+  const { userData } = useAuth();
 
   const recentResources = useMemo(() => {
     return resources.slice(0, 3);
@@ -87,9 +89,15 @@ export default function StudentDashboard({user}: StudentDashboardProps) {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user?.displayName || 'Student'}!</h1>
-        <p className="text-muted-foreground">Here's your overview for today.</p>
+      <div className="flex items-center gap-4">
+        <Avatar className="h-16 w-16 border-2 border-primary/10">
+            <AvatarImage src={userData?.photoURL || undefined} alt={user?.displayName || 'User'} />
+            <AvatarFallback>{user?.displayName?.charAt(0)}</AvatarFallback>
+        </Avatar>
+        <div>
+            <h1 className="text-3xl font-bold tracking-tight">Welcome back, {user?.displayName || 'Student'}!</h1>
+            <p className="text-muted-foreground">Here's your overview for today.</p>
+        </div>
       </div>
 
       <WeeklyFocus />
