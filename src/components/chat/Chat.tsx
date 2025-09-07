@@ -24,7 +24,7 @@ import {
 } from '../ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { UserData } from '@/contexts/AuthContext';
+import { UserData, useAuth } from '@/contexts/AuthContext';
 
 
 type ChatEntity = { id: string; name: string; avatar?: string; dataAiHint: string; type: 'dm' | 'group' };
@@ -67,12 +67,10 @@ const MessageBubble = React.memo(({
         isSender ? 'flex-row-reverse' : 'justify-start'
       )}
     >
-      {!isSender && (
         <Avatar className='h-8 w-8'>
           <AvatarImage src={senderData?.photoURL} alt={msg.senderName} />
           <AvatarFallback>{msg.senderName.charAt(0)}</AvatarFallback>
         </Avatar>
-      )}
       <div className={cn('max-w-[75%]', isSender ? 'flex flex-col items-end' : 'flex flex-col items-start')}>
         <div className={cn('mb-1 flex items-baseline gap-2', isSender ? 'flex-row-reverse' : 'justify-start')}>
           <p className='text-xs'>{isSender ? 'You' : msg.senderName}</p>

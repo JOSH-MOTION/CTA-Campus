@@ -5,7 +5,7 @@ import {createContext, useContext, useState, ReactNode, useEffect, useCallback, 
 import {auth, db} from '@/lib/firebase';
 import type {User} from 'firebase/auth';
 import {onAuthStateChanged}from 'firebase/auth';
-import {doc, getDoc, setDoc, collection, getDocs, query, where} from 'firebase/firestore';
+import {doc, getDoc, setDoc, collection, getDocs, query, where, onSnapshot} from 'firebase/firestore';
 
 export type UserRole = 'student' | 'teacher' | 'admin';
 
@@ -89,34 +89,37 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
     }
   }, []);
   
-    useEffect(() => {
+  useEffect(() => {
     const authUnsubscribe = onAuthStateChanged(auth, async (user) => {
-      setLoading(true); // Ensure loading is true until all data is fetched.
       if (user) {
         setUser(user);
         const docRef = doc(db, 'users', user.uid);
-        try {
-          const docSnap = await getDoc(docRef);
-          if (docSnap.exists()) {
-            const data = docSnap.data() as UserData;
-            setUserData(data);
-            setRole(data.role);
-            localStorage.setItem('userRole', data.role);
-          } else {
-              const storedRole = localStorage.getItem('userRole') as UserRole;
-              if(storedRole) setRole(storedRole);
-          }
-          // Fetch all users after getting individual user data
-          await fetchAllUsers();
-        } catch (error) {
-           console.error("Failed to fetch user data:", error);
-           setUser(null);
-           setUserData(null);
-           setRole(null);
-           localStorage.removeItem('userRole');
-        } finally {
+        const userDocUnsubscribe = onSnapshot(docRef, async (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data() as UserData;
+                setUserData(data);
+                setRole(data.role);
+                localStorage.setItem('userRole', data.role);
+                
+                // Fetch all users after getting individual user data
+                await fetchAllUsers();
+                setLoading(false);
+            } else {
+                // This case handles the delay between user creation and document creation
+                // We'll keep loading until we get the document.
+                setLoading(true);
+            }
+        }, (error) => {
+            console.error("Failed to fetch user data:", error);
+            setUser(null);
+            setUserData(null);
+            setRole(null);
+            localStorage.removeItem('userRole');
             setLoading(false);
-        }
+        });
+        
+        return () => userDocUnsubscribe();
+
       } else {
         setUser(null);
         setUserData(null);
@@ -128,6 +131,7 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
 
     return () => authUnsubscribe();
   }, [fetchAllUsers]);
+
 
   const handleSetRole = async (newRole: UserRole) => {
     setRole(newRole);
