@@ -1,8 +1,8 @@
-
 // src/components/chat/Chat.tsx
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -56,7 +56,6 @@ interface ChatProps {
   messages: Message[];
   onSendMessage: (text: string, replyTo?: Message, mentions?: UserData[]) => void;
   currentUser: User | null;
-  onToggleContacts: () => void;
   loading: boolean;
   allUsers: UserData[];
 }
@@ -112,12 +111,12 @@ export const Chat = React.memo(function Chat({
   messages,
   onSendMessage,
   currentUser,
-  onToggleContacts,
   loading,
   allUsers,
 }: ChatProps) {
   const [text, setText] = useState('');
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   useEffect(() => {
     scrollToBottom('auto');
@@ -170,11 +169,10 @@ export const Chat = React.memo(function Chat({
           <Button
             variant='ghost'
             size='icon'
-            onClick={onToggleContacts}
-            className='md:hidden'
+            onClick={() => router.push('/')}
           >
             <ArrowLeft className='h-5 w-5' />
-            <span className='sr-only'>Back</span>
+            <span className='sr-only'>Back to Dashboard</span>
           </Button>
           <Avatar className='h-10 w-10'>
             <AvatarFallback>{entity.name.charAt(0)}</AvatarFallback>

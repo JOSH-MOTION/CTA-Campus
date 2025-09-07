@@ -325,7 +325,6 @@ export default function ChatPage() {
             messages={messages}
             onSendMessage={handleSendMessage}
             currentUser={currentUser}
-            onToggleContacts={() => setIsContactListOpen((prev) => !prev)}
             loading={loading}
             allUsers={allUsers}
           />
