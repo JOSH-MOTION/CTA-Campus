@@ -146,6 +146,17 @@ export const Chat = React.memo(function Chat({
     onSendMessage(text);
     setText('');
   };
+  
+  const memberCount = useMemo(() => {
+    if (entity.type === 'dm') {
+      return 2;
+    }
+    if (entity.type === 'group') {
+      const gen = entity.id.replace('group-', '');
+      return allUsers.filter(u => u.gen === gen).length;
+    }
+    return allUsers.length;
+  }, [entity, allUsers]);
 
   return (
     <div className='h-full flex flex-col bg-muted/40'>
@@ -165,7 +176,7 @@ export const Chat = React.memo(function Chat({
           </Avatar>
           <div className="flex-1">
             <h2 className='text-md font-semibold'>{entity.name}</h2>
-            <p className="text-xs text-muted-foreground">{allUsers.length} members</p>
+            <p className="text-xs text-muted-foreground">{memberCount} members</p>
           </div>
            <Button variant="ghost" size="icon">
              <Search className="h-5 w-5" />
