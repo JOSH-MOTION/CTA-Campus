@@ -1,3 +1,4 @@
+
 // src/app/(app)/layout.tsx
 'use client';
 
@@ -32,9 +33,18 @@ import Link from 'next/link';
 import { NotificationBell } from '@/components/NotificationBell';
 import { cn } from '@/lib/utils';
 import { School } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const MemoizedProtectedLayout = memo(function ProtectedLayout({children}: {children: ReactNode}) {
-  const {user, role, loading} = useAuth();
+  const {user, userData, role, loading} = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -120,12 +130,29 @@ const MemoizedProtectedLayout = memo(function ProtectedLayout({children}: {child
                         <div className="ml-auto flex items-center gap-2">
                           <ThemeToggle />
                           <NotificationBell />
-                          <Button variant="ghost" size="icon" asChild>
-                            <Link href="/profile">
-                              <User className="h-5 w-5" />
-                              <span className="sr-only">Profile</span>
-                            </Link>
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="rounded-full">
+                                <Avatar className="h-8 w-8">
+                                  <AvatarImage src={userData?.photoURL || undefined} alt={user?.displayName || 'User'} />
+                                  <AvatarFallback>{user?.displayName?.charAt(0)}</AvatarFallback>
+                                </Avatar>
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                               <DropdownMenuLabel>
+                                  <p>{userData?.displayName}</p>
+                                  <p className="text-xs text-muted-foreground font-normal">{userData?.email}</p>
+                                </DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem asChild>
+                                  <Link href="/profile">Profile</Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => auth.signOut()}>
+                                  Log out
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </header>
                       <main className={cn('flex-1 flex flex-col', !isChatPage && 'p-4 sm:p-6 overflow-y-auto')}>
