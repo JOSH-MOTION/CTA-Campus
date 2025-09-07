@@ -31,6 +31,7 @@ import {User} from 'lucide-react';
 import Link from 'next/link';
 import { NotificationBell } from '@/components/NotificationBell';
 import { cn } from '@/lib/utils';
+import { School } from 'lucide-react';
 
 const MemoizedProtectedLayout = memo(function ProtectedLayout({children}: {children: ReactNode}) {
   const {user, role, loading} = useAuth();
@@ -86,7 +87,7 @@ const MemoizedProtectedLayout = memo(function ProtectedLayout({children}: {child
   if (loading || !user) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <p>Loading...</p>
+        <School className="h-12 w-12 animate-pulse text-primary" />
       </div>
     );
   }
@@ -106,22 +107,8 @@ const MemoizedProtectedLayout = memo(function ProtectedLayout({children}: {child
                       <SidebarContent className="p-4">
                         <div className="flex items-center justify-between px-2">
                           <div className="flex items-center gap-2">
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="24"
-                              height="24"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="h-6 w-6 text-primary"
-                            >
-                              <path d="M12 22c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8Z"></path>
-                              <path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z"></path>
-                            </svg>
-                            <h1 className="text-xl font-semibold">Coderain Campus</h1>
+                            <School className="h-6 w-6 text-primary" />
+                            <h1 className="text-xl font-semibold">Codetrain Campus</h1>
                           </div>
                         </div>
                         <SidebarNav />

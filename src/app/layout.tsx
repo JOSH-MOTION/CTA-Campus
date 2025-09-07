@@ -6,7 +6,7 @@ import {ThemeProvider} from '@/components/ThemeProvider';
 import {AuthProvider} from '@/contexts/AuthContext';
 
 export const metadata: Metadata = {
-  title: 'Coderain Campus',
+  title: 'Codetrain Campus',
   description: 'A modern school management app.',
 };
 
@@ -24,6 +24,7 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
+        <link rel="icon" href="/favicon.ico" sizes="any" />
       </head>
       <body className={cn('min-h-screen bg-background font-body antialiased')} suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>

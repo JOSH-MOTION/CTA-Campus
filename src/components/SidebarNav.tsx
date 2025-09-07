@@ -31,6 +31,7 @@ import {
   History,
   Inbox,
   Star,
+  School
 } from 'lucide-react';
 import {SidebarMenu, SidebarMenuItem, SidebarMenuButton} from '@/components/ui/sidebar';
 import Link from 'next/link';

@@ -1,4 +1,3 @@
-
 // src/app/(auth)/student-signup/page.tsx
 'use client';
 
@@ -13,7 +12,7 @@ import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
 import {useToast} from '@/hooks/use-toast';
 import {useAuth} from '@/contexts/AuthContext';
-import {Camera, Clock, Compass, Loader2} from 'lucide-react';
+import {Camera, Clock, School, Loader2} from 'lucide-react';
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select';
 import {Textarea} from '@/components/ui/textarea';
 import {RadioGroup, RadioGroupItem} from '@/components/ui/radio-group';
@@ -135,8 +134,8 @@ export default function StudentSignupPage() {
   return (
     <div className="flex flex-col items-center justify-center space-y-6 py-8">
       <div className="flex items-center gap-3 text-primary">
-        <Compass className="h-10 w-10" />
-        <h1 className="text-4xl font-bold">Coderain Campus</h1>
+        <School className="h-10 w-10" />
+        <h1 className="text-4xl font-bold">Codetrain Campus</h1>
       </div>
       <Card className="w-full max-w-lg">
         <CardHeader>

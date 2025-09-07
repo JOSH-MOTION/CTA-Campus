@@ -1,11 +1,11 @@
 
-# Coderain Campus - System Design Document
+# Codetrain Campus - System Design Document
 
-This document outlines the system architecture, data model, and core components of the Coderain Campus application.
+This document outlines the system architecture, data model, and core components of the Codetrain Campus application.
 
 ## 1. High-Level Architecture
 
-Coderain Campus is a modern, full-stack web application built on a serverless architecture. It leverages Next.js for the frontend and Firebase for backend services, creating a robust and scalable platform for managing a coding school.
+Codetrain Campus is a modern, full-stack web application built on a serverless architecture. It leverages Next.js for the frontend and Firebase for backend services, creating a robust and scalable platform for managing a coding school.
 
 -   **Frontend**: A responsive Single Page Application (SPA) built with Next.js and React.
 -   **Backend**: A collection of serverless services provided by Google Firebase (BaaS - Backend-as-a-Service).
