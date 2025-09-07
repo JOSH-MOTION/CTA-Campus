@@ -17,7 +17,7 @@ const GradeSubmissionInputSchema = z.object({
   submissionId: z.string().describe("The ID of the submission document to grade."),
   studentId: z.string().describe("The UID of the student who made the submission."),
   assignmentTitle: z.string().describe("The title of the assignment being graded."),
-  grade: z.string().default('Complete').describe("The grade to award for the submission."),
+  grade: z.string().optional().describe("The grade to award for the submission."),
   feedback: z.string().optional().describe("Optional feedback for the student."),
 });
 export type GradeSubmissionInput = z.infer<typeof GradeSubmissionInputSchema>;
@@ -43,7 +43,7 @@ export const gradeSubmissionFlow = ai.defineFlow(
         }
     }
   },
-  async (input) => {
+  async (input, context) => {
     const { submissionId, studentId, grade, feedback, assignmentTitle } = input;
     
     try {
@@ -59,7 +59,7 @@ export const gradeSubmissionFlow = ai.defineFlow(
       const notification = {
         userId: studentId,
         title: `Graded: ${assignmentTitle}`,
-        description: "Your submission has been graded by your teacher.",
+        description: `Your submission has been graded by ${context.auth?.displayName || 'your teacher'}.`,
         href: `/submissions`, // Simple link, can be improved to point to the exact item
         read: false,
         date: serverTimestamp(),

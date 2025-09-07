@@ -40,7 +40,7 @@ import type { UserData } from '@/contexts/AuthContext';
   /**
    * Creates a new submission for an assignment.
    */
-  export const addSubmission = async (submissionData: NewSubmissionData, allUsers: UserData[]): Promise<{ id: string }> => {
+  export const addSubmission = async (submissionData: NewSubmissionData): Promise<{ id: string }> => {
     const { pointsToAward, ...restOfSubmissionData } = submissionData;
     
     const is100Days = submissionData.assignmentId === '100-days-of-code';
@@ -70,15 +70,17 @@ import type { UserData } from '@/contexts/AuthContext';
 
     // Send notification to all staff
     try {
-        const staff = allUsers.filter(u => u.role === 'teacher' || u.role === 'admin');
+        const staffQuery = query(collection(db, 'users'), where('role', 'in', ['teacher', 'admin']));
+        const staffSnapshot = await getDocs(staffQuery);
+        
         const batch = writeBatch(db);
-        staff.forEach(staffMember => {
+        staffSnapshot.forEach(staffDoc => {
             const notificationRef = doc(collection(db, 'notifications'));
             batch.set(notificationRef, {
                 title: `New Submission: ${submissionData.assignmentTitle}`,
                 description: `From ${submissionData.studentName} (${submissionData.studentGen})`,
                 href: `/submissions`,
-                userId: staffMember.uid,
+                userId: staffDoc.id,
                 read: false,
                 date: serverTimestamp(),
             });

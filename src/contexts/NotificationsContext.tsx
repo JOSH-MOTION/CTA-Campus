@@ -32,7 +32,7 @@ const NotificationsContext = createContext<NotificationsContextType | undefined>
 
 export const NotificationsProvider: FC<{children: ReactNode}> = ({children}) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const { user, allUsers } = useAuth();
+  const { user } = useAuth();
 
   useEffect(() => {
     if (!user) {
@@ -74,19 +74,25 @@ export const NotificationsProvider: FC<{children: ReactNode}> = ({children}) => 
 
   const addNotificationForGen = useCallback(async (targetGen: string, notificationData: Omit<Notification, 'id' | 'date' | 'read' | 'userId'>) => {
     const batch = writeBatch(db);
+    const usersCollection = collection(db, 'users');
+    
+    let targetQuery;
+    if (targetGen === 'Everyone') {
+        targetQuery = query(usersCollection);
+    } else if (targetGen === 'All Staff') {
+        targetQuery = query(usersCollection, where('role', 'in', ['teacher', 'admin']));
+    } else if (targetGen === 'All Students') {
+        targetQuery = query(usersCollection, where('role', '==', 'student'));
+    } else {
+        targetQuery = query(usersCollection, where('gen', '==', targetGen));
+    }
 
-    const targetUsers = allUsers.filter(u => {
-        if (targetGen === 'Everyone') return true;
-        if (targetGen === 'All Staff' && (u.role === 'teacher' || u.role === 'admin')) return true;
-        if (targetGen === 'All Students' && u.role === 'student') return true;
-        if (u.gen === targetGen) return true;
-        return false;
-    });
+    const querySnapshot = await getDocs(targetQuery);
 
-    targetUsers.forEach(targetUser => {
+    querySnapshot.forEach(userDoc => {
         const newNotification = {
             ...notificationData,
-            userId: targetUser.uid,
+            userId: userDoc.id,
             read: false,
             date: serverTimestamp(),
         };
@@ -96,7 +102,7 @@ export const NotificationsProvider: FC<{children: ReactNode}> = ({children}) => 
 
     await batch.commit();
 
-  }, [allUsers]);
+  }, []);
 
   const markAsRead = useCallback(async (notificationId: string) => {
       const notifDoc = doc(db, 'notifications', notificationId);
