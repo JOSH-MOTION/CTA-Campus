@@ -51,12 +51,10 @@ const MessageBubble = React.memo(({ msg, currentUser, allUsers }: { msg: Message
 
     return (
         <div className={cn("group flex w-full items-start gap-3", isSender ? "flex-row-reverse" : "justify-start")}>
-             {!isSender && (
-                <Avatar className='h-8 w-8 shrink-0'>
-                    <AvatarImage src={sender?.photoURL} alt={sender?.displayName} />
-                    <AvatarFallback>{msg.senderName.charAt(0)}</AvatarFallback>
-                </Avatar>
-             )}
+             <Avatar className='h-8 w-8 shrink-0'>
+                <AvatarImage src={sender?.photoURL} alt={sender?.displayName} />
+                <AvatarFallback>{msg.senderName.charAt(0)}</AvatarFallback>
+            </Avatar>
             <div className={cn("flex flex-col", isSender ? "items-end" : "items-start")}>
                  {!isSender && (
                     <p className='text-xs text-muted-foreground mb-1'>{msg.senderName}</p>
