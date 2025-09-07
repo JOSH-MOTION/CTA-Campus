@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Users, Loader2, ArrowLeft, ArrowDownCircle, Reply, Pin, Trash2, Edit, X, Paperclip, Smile } from 'lucide-react';
+import { Send, Users, Loader2, ArrowLeft, ArrowDownCircle, Reply, Pin, Trash2, Edit, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Message } from '@/services/chat';
 import { updateMessage, getChatId, deleteMessage } from '@/services/chat';
@@ -29,62 +29,11 @@ type ChatEntity = { id: string; name: string; avatar?: string; dataAiHint: strin
 interface ChatProps {
   entity: ChatEntity;
   messages: Message[];
-  onSendMessage: (text: string, replyTo?: Message, mentions?: UserData[]) => void;
+  onSendMessage: (text: string, replyTo?: Message) => void;
   currentUser: User | null;
   onToggleContacts: () => void;
   allUsers: UserData[];
 }
-
-const MessageBubble = React.memo(({
-  msg,
-  currentUser,
-  onReply,
-  onPin,
-  onEdit,
-  onDelete,
-  allUsers,
-}: {
-  msg: Message;
-  currentUser: User | null;
-  onReply: (message: Message) => void;
-  onPin: (message: Message) => void;
-  onEdit: (message: Message) => void;
-  onDelete: (message: Message) => void;
-  allUsers: UserData[];
-}) => {
-  const isSender = msg.senderId === currentUser?.uid;
-  const messageTime = msg.timestamp ? format(msg.timestamp.toDate(), 'HH:mm') : '';
-  const senderData = allUsers.find(u => u.uid === msg.senderId);
-  const senderPhoto = senderData?.photoURL;
-  
-  return (
-    <div
-      className={cn(
-        'group flex w-full items-start gap-3',
-        isSender ? 'flex-row-reverse' : 'justify-start'
-      )}
-    >
-      <div className={cn('max-w-[75%]', isSender ? 'flex flex-col items-end' : 'flex flex-col items-start')}>
-        <div
-          className={cn(
-            'relative w-fit rounded-xl p-3 text-sm',
-            isSender ? 'bg-primary text-primary-foreground rounded-br-none' : 'bg-card text-card-foreground rounded-bl-none',
-            msg.isPinned && 'border-2 border-primary'
-          )}
-        >
-          {msg.isPinned && <Pin className="absolute -top-2 -left-2 h-4 w-4 rotate-45 text-primary" />}
-          <p className='whitespace-pre-wrap'>{msg.text}</p>
-        </div>
-        <div className={cn('mt-1 flex items-baseline gap-2 text-xs text-muted-foreground')}>
-            <p>{isSender ? 'You' : msg.senderName}</p>
-            <p>{messageTime}</p>
-            {msg.edited && <span>(edited)</span>}
-        </div>
-      </div>
-    </div>
-  );
-});
-MessageBubble.displayName = 'MessageBubble';
 
 const DateSeparator = React.memo(({ date }: { date: Date }) => {
   let label;
@@ -106,13 +55,80 @@ const DateSeparator = React.memo(({ date }: { date: Date }) => {
 });
 DateSeparator.displayName = 'DateSeparator';
 
+
+const MessageBubble = React.memo(({
+  msg,
+  currentUser,
+  onReply,
+  onPin,
+  onEdit,
+  onDelete,
+}: {
+  msg: Message;
+  currentUser: User | null;
+  onReply: (message: Message) => void;
+  onPin: (message: Message) => void;
+  onEdit: (message: Message) => void;
+  onDelete: (message: Message) => void;
+}) => {
+  const isSender = msg.senderId === currentUser?.uid;
+  const messageTime = msg.timestamp ? format(msg.timestamp.toDate(), 'HH:mm') : '';
+  const senderPhoto = isSender ? currentUser?.photoURL : null; // TODO: get other user photo
+
+  return (
+    <div
+      className={cn(
+        'group flex w-full items-start gap-3',
+        isSender ? 'flex-row-reverse' : 'justify-start'
+      )}
+    >
+      <Avatar className='h-8 w-8'>
+        <AvatarImage src={senderPhoto || undefined} alt={msg.senderName} />
+        <AvatarFallback>{msg.senderName.charAt(0)}</AvatarFallback>
+      </Avatar>
+      <div className={cn('max-w-[75%]', isSender ? 'flex flex-col items-end' : 'flex flex-col items-start')}>
+        <div
+          className={cn(
+            'relative rounded-lg px-3 py-2 text-sm',
+            isSender ? 'bg-primary text-primary-foreground' : 'bg-card',
+            msg.isPinned && 'border-2 border-primary'
+          )}
+        >
+          {msg.isPinned && <Pin className="absolute -top-2 -left-2 h-4 w-4 rotate-45 text-primary" />}
+          {msg.replyTo && (
+            <div className="mb-1 rounded bg-black/10 p-2">
+              <p className="text-xs font-semibold">{msg.replyTo.senderName}</p>
+              <p className="text-xs opacity-80">{msg.replyTo.text}</p>
+            </div>
+          )}
+          {msg.text}
+          <div className="absolute top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center bg-card rounded-full p-1 shadow-md"
+               style={isSender ? { right: '100%', marginRight: '8px' } : { left: '100%', marginLeft: '8px' }}>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onReply(msg)}><Reply className="h-3 w-3" /></Button>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onPin(msg)}><Pin className="h-3 w-3" /></Button>
+              {isSender && (
+                  <>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onEdit(msg)}><Edit className="h-3 w-3" /></Button>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onDelete(msg)}><Trash2 className="h-3 w-3 text-destructive" /></Button>
+                  </>
+              )}
+          </div>
+        </div>
+        <div className={cn('mt-1 text-xs text-muted-foreground')}>{messageTime} {msg.edited && '(edited)'}</div>
+      </div>
+    </div>
+  );
+});
+MessageBubble.displayName = 'MessageBubble';
+
+
 export const Chat = React.memo(function Chat({
   entity,
   messages,
   onSendMessage,
   currentUser,
   onToggleContacts,
-  allUsers,
+  allUsers
 }: ChatProps) {
   const [text, setText] = useState('');
   const [replyTo, setReplyTo] = useState<Message | undefined>(undefined);
@@ -149,28 +165,23 @@ export const Chat = React.memo(function Chat({
 
   const scrollToBottom = (behavior: 'smooth' | 'auto' = 'auto') => {
     if (scrollAreaRef.current) {
-        const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-        if (viewport) {
-            viewport.scrollTo({ top: viewport.scrollHeight, behavior });
-        }
+        scrollAreaRef.current.scrollTo({
+            top: scrollAreaRef.current.scrollHeight,
+            behavior,
+        });
     }
   };
 
   useEffect(() => {
-    const lastPinned = messages.filter(m => m.isPinned).sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis())[0];
+    const lastPinned = messages.filter(m => m.isPinned).sort((a,b) => b.timestamp.toMillis() - a.timestamp.toMillis())[0];
     setPinnedMessage(lastPinned || null);
     scrollToBottom();
   }, [messages]);
 
-  const handleScroll = () => {
-    if (scrollAreaRef.current) {
-        const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-        if (viewport) {
-            const { scrollTop, scrollHeight, clientHeight } = viewport;
-            const isScrolledUp = scrollHeight - scrollTop > clientHeight + 100;
-            setShowScrollToBottom(isScrolledUp);
-        }
-    }
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    const isScrolledUp = scrollHeight - scrollTop > clientHeight + 100;
+    setShowScrollToBottom(isScrolledUp);
   };
 
   const handleEditClick = (message: Message) => {
@@ -198,12 +209,11 @@ export const Chat = React.memo(function Chat({
             onPin={handlePin}
             onEdit={handleEditClick}
             onDelete={setDeletingMessage}
-            allUsers={allUsers}
           />
         </React.Fragment>
       );
     });
-  }, [messages, currentUser, pinnedMessage, allUsers]);
+  }, [messages, currentUser, pinnedMessage]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -262,56 +272,71 @@ export const Chat = React.memo(function Chat({
 
   return (
     <>
-      <div className='h-full flex flex-col bg-muted'>
-        <header className='flex h-[65px] shrink-0 items-center gap-4 border-b bg-background p-4'>
+      <div className='flex flex-col h-full bg-muted'>
+        <header className='flex h-[60px] shrink-0 items-center gap-4 border-b bg-background p-4'>
           <Button variant='ghost' size='icon' onClick={onToggleContacts} className='md:hidden'>
             <ArrowLeft className='h-5 w-5' />
             <span className='sr-only'>Back</span>
           </Button>
-          <div className="flex items-center gap-3">
-             <Avatar className='h-10 w-10'>
-                <AvatarImage src={entity.avatar} alt={entity.name} />
-                <AvatarFallback>{entity.name.charAt(0)}</AvatarFallback>
+          <div className='flex items-center gap-3'>
+            <Avatar className='h-9 w-9'>
+              <AvatarImage src={entity.avatar} alt={entity.name} />
+              <AvatarFallback>{entity.name.charAt(0)}</AvatarFallback>
             </Avatar>
-             <div>
-                <h2 className='text-base font-semibold'>{entity.name}</h2>
-                <p className="text-xs text-muted-foreground">online</p>
-             </div>
-          </div>
-          <div className="ml-auto">
-            {showScrollToBottom && (
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-10 w-10 rounded-full"
-                    onClick={() => scrollToBottom('smooth')}
-                >
-                    <ArrowDownCircle className="h-6 w-6" />
-                </Button>
-            )}
+            <h2 className='text-lg font-semibold'>{entity.name}</h2>
           </div>
         </header>
 
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 overflow-hidden relative">
           <ScrollArea
             className='h-full'
+            onScroll={handleScroll}
             ref={scrollAreaRef}
-            onScrollCapture={handleScroll}
           >
-            <div className='space-y-6 p-4 md:p-6'>
+            <div className='space-y-4 p-4'>
+              {pinnedMessage && (
+                  <div className="sticky top-2 z-10">
+                      <div className="rounded-md bg-amber-100 dark:bg-amber-900/50 p-2 border border-amber-300 dark:border-amber-700 flex items-center gap-2 text-xs">
+                          <Pin className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                          <span className="font-semibold text-amber-700 dark:text-amber-300">{pinnedMessage.senderName}:</span>
+                          <span className="truncate text-amber-800 dark:text-amber-200">{pinnedMessage.text}</span>
+                      </div>
+                  </div>
+              )}
               {messageList}
             </div>
           </ScrollArea>
+           {showScrollToBottom && (
+              <Button
+                  variant="secondary"
+                  size="icon"
+                  className="absolute bottom-4 right-4 h-10 w-10 rounded-full shadow-lg"
+                  onClick={() => scrollToBottom('smooth')}
+              >
+                  <ArrowDownCircle className="h-6 w-6" />
+              </Button>
+          )}
         </div>
 
-        <footer className='shrink-0 border-t bg-background p-4'>
+        <footer className='shrink-0 border-t bg-background p-4 space-y-2'>
+          {replyTo && (
+            <div className="flex items-center justify-between rounded-md bg-muted p-2 text-sm">
+              <div className="truncate">
+                <p className="font-semibold">Replying to {replyTo.senderName}</p>
+                <p className="truncate text-muted-foreground">{replyTo.text}</p>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setReplyTo(undefined)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
           {editingMessageId ? (
             <div className="flex items-center gap-2">
               <Input
                 value={editingText}
                 onChange={(e) => setEditingText(e.target.value)}
                 placeholder="Editing message..."
-                className="h-12 w-full rounded-lg border-none bg-gray-100 pr-12 focus:ring-0 dark:bg-gray-800"
+                className="flex-1"
               />
               <Button onClick={handleSaveEdit} disabled={isProcessing}>
                 {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -324,20 +349,16 @@ export const Chat = React.memo(function Chat({
               <Input
                 value={text || ''}
                 onChange={(e) => setText(e.target.value)}
-                placeholder='Enter your message here'
-                className='h-12 w-full rounded-lg bg-muted pr-28 focus-visible:ring-1 focus-visible:ring-ring'
+                placeholder={`Message ${entity.name}`}
+                className='pr-12'
               />
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
-                <Button type="button" variant="ghost" size="icon"><Paperclip className="h-5 w-5" /></Button>
-                <Button type="button" variant="ghost" size="icon"><Smile className="h-5 w-5" /></Button>
-                <Button
-                  type='submit'
-                  size='default'
-                  className='rounded-lg'
-                >
-                  Send
-                </Button>
-              </div>
+              <Button
+                type='submit'
+                size='icon'
+                className='absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2'
+              >
+                <Send className='h-4 w-4' />
+              </Button>
             </form>
           )}
         </footer>
