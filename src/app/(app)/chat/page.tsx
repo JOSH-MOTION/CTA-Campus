@@ -197,36 +197,18 @@ export default function ChatPage() {
     return format(date, 'HH:mm');
   };
 
-  const chatList = useMemo(() => {
-    const dms = otherUsers.map((user) => ({
-      id: user.uid,
-      name: user.displayName,
-      type: 'dm' as ChatEntityType,
-      avatar: user.photoURL,
-      dataAiHint: 'student portrait',
-    }));
-
-    const grps = groupChats.map((g) => ({
-      ...g,
-      type: 'group' as ChatEntityType,
-      avatar: `https://placehold.co/100x100.png?text=${g.name.charAt(0)}`,
-    }));
-
-    return [...grps, ...dms];
-  }, [otherUsers, groupChats]);
-
   const ContactList = () => (
-    <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-950">
-      <SheetHeader className="p-4 border-b border-gray-200 dark:border-gray-800 shrink-0">
-        <SheetTitle>Contact list</SheetTitle>
-      </SheetHeader>
+    <div className="flex flex-col h-full bg-background border-r">
+      <div className="p-4 border-b shrink-0">
+         <h2 className="text-xl font-semibold">Campus Connect</h2>
+      </div>
 
       <div className="p-3 shrink-0">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500 dark:text-gray-400" />
+          <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search"
-            className="bg-gray-100 dark:bg-gray-800 border-none pl-10 rounded-lg"
+            className="bg-muted border-none pl-10 rounded-lg"
           />
         </div>
       </div>
@@ -239,12 +221,17 @@ export default function ChatPage() {
             </div>
           ) : (
             <>
+              {groupChats.length > 0 && (
+                <div className="p-3">
+                  <h3 className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Group Channels</h3>
+                </div>
+              )}
               {groupChats.map((chatItem) => (
                 <button
                   key={chatItem.id}
                   className={cn(
-                    'w-full text-left p-3 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors flex items-center gap-3',
-                    selectedChat?.id === chatItem.id && 'bg-primary/10 dark:bg-primary/20'
+                    'w-full text-left p-3 hover:bg-muted transition-colors flex items-center gap-3',
+                    selectedChat?.id === chatItem.id && 'bg-primary/10'
                   )}
                   onClick={() =>
                     handleSelectChat({
@@ -265,23 +252,25 @@ export default function ChatPage() {
                   <div className="flex-1">
                     <div className="flex justify-between">
                       <p className="font-semibold text-sm">{chatItem.name}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {formatTimestamp(new Date())}
-                      </p>
                     </div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                    <p className="text-sm text-muted-foreground truncate">
                       Group Chat
                     </p>
                   </div>
                 </button>
               ))}
 
+              {otherUsers.length > 0 && (
+                <div className="p-3 mt-4">
+                  <h3 className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Direct Messages</h3>
+                </div>
+              )}
               {otherUsers.map((chatItem) => (
                 <button
                   key={chatItem.uid}
                   className={cn(
-                    'w-full text-left p-3 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors flex items-center gap-3',
-                    selectedChat?.id === chatItem.uid && 'bg-primary/10 dark:bg-primary/20'
+                    'w-full text-left p-3 hover:bg-muted transition-colors flex items-center gap-3',
+                    selectedChat?.id === chatItem.uid && 'bg-primary/10'
                   )}
                   onClick={() =>
                     handleSelectChat({
@@ -302,13 +291,8 @@ export default function ChatPage() {
                     <AvatarFallback>{chatItem.displayName.charAt(0)}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1">
-                    <div className="flex justify-between">
-                      <p className="font-semibold text-sm">{chatItem.displayName}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {formatTimestamp(new Date())}
-                      </p>
-                    </div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                    <p className="font-semibold text-sm">{chatItem.displayName}</p>
+                    <p className="text-sm text-muted-foreground truncate">
                       Direct Message
                     </p>
                   </div>
@@ -322,39 +306,45 @@ export default function ChatPage() {
   );
 
   return (
-    <div className="h-full w-full overflow-hidden">
+    <div className="h-screen w-full flex bg-background">
       <Sheet open={isContactListOpen} onOpenChange={setIsContactListOpen}>
-        <SheetContent side="left" className="p-0 w-[350px]">
+        <SheetContent side="left" className="p-0 w-[350px] border-r-0">
           <ContactList />
         </SheetContent>
       </Sheet>
 
-      {selectedChat ? (
-        <Chat
-          key={selectedChat.id}
-          entity={selectedChat}
-          messages={messages}
-          onSendMessage={handleSendMessage}
-          currentUser={currentUser}
-          onToggleContacts={() => setIsContactListOpen((prev) => !prev)}
-          loading={loading}
-          allUsers={allUsers}
-        />
-      ) : (
-        <div className="flex h-full w-full items-center justify-center bg-gray-100 dark:bg-gray-900">
-          {loading ? (
-            <Loader2 className="h-8 w-8 animate-spin" />
-          ) : (
-            <div className="text-center text-gray-500">
-              <h2 className="text-2xl font-semibold">Codetrain Campus</h2>
-              <p>Select a chat to start messaging</p>
-              <Button onClick={() => setIsContactListOpen(true)} className="mt-4">
-                <Users className="mr-2 h-4 w-4" /> Open Contacts
-              </Button>
-            </div>
-          )}
-        </div>
-      )}
+      <div className="hidden md:block w-[350px] shrink-0">
+        <ContactList />
+      </div>
+
+      <div className="flex-1 flex flex-col">
+        {selectedChat ? (
+          <Chat
+            key={selectedChat.id}
+            entity={selectedChat}
+            messages={messages}
+            onSendMessage={handleSendMessage}
+            currentUser={currentUser}
+            onToggleContacts={() => setIsContactListOpen((prev) => !prev)}
+            loading={loading}
+            allUsers={allUsers}
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-background">
+            {loading ? (
+              <Loader2 className="h-8 w-8 animate-spin" />
+            ) : (
+              <div className="text-center text-muted-foreground">
+                <h2 className="text-2xl font-semibold">Codetrain Campus</h2>
+                <p>Select a chat to start messaging</p>
+                <Button onClick={() => setIsContactListOpen(true)} className="mt-4 md:hidden">
+                  <Users className="mr-2 h-4 w-4" /> Open Contacts
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

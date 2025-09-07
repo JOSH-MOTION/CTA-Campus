@@ -103,6 +103,14 @@ const MemoizedProtectedLayout = memo(function ProtectedLayout({children}: {child
   }
 
   const isChatPage = pathname === '/chat';
+  
+  if(isChatPage) {
+    return (
+        <NotificationsProvider>
+         {children}
+        </NotificationsProvider>
+    )
+  }
 
   return (
     <NotificationsProvider>
