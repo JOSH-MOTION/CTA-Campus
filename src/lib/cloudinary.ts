@@ -1,28 +1,27 @@
 // src/lib/cloudinary.ts
-import { v2 as cloudinary } from 'cloudinary';
 
-cloudinary.config({ 
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME, 
-  api_key: process.env.CLOUDINARY_API_KEY, 
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-  secure: true
-});
+const CLOUDINARY_CONFIG = {
+  cloudName: 'dfff3hdrf',
+  uploadPreset: 'foodApp',
+  apiKey: '253477856255366',
+};
 
 export const uploadImage = async (file: File) => {
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
+  formData.append('api_key', CLOUDINARY_CONFIG.apiKey);
 
-    return new Promise((resolve, reject) => {
-        const uploadStream = cloudinary.uploader.upload_stream(
-            { resource_type: 'image' },
-            (error, result) => {
-                if (error) {
-                    console.error('Cloudinary upload error:', error);
-                    reject(error);
-                }
-                resolve(result);
-            }
-        );
-        uploadStream.end(buffer);
-    });
+  const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/image/upload`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    console.error('Cloudinary upload error:', errorData);
+    throw new Error('Failed to upload image to Cloudinary.');
+  }
+
+  return response.json();
 };
