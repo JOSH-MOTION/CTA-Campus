@@ -58,7 +58,8 @@ const MessageBubble = React.memo(({
 }) => {
   const isSender = msg.senderId === currentUser?.uid;
   const messageTime = msg.timestamp ? format(msg.timestamp.toDate(), 'HH:mm') : '';
-  const senderData = allUsers.find(u => u.uid === msg.senderId);
+  const senderData = isSender ? currentUser : allUsers.find(u => u.uid === msg.senderId);
+  const senderPhoto = isSender ? (currentUser as any)?.photoURL : senderData?.photoURL
 
   return (
     <div
@@ -68,7 +69,7 @@ const MessageBubble = React.memo(({
       )}
     >
         <Avatar className='h-8 w-8'>
-          <AvatarImage src={senderData?.photoURL} alt={msg.senderName} />
+          <AvatarImage src={senderPhoto} alt={msg.senderName} />
           <AvatarFallback>{msg.senderName.charAt(0)}</AvatarFallback>
         </Avatar>
       <div className={cn('max-w-[75%]', isSender ? 'flex flex-col items-end' : 'flex flex-col items-start')}>
@@ -295,7 +296,7 @@ export const Chat = React.memo(function Chat({
 
   return (
     <>
-      <div className='h-full flex flex-col bg-gray-100 dark:bg-gray-900 overflow-hidden'>
+      <div className='h-full flex flex-col bg-gray-100 dark:bg-gray-900'>
         {/* Header - Fixed */}
         <header className='flex h-[60px] shrink-0 items-center gap-4 border-b border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950'>
           <Button variant='ghost' size='icon' onClick={onToggleContacts} className='md:hidden'>
