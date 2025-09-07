@@ -9,14 +9,9 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Send,
-  Users,
   Loader2,
   ArrowLeft,
-  ArrowDownCircle,
   Reply,
-  Pin,
-  Trash2,
-  Edit,
   X,
   Smile,
   MoreVertical,
@@ -27,19 +22,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import Picker from 'emoji-picker-react';
 import { cn } from '@/lib/utils';
 import type { Message } from '@/services/chat';
-import { updateMessage, getChatId, deleteMessage } from '@/services/chat';
 import type { User } from 'firebase/auth';
 import { format, isToday, isYesterday } from 'date-fns';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '../ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { UserData } from '@/contexts/AuthContext';
 
@@ -60,14 +44,16 @@ interface ChatProps {
   allUsers: UserData[];
 }
 
-const MessageBubble = React.memo(({ msg, currentUser }: { msg: Message; currentUser: User | null }) => {
+const MessageBubble = React.memo(({ msg, currentUser, allUsers }: { msg: Message; currentUser: User | null, allUsers: UserData[] }) => {
     const isSender = msg.senderId === currentUser?.uid;
     const messageTime = msg.timestamp ? format(msg.timestamp.toDate(), 'HH:mm') : '';
-    
+    const sender = allUsers.find(u => u.uid === msg.senderId);
+
     return (
         <div className={cn("group flex w-full items-start gap-3", isSender ? "flex-row-reverse" : "justify-start")}>
              {!isSender && (
                 <Avatar className='h-8 w-8 shrink-0'>
+                    <AvatarImage src={sender?.photoURL} alt={sender?.displayName} />
                     <AvatarFallback>{msg.senderName.charAt(0)}</AvatarFallback>
                 </Avatar>
              )}
@@ -149,6 +135,7 @@ export const Chat = React.memo(function Chat({
           <MessageBubble
             msg={msg}
             currentUser={currentUser}
+            allUsers={allUsers}
           />
         </React.Fragment>
       );
@@ -175,6 +162,7 @@ export const Chat = React.memo(function Chat({
             <span className='sr-only'>Back to Dashboard</span>
           </Button>
           <Avatar className='h-10 w-10'>
+            <AvatarImage src={entity.avatar} alt={entity.name} />
             <AvatarFallback>{entity.name.charAt(0)}</AvatarFallback>
           </Avatar>
           <div className="flex-1">
