@@ -1,9 +1,9 @@
 // src/lib/cloudinary.ts
 
 const CLOUDINARY_CONFIG = {
-  cloudName: 'dfff3hdrf',
-  uploadPreset: 'foodApp',
-  apiKey: '253477856255366',
+  cloudName: 'dlng6dqtl',
+  uploadPreset: 'eshool',
+  apiKey: '755841551827629',
 };
 
 export const uploadImage = async (file: File) => {

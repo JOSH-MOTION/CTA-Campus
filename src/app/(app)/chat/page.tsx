@@ -221,7 +221,7 @@ export default function ChatPage() {
                                 "w-full text-left p-3 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors flex items-center gap-3",
                                 selectedChat?.id === chatItem.id && "bg-primary/10 dark:bg-primary/20"
                             )}
-                            onClick={() => handleSelectChat({...chatItem, type: 'group'})}
+                            onClick={() => handleSelectChat({...chatItem, type: 'group', avatar: `https://placehold.co/100x100.png?text=${chatItem.name.charAt(0)}`})}
                         >
                             <Avatar className="h-12 w-12">
                                 <AvatarImage src={`https://placehold.co/100x100.png?text=${chatItem.name.charAt(0)}`} alt={chatItem.name} data-ai-hint={chatItem.dataAiHint} />

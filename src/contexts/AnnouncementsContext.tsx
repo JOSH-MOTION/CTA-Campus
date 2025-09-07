@@ -15,6 +15,7 @@ export interface Announcement {
   authorId: string;
   date: string;
   targetGen: string; // e.g., "Gen 30", "All Students", or "Everyone"
+  imageUrl?: string;
 }
 
 export type AnnouncementData = Omit<Announcement, 'id' | 'date' | 'author' | 'authorId'>;

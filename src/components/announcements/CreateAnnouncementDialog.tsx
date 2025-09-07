@@ -1,7 +1,7 @@
 // src/components/announcements/CreateAnnouncementDialog.tsx
 'use client';
 
-import {useState, type ReactNode, useEffect, useMemo} from 'react';
+import {useState, type ReactNode, useEffect, useMemo, useRef} from 'react';
 import {
   Dialog,
   DialogContent,
@@ -22,7 +22,9 @@ import {useAnnouncements} from '@/contexts/AnnouncementsContext';
 import {useAuth, UserData} from '@/contexts/AuthContext';
 import {useToast} from '@/hooks/use-toast';
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup} from '@/components/ui/select';
-import { Loader2 } from 'lucide-react';
+import { Loader2, UploadCloud } from 'lucide-react';
+import { uploadImage } from '@/lib/cloudinary';
+import Image from 'next/image';
 
 const announcementSchema = z.object({
   title: z.string().min(5, 'Title must be at least 5 characters long.'),
@@ -44,6 +46,9 @@ export function CreateAnnouncementDialog({children}: CreateAnnouncementDialogPro
   const {user, fetchAllUsers} = useAuth();
   const [allUsers, setAllUsers] = useState<UserData[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -56,6 +61,18 @@ export function CreateAnnouncementDialog({children}: CreateAnnouncementDialogPro
       loadUsers();
     }
   }, [isOpen, fetchAllUsers]);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const availableGens = useMemo(() => {
     const studentGens = allUsers
@@ -76,17 +93,26 @@ export function CreateAnnouncementDialog({children}: CreateAnnouncementDialogPro
   const onSubmit = async (data: AnnouncementFormValues) => {
     if (!user) return;
     setIsSubmitting(true);
+    let imageUrl = '';
     try {
+      if (imageFile) {
+        const uploadResult: any = await uploadImage(imageFile);
+        imageUrl = uploadResult.secure_url;
+      }
+
       await addAnnouncement({
         ...data,
         author: user?.displayName || 'User',
         authorId: user.uid,
+        imageUrl: imageUrl || undefined,
       });
       toast({
         title: 'Announcement Created',
         description: 'Your announcement has been posted.',
       });
       form.reset();
+      setImageFile(null);
+      setImagePreview(null);
       setIsOpen(false);
     } catch (error) {
        toast({
@@ -165,6 +191,28 @@ export function CreateAnnouncementDialog({children}: CreateAnnouncementDialogPro
                 </FormItem>
               )}
             />
+            <FormItem>
+              <FormLabel>Image (Optional)</FormLabel>
+              <FormControl>
+                <div 
+                  className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-md cursor-pointer"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <div className="space-y-1 text-center">
+                    {imagePreview ? (
+                      <Image src={imagePreview} alt="Preview" width={200} height={100} className="mx-auto h-24 object-contain" />
+                    ) : (
+                      <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground" />
+                    )}
+                    <div className="flex text-sm text-muted-foreground">
+                      <p className="pl-1">Click to upload an image</p>
+                      <Input ref={fileInputRef} id="file-upload" name="file-upload" type="file" className="sr-only" onChange={handleImageChange} accept="image/*" />
+                    </div>
+                    <p className="text-xs text-muted-foreground">PNG, JPG, GIF up to 10MB</p>
+                  </div>
+                </div>
+              </FormControl>
+            </FormItem>
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>
                 Cancel

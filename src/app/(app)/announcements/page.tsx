@@ -11,6 +11,7 @@ import {CreateAnnouncementDialog} from '@/components/announcements/CreateAnnounc
 import {Avatar, AvatarFallback} from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { AnnouncementActions } from '@/components/announcements/AnnouncementActions';
+import Image from 'next/image';
 
 // Function to find and wrap URLs in anchor tags
 const linkify = (text: string) => {
@@ -54,7 +55,12 @@ export default function AnnouncementsPage() {
       ) : sortedAnnouncements.length > 0 ? (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {sortedAnnouncements.map(announcement => (
-            <Card key={announcement.id}>
+            <Card key={announcement.id} className="flex flex-col">
+              {announcement.imageUrl && (
+                <div className="relative h-40 w-full">
+                  <Image src={announcement.imageUrl} alt={announcement.title} layout="fill" className="object-cover rounded-t-lg" />
+                </div>
+              )}
               <CardHeader>
                  <div className="flex justify-between items-start">
                   <div className="flex-1 pr-2">
@@ -67,7 +73,7 @@ export default function AnnouncementsPage() {
                 </div>
                 <CardDescription className="pt-2 whitespace-pre-wrap break-words">{linkify(announcement.content)}</CardDescription>
               </CardHeader>
-              <CardFooter className="flex items-center gap-2 text-sm text-muted-foreground">
+              <CardFooter className="mt-auto flex items-center gap-2 text-sm text-muted-foreground">
                 <Avatar className="h-6 w-6">
                   <AvatarFallback>{announcement.author.charAt(0)}</AvatarFallback>
                 </Avatar>

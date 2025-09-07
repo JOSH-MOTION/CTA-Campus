@@ -1,4 +1,4 @@
-
+// src/components/chat/Chat.tsx
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -46,6 +46,7 @@ const MessageBubble = React.memo(({
   onPin,
   onEdit,
   onDelete,
+  allUsers,
 }: {
   msg: Message;
   currentUser: User | null;
@@ -53,9 +54,11 @@ const MessageBubble = React.memo(({
   onPin: (message: Message) => void;
   onEdit: (message: Message) => void;
   onDelete: (message: Message) => void;
+  allUsers: UserData[];
 }) => {
   const isSender = msg.senderId === currentUser?.uid;
   const messageTime = msg.timestamp ? format(msg.timestamp.toDate(), 'HH:mm') : '';
+  const senderData = allUsers.find(u => u.uid === msg.senderId);
 
   return (
     <div
@@ -66,7 +69,7 @@ const MessageBubble = React.memo(({
     >
       {!isSender && (
         <Avatar className='h-8 w-8'>
-          <AvatarImage src={`https://placehold.co/100x100.png?text=${msg.senderName.charAt(0)}`} alt={msg.senderName} />
+          <AvatarImage src={senderData?.photoURL} alt={msg.senderName} />
           <AvatarFallback>{msg.senderName.charAt(0)}</AvatarFallback>
         </Avatar>
       )}
@@ -145,7 +148,7 @@ export const Chat = React.memo(function Chat({
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
-  const viewportRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   
   const [pinnedMessage, setPinnedMessage] = useState<Message | null>(null);
@@ -173,8 +176,11 @@ export const Chat = React.memo(function Chat({
   }, [entity.id]);
 
   const scrollToBottom = (behavior: 'smooth' | 'auto' = 'auto') => {
-    if (viewportRef.current) {
-        viewportRef.current.scrollTo({ top: viewportRef.current.scrollHeight, behavior });
+    if (scrollAreaRef.current) {
+        const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+        if (viewport) {
+            viewport.scrollTo({ top: viewport.scrollHeight, behavior });
+        }
     }
   };
 
@@ -182,19 +188,18 @@ export const Chat = React.memo(function Chat({
     const lastPinned = messages.filter(m => m.isPinned).sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis())[0];
     setPinnedMessage(lastPinned || null);
     
-    if (!viewportRef.current) return;
-    const { scrollTop, scrollHeight, clientHeight } = viewportRef.current;
-    
-    if (scrollHeight - scrollTop < clientHeight + 200) {
-        scrollToBottom();
-    }
+    // Auto scroll to bottom when new messages arrive
+    scrollToBottom();
   }, [messages]);
 
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    if (viewportRef.current) {
-        const { scrollTop, scrollHeight, clientHeight } = viewportRef.current;
-        const isScrolledUp = scrollHeight - scrollTop > clientHeight + 100;
-        setShowScrollToBottom(isScrolledUp);
+  const handleScroll = () => {
+    if (scrollAreaRef.current) {
+        const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+        if (viewport) {
+            const { scrollTop, scrollHeight, clientHeight } = viewport;
+            const isScrolledUp = scrollHeight - scrollTop > clientHeight + 100;
+            setShowScrollToBottom(isScrolledUp);
+        }
     }
   };
   
@@ -226,11 +231,12 @@ export const Chat = React.memo(function Chat({
             onPin={handlePin}
             onEdit={handleEditClick}
             onDelete={setDeletingMessage}
+            allUsers={allUsers}
           />
         </React.Fragment>
       );
     });
-  }, [messages, currentUser, pinnedMessage]);
+  }, [messages, currentUser, pinnedMessage, allUsers]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -291,8 +297,9 @@ export const Chat = React.memo(function Chat({
 
   return (
     <>
-      <div className='flex h-full flex-col bg-gray-100 dark:bg-gray-900'>
-        <header className='flex h-[60px] flex-shrink-0 items-center gap-4 border-b border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950'>
+      <div className='h-full flex flex-col bg-gray-100 dark:bg-gray-900 overflow-hidden'>
+        {/* Header - Fixed */}
+        <header className='flex h-[60px] shrink-0 items-center gap-4 border-b border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950'>
           <Button variant='ghost' size='icon' onClick={onToggleContacts} className='md:hidden'>
             <ArrowLeft className='h-5 w-5' />
             <span className='sr-only'>Back</span>
@@ -318,8 +325,9 @@ export const Chat = React.memo(function Chat({
           )}
         </header>
 
+        {/* Pinned Message - Fixed */}
         {pinnedMessage && (
-            <div className="flex-shrink-0 border-b border-primary/20 bg-primary/5 p-3">
+            <div className="shrink-0 border-b border-primary/20 bg-primary/5 p-3">
                 <div className="flex items-start gap-3">
                     <Pin className="h-4 w-4 mt-1 text-primary" />
                     <div className="flex-1">
@@ -333,13 +341,20 @@ export const Chat = React.memo(function Chat({
             </div>
         )}
 
-        <div className="flex-1 relative">
-            <ScrollArea className='h-full' viewportRef={viewportRef} onScroll={handleScroll}>
-              <div className='space-y-6 p-4 md:p-10'>{messageList}</div>
+        {/* Messages Area - Scrollable */}
+        <div className="flex-1 min-h-0">
+            <ScrollArea 
+                className='h-full' 
+                ref={scrollAreaRef}
+                onScrollCapture={handleScroll}
+            >
+                <div className='space-y-6 p-4 md:p-6'>
+                    {messageList}
+                </div>
             </ScrollArea>
         </div>
 
-
+        {/* Input Area - Fixed */}
         <footer className='shrink-0 border-t border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-950'>
           {editingMessageId ? (
              <div className="flex items-center gap-2">
