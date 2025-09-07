@@ -340,68 +340,69 @@ export const Chat = React.memo(function Chat({
             </div>
         )}
 
-        {/* Messages Area - Scrollable */}
-        <div className="flex-1 min-h-0">
-            <ScrollArea 
-                className='h-full' 
-                ref={scrollAreaRef}
-                onScrollCapture={handleScroll}
-            >
-                <div className='space-y-6 p-4 md:p-6'>
-                    {messageList}
-                </div>
-            </ScrollArea>
-        </div>
+      {/* Messages Area - Scrollable */}
+<div className="flex-1 min-h-0 overflow-hidden relative">
+  <ScrollArea
+    className="h-full pb-24" // 👈 give bottom padding so last msg isn't hidden behind input
+    ref={scrollAreaRef}
+    onScrollCapture={handleScroll}
+  >
+    <div className="space-y-6 p-4 md:p-6">
+      {messageList}
+    </div>
+  </ScrollArea>
 
-        {/* Input Area - Fixed */}
-        <footer className='shrink-0 border-t border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-950'>
-          {editingMessageId ? (
-             <div className="flex items-center gap-2">
-                <Input
-                    value={editingText}
-                    onChange={(e) => setEditingText(e.target.value)}
-                    placeholder="Editing message..."
-                    className="h-12 w-full rounded-lg border-none bg-gray-100 pr-12 focus:ring-0 dark:bg-gray-800"
-                />
-                <Button onClick={handleSaveEdit} disabled={isProcessing}>
-                    {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Save
-                </Button>
-                <Button variant="ghost" onClick={handleCancelEdit}>Cancel</Button>
-             </div>
-          ) : (
-            <>
-            {replyTo && (
-              <div className="mb-2 p-2 bg-gray-100 dark:bg-gray-800 rounded-md text-sm text-gray-600 dark:text-gray-400 flex justify-between items-center">
-                <div>
-                  <p className="font-semibold">Replying to {replyTo.senderName}</p>
-                  <p className="italic truncate">"{replyTo.text}"</p>
-                </div>
-                <Button variant="ghost" size="icon" onClick={() => setReplyTo(undefined)}>
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
-            <form onSubmit={handleSubmit} className='relative flex-1'>
-                <Input
-                value={text || ''}
-                onChange={(e) => setText(e.target.value)}
-                placeholder='Write your message...'
-                className='h-12 w-full rounded-lg border-none bg-gray-100 pr-12 focus:ring-0 dark:bg-gray-800'
-                disabled={editingMessageId !== null}
-                />
-                <Button
-                type='submit'
-                size='icon'
-                className='absolute right-2 top-1/2 h-9 w-9 -translate-y-1/2 rounded-lg bg-primary/20 text-primary hover:bg-primary/30'
-                >
-                <Send className='h-5 w-5' />
-                </Button>
-            </form>
-            </>
-          )}
-        </footer>
+  {/* Input Area - Always Fixed */}
+  <footer className="absolute bottom-0 left-0 right-0 border-t border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-950">
+    {editingMessageId ? (
+      <div className="flex items-center gap-2">
+        <Input
+          value={editingText}
+          onChange={(e) => setEditingText(e.target.value)}
+          placeholder="Editing message..."
+          className="h-12 w-full rounded-lg border-none bg-gray-100 pr-12 focus:ring-0 dark:bg-gray-800"
+        />
+        <Button onClick={handleSaveEdit} disabled={isProcessing}>
+          {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Save
+        </Button>
+        <Button variant="ghost" onClick={handleCancelEdit}>Cancel</Button>
       </div>
+    ) : (
+      <>
+        {replyTo && (
+          <div className="mb-2 p-2 bg-gray-100 dark:bg-gray-800 rounded-md text-sm text-gray-600 dark:text-gray-400 flex justify-between items-center">
+            <div>
+              <p className="font-semibold">Replying to {replyTo.senderName}</p>
+              <p className="italic truncate">"{replyTo.text}"</p>
+            </div>
+            <Button variant="ghost" size="icon" onClick={() => setReplyTo(undefined)}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+        <form onSubmit={handleSubmit} className="relative flex-1">
+          <Input
+            value={text || ''}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Write your message..."
+            className="h-12 w-full rounded-lg border-none bg-gray-100 pr-12 focus:ring-0 dark:bg-gray-800"
+            disabled={editingMessageId !== null}
+          />
+          <Button
+            type="submit"
+            size="icon"
+            className="absolute right-2 top-1/2 h-9 w-9 -translate-y-1/2 rounded-lg bg-primary/20 text-primary hover:bg-primary/30"
+          >
+            <Send className="h-5 w-5" />
+          </Button>
+        </form>
+      </>
+    )}
+  </footer>
+</div>
+      </div>
+
       <AlertDialog open={!!deletingMessage} onOpenChange={(open) => !open && setDeletingMessage(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
