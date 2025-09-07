@@ -1,11 +1,26 @@
 // src/components/chat/Chat.tsx
 'use client';
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Users, Loader2, ArrowLeft, ArrowDownCircle, Reply, Pin, Trash2, Edit, X } from 'lucide-react';
+import {
+  Send,
+  Users,
+  Loader2,
+  ArrowLeft,
+  ArrowDownCircle,
+  Reply,
+  Pin,
+  Trash2,
+  Edit,
+  X,
+  Smile,
+} from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import Picker from 'emoji-picker-react';
 import { cn } from '@/lib/utils';
 import type { Message } from '@/services/chat';
 import { updateMessage, getChatId, deleteMessage } from '@/services/chat';
@@ -25,15 +40,136 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { UserData, useAuth } from '@/contexts/AuthContext';
 
-type ChatEntity = { id: string; name: string; avatar?: string; dataAiHint: string; type: 'dm' | 'group' };
+type ChatEntity = {
+  id: string;
+  name: string;
+  avatar?: string;
+  dataAiHint: string;
+  type: 'dm' | 'group';
+};
+
 interface ChatProps {
   entity: ChatEntity;
   messages: Message[];
-  onSendMessage: (text: string, replyTo?: Message) => void;
+  onSendMessage: (text: string, replyTo?: Message, mentions?: UserData[]) => void;
   currentUser: User | null;
   onToggleContacts: () => void;
+  loading: boolean;
   allUsers: UserData[];
 }
+
+const MessageBubble = React.memo(
+  ({
+    msg,
+    currentUser,
+    onReply,
+    onPin,
+    onEdit,
+    onDelete,
+    allUsers,
+  }: {
+    msg: Message;
+    currentUser: User | null;
+    onReply: (message: Message) => void;
+    onPin: (message: Message) => void;
+    onEdit: (message: Message) => void;
+    onDelete: (message: Message) => void;
+    allUsers: UserData[];
+  }) => {
+    const isSender = msg.senderId === currentUser?.uid;
+    const messageTime = msg.timestamp ? format(msg.timestamp.toDate(), 'HH:mm') : '';
+    const senderData = isSender ? currentUser : allUsers.find(u => u.uid === msg.senderId);
+    const senderPhoto = isSender ? (currentUser as any)?.photoURL : senderData?.photoURL;
+
+    return (
+      <div
+        className={cn(
+          'group flex w-full items-start gap-3',
+          isSender ? 'flex-row-reverse' : 'justify-start'
+        )}
+      >
+        <Avatar className='h-8 w-8'>
+          <AvatarImage src={senderPhoto} alt={msg.senderName} />
+          <AvatarFallback>{msg.senderName.charAt(0)}</AvatarFallback>
+        </Avatar>
+        <div
+          className={cn(
+            'max-w-[75%]',
+            isSender ? 'flex flex-col items-end' : 'flex flex-col items-start'
+          )}
+        >
+          <div
+            className={cn(
+              'mb-1 flex items-baseline gap-2',
+              isSender ? 'flex-row-reverse' : 'justify-start'
+            )}
+          >
+            <p className='text-xs'>{isSender ? 'You' : msg.senderName}</p>
+            <p className='text-xs text-gray-500'>{messageTime}</p>
+          </div>
+          <div
+            className={cn(
+              'relative w-fit rounded-lg p-3 text-sm shadow-sm',
+              isSender ? 'bg-primary/20 dark:bg-primary/30' : 'bg-white dark:bg-gray-800',
+              msg.isPinned && 'border-2 border-primary'
+            )}
+          >
+            {msg.isPinned && (
+              <Pin className="absolute -top-2 -left-2 h-4 w-4 rotate-45 text-primary" />
+            )}
+            <p className='whitespace-pre-wrap'>{msg.text}</p>
+            {msg.edited && <span className="text-xs text-gray-500 ml-2">(edited)</span>}
+          </div>
+        </div>
+        <div
+          className={cn(
+            'flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity',
+            isSender ? 'flex-row-reverse' : ''
+          )}
+        >
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => onReply(msg)}
+          >
+            <Reply className="h-3 w-3" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => onPin(msg)}
+          >
+            <Pin className="h-3 w-3" />
+          </Button>
+          {isSender && (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => onEdit(msg)}
+              >
+                <Edit className="h-3 w-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-destructive"
+                onClick={() => onDelete(msg)}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+);
+
+MessageBubble.displayName = 'MessageBubble';
 
 const DateSeparator = React.memo(({ date }: { date: Date }) => {
   let label;
@@ -47,80 +183,14 @@ const DateSeparator = React.memo(({ date }: { date: Date }) => {
   }
   return (
     <div className='my-4 flex justify-center'>
-      <span className='rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground'>
+      <span className='rounded-full bg-gray-200 px-3 py-1 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400'>
         {label}
       </span>
     </div>
   );
 });
+
 DateSeparator.displayName = 'DateSeparator';
-
-
-const MessageBubble = React.memo(({
-  msg,
-  currentUser,
-  onReply,
-  onPin,
-  onEdit,
-  onDelete,
-}: {
-  msg: Message;
-  currentUser: User | null;
-  onReply: (message: Message) => void;
-  onPin: (message: Message) => void;
-  onEdit: (message: Message) => void;
-  onDelete: (message: Message) => void;
-}) => {
-  const isSender = msg.senderId === currentUser?.uid;
-  const messageTime = msg.timestamp ? format(msg.timestamp.toDate(), 'HH:mm') : '';
-  const senderPhoto = isSender ? currentUser?.photoURL : null; // TODO: get other user photo
-
-  return (
-    <div
-      className={cn(
-        'group flex w-full items-start gap-3',
-        isSender ? 'flex-row-reverse' : 'justify-start'
-      )}
-    >
-      <Avatar className='h-8 w-8'>
-        <AvatarImage src={senderPhoto || undefined} alt={msg.senderName} />
-        <AvatarFallback>{msg.senderName.charAt(0)}</AvatarFallback>
-      </Avatar>
-      <div className={cn('max-w-[75%]', isSender ? 'flex flex-col items-end' : 'flex flex-col items-start')}>
-        <div
-          className={cn(
-            'relative rounded-lg px-3 py-2 text-sm',
-            isSender ? 'bg-primary text-primary-foreground' : 'bg-card',
-            msg.isPinned && 'border-2 border-primary'
-          )}
-        >
-          {msg.isPinned && <Pin className="absolute -top-2 -left-2 h-4 w-4 rotate-45 text-primary" />}
-          {msg.replyTo && (
-            <div className="mb-1 rounded bg-black/10 p-2">
-              <p className="text-xs font-semibold">{msg.replyTo.senderName}</p>
-              <p className="text-xs opacity-80">{msg.replyTo.text}</p>
-            </div>
-          )}
-          {msg.text}
-          <div className="absolute top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center bg-card rounded-full p-1 shadow-md"
-               style={isSender ? { right: '100%', marginRight: '8px' } : { left: '100%', marginLeft: '8px' }}>
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onReply(msg)}><Reply className="h-3 w-3" /></Button>
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onPin(msg)}><Pin className="h-3 w-3" /></Button>
-              {isSender && (
-                  <>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onEdit(msg)}><Edit className="h-3 w-3" /></Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onDelete(msg)}><Trash2 className="h-3 w-3 text-destructive" /></Button>
-                  </>
-              )}
-          </div>
-        </div>
-        <div className={cn('mt-1 text-xs text-muted-foreground')}>{messageTime} {msg.edited && '(edited)'}</div>
-      </div>
-    </div>
-  );
-});
-MessageBubble.displayName = 'MessageBubble';
-
 
 export const Chat = React.memo(function Chat({
   entity,
@@ -128,7 +198,8 @@ export const Chat = React.memo(function Chat({
   onSendMessage,
   currentUser,
   onToggleContacts,
-  allUsers
+  loading,
+  allUsers,
 }: ChatProps) {
   const [text, setText] = useState('');
   const [replyTo, setReplyTo] = useState<Message | undefined>(undefined);
@@ -154,7 +225,11 @@ export const Chat = React.memo(function Chat({
       await updateMessage(chatId, message.id, { isPinned: !message.isPinned });
       toast({ title: message.isPinned ? 'Message Unpinned' : 'Message Pinned!' });
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not pin message.' });
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Could not pin message.',
+      });
     }
   };
 
@@ -165,23 +240,36 @@ export const Chat = React.memo(function Chat({
 
   const scrollToBottom = (behavior: 'smooth' | 'auto' = 'auto') => {
     if (scrollAreaRef.current) {
-        scrollAreaRef.current.scrollTo({
-            top: scrollAreaRef.current.scrollHeight,
-            behavior,
-        });
+      const viewport = scrollAreaRef.current.querySelector(
+        '[data-radix-scroll-area-viewport]'
+      );
+      if (viewport) {
+        viewport.scrollTo({ top: viewport.scrollHeight, behavior });
+      }
     }
   };
 
   useEffect(() => {
-    const lastPinned = messages.filter(m => m.isPinned).sort((a,b) => b.timestamp.toMillis() - a.timestamp.toMillis())[0];
+    const lastPinned = messages
+      .filter(m => m.isPinned)
+      .sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis())[0];
     setPinnedMessage(lastPinned || null);
+
+    // Auto scroll to bottom when new messages arrive
     scrollToBottom();
   }, [messages]);
 
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-    const isScrolledUp = scrollHeight - scrollTop > clientHeight + 100;
-    setShowScrollToBottom(isScrolledUp);
+  const handleScroll = () => {
+    if (scrollAreaRef.current) {
+      const viewport = scrollAreaRef.current.querySelector(
+        '[data-radix-scroll-area-viewport]'
+      );
+      if (viewport) {
+        const { scrollTop, scrollHeight, clientHeight } = viewport;
+        const isScrolledUp = scrollHeight - scrollTop > clientHeight + 100;
+        setShowScrollToBottom(isScrolledUp);
+      }
+    }
   };
 
   const handleEditClick = (message: Message) => {
@@ -190,7 +278,10 @@ export const Chat = React.memo(function Chat({
   };
 
   const messageList = useMemo(() => {
-    const regularMessages = pinnedMessage ? messages.filter(m => m.id !== pinnedMessage.id) : messages;
+    const regularMessages = pinnedMessage
+      ? messages.filter(m => m.id !== pinnedMessage.id)
+      : messages;
+
     return regularMessages.map((msg, index) => {
       const prevMessage = regularMessages[index - 1];
       const showDateSeparator =
@@ -209,11 +300,12 @@ export const Chat = React.memo(function Chat({
             onPin={handlePin}
             onEdit={handleEditClick}
             onDelete={setDeletingMessage}
+            allUsers={allUsers}
           />
         </React.Fragment>
       );
     });
-  }, [messages, currentUser, pinnedMessage]);
+  }, [messages, currentUser, pinnedMessage, allUsers]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -236,13 +328,19 @@ export const Chat = React.memo(function Chat({
     } else {
       chatId = entity.id;
     }
-
     setIsProcessing(true);
     try {
-      await updateMessage(chatId, editingMessageId, { text: editingText, edited: true });
+      await updateMessage(chatId, editingMessageId, {
+        text: editingText,
+        edited: true,
+      });
       toast({ title: 'Message updated' });
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to update message.' });
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to update message.',
+      });
     } finally {
       setIsProcessing(false);
       handleCancelEdit();
@@ -257,13 +355,16 @@ export const Chat = React.memo(function Chat({
     } else {
       chatId = entity.id;
     }
-
     setIsProcessing(true);
     try {
       await deleteMessage(chatId, deletingMessage.id);
       toast({ title: 'Message deleted' });
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete message.' });
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to delete message.',
+      });
     } finally {
       setIsProcessing(false);
       setDeletingMessage(null);
@@ -272,109 +373,168 @@ export const Chat = React.memo(function Chat({
 
   return (
     <>
-      <div className='flex flex-col h-full bg-muted'>
-        <header className='flex h-[60px] shrink-0 items-center gap-4 border-b bg-background p-4'>
-          <Button variant='ghost' size='icon' onClick={onToggleContacts} className='md:hidden'>
+      <div className='h-full flex flex-col bg-gray-100 dark:bg-gray-900'>
+        {/* Header - Fixed */}
+        <header className='flex h-[60px] shrink-0 items-center gap-4 border-b border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950'>
+          <Button
+            variant='ghost'
+            size='icon'
+            onClick={onToggleContacts}
+            className='md:hidden'
+          >
             <ArrowLeft className='h-5 w-5' />
             <span className='sr-only'>Back</span>
           </Button>
-          <div className='flex items-center gap-3'>
-            <Avatar className='h-9 w-9'>
-              <AvatarImage src={entity.avatar} alt={entity.name} />
-              <AvatarFallback>{entity.name.charAt(0)}</AvatarFallback>
-            </Avatar>
-            <h2 className='text-lg font-semibold'>{entity.name}</h2>
-          </div>
+          <Button
+            variant='ghost'
+            size='icon'
+            onClick={onToggleContacts}
+            className='hidden md:flex'
+          >
+            <Users className='h-5 w-5' />
+            <span className='sr-only'>Toggle Contacts</span>
+          </Button>
+          <Avatar className='h-10 w-10'>
+            <AvatarImage src={entity.avatar} alt={entity.name} />
+            <AvatarFallback>{entity.name.charAt(0)}</AvatarFallback>
+          </Avatar>
+          <h2 className='flex-1 text-lg font-semibold'>{entity.name}</h2>
+          {showScrollToBottom && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10 rounded-full"
+              onClick={() => scrollToBottom('smooth')}
+            >
+              <ArrowDownCircle className="h-6 w-6" />
+            </Button>
+          )}
         </header>
 
-        <div className="flex-1 overflow-hidden relative">
-          <ScrollArea
-            className='h-full'
-            onScroll={handleScroll}
-            ref={scrollAreaRef}
-          >
-            <div className='space-y-4 p-4'>
-              {pinnedMessage && (
-                  <div className="sticky top-2 z-10">
-                      <div className="rounded-md bg-amber-100 dark:bg-amber-900/50 p-2 border border-amber-300 dark:border-amber-700 flex items-center gap-2 text-xs">
-                          <Pin className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                          <span className="font-semibold text-amber-700 dark:text-amber-300">{pinnedMessage.senderName}:</span>
-                          <span className="truncate text-amber-800 dark:text-amber-200">{pinnedMessage.text}</span>
-                      </div>
-                  </div>
-              )}
-              {messageList}
-            </div>
-          </ScrollArea>
-           {showScrollToBottom && (
-              <Button
-                  variant="secondary"
-                  size="icon"
-                  className="absolute bottom-4 right-4 h-10 w-10 rounded-full shadow-lg"
-                  onClick={() => scrollToBottom('smooth')}
-              >
-                  <ArrowDownCircle className="h-6 w-6" />
-              </Button>
-          )}
-        </div>
-
-        <footer className='shrink-0 border-t bg-background p-4 space-y-2'>
-          {replyTo && (
-            <div className="flex items-center justify-between rounded-md bg-muted p-2 text-sm">
-              <div className="truncate">
-                <p className="font-semibold">Replying to {replyTo.senderName}</p>
-                <p className="truncate text-muted-foreground">{replyTo.text}</p>
+        {/* Pinned Message - Fixed */}
+        {pinnedMessage && (
+          <div className="shrink-0 border-b border-primary/20 bg-primary/5 p-3">
+            <div className="flex items-start gap-3">
+              <Pin className="h-4 w-4 mt-1 text-primary" />
+              <div className="flex-1">
+                <p className="text-xs font-semibold text-primary">
+                  Pinned by {pinnedMessage.senderName}
+                </p>
+                <p className="text-sm text-foreground">{pinnedMessage.text}</p>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => setReplyTo(undefined)}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => handlePin(pinnedMessage)}
+              >
                 <X className="h-4 w-4" />
               </Button>
             </div>
-          )}
+          </div>
+        )}
+
+        {/* Messages Area - Scrollable */}
+        <div className="flex-1 min-h-0">
+          <ScrollArea
+            className='h-full'
+            ref={scrollAreaRef}
+            onScrollCapture={handleScroll}
+          >
+            <div className='space-y-6 p-4 md:p-6'>{messageList}</div>
+          </ScrollArea>
+        </div>
+
+        {/* Input Area - Fixed */}
+        <footer className='shrink-0 border-t border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-950'>
           {editingMessageId ? (
             <div className="flex items-center gap-2">
               <Input
                 value={editingText}
                 onChange={(e) => setEditingText(e.target.value)}
                 placeholder="Editing message..."
-                className="flex-1"
+                className="h-12 w-full rounded-lg border-none bg-gray-100 pr-12 focus:ring-0 dark:bg-gray-800"
               />
               <Button onClick={handleSaveEdit} disabled={isProcessing}>
-                {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isProcessing && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
                 Save
               </Button>
-              <Button variant="ghost" onClick={handleCancelEdit}>Cancel</Button>
+              <Button variant="ghost" onClick={handleCancelEdit}>
+                Cancel
+              </Button>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className='relative flex-1'>
-              <Input
-                value={text || ''}
-                onChange={(e) => setText(e.target.value)}
-                placeholder={`Message ${entity.name}`}
-                className='pr-12'
-              />
-              <Button
-                type='submit'
-                size='icon'
-                className='absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2'
-              >
-                <Send className='h-4 w-4' />
-              </Button>
-            </form>
+            <>
+              {replyTo && (
+                <div className="mb-2 p-2 bg-gray-100 dark:bg-gray-800 rounded-md text-sm text-gray-600 dark:text-gray-400 flex justify-between items-center">
+                  <div>
+                    <p className="font-semibold">
+                      Replying to {replyTo.senderName}
+                    </p>
+                    <p className="italic truncate">"{replyTo.text}"</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setReplyTo(undefined)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+              <form onSubmit={handleSubmit} className='relative flex-1 flex items-center gap-2'>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg bg-primary/20 text-primary hover:bg-primary/30">
+                      <Smile className='h-5 w-5' />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0 border-none">
+                    <Picker onEmojiClick={(emojiObject) => setText(prev => prev + emojiObject.emoji)} />
+                  </PopoverContent>
+                </Popover>
+                <div className="relative w-full">
+                    <Input
+                    value={text || ''}
+                    onChange={(e) => setText(e.target.value)}
+                    placeholder='Write your message...'
+                    className='h-12 w-full rounded-lg border-none bg-gray-100 pr-12 focus:ring-0 dark:bg-gray-800'
+                    disabled={editingMessageId !== null}
+                    />
+                    <Button
+                    type='submit'
+                    size='icon'
+                    className='absolute right-2 top-1/2 h-9 w-9 -translate-y-1/2 rounded-lg bg-primary/20 text-primary hover:bg-primary/30'
+                    >
+                    <Send className='h-5 w-5' />
+                    </Button>
+                </div>
+              </form>
+            </>
           )}
         </footer>
       </div>
-      <AlertDialog open={!!deletingMessage} onOpenChange={(open) => !open && setDeletingMessage(null)}>
+
+      <AlertDialog
+        open={!!deletingMessage}
+        onOpenChange={(open) => !open && setDeletingMessage(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete this message.
+              This action cannot be undone. This will permanently delete this
+              message.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} disabled={isProcessing}>
-              {isProcessing && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
+              {isProcessing && (
+                <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+              )}
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
