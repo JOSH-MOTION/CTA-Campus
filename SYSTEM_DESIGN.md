@@ -110,3 +110,62 @@ Firestore is structured with top-level collections representing the core entitie
 -   Separate providers (`AuthProvider`, `AssignmentsContext`, etc.) encapsulate related state and logic.
 -   This approach keeps component logic clean and centralizes data fetching and manipulation.
 
+---
+
+## 5. Functional Requirements
+
+### 5.1. General (All Users)
+- **Authentication**: Users must be able to sign up, log in, and log out.
+- **Profile Management**: Users can view and update their own profile information (name, bio, profile picture).
+- **Real-time Chat**: All users can send and receive messages in real-time, both in direct messages and in group chats relevant to them.
+- **Notifications**: Users receive real-time notifications for important events (new messages, grades, announcements).
+
+### 5.2. Student-Specific
+- **Dashboard**: View a personalized summary of weekly topics, schedule, and recent resources.
+- **Academic Content**: View announcements, assignments, exercises, and projects targeted to their generation.
+- **Submissions**: Submit links to their work for all academic tasks.
+- **Grading & Points**: View their total points and a breakdown of how they were earned.
+- **Roadmap**: View the academic roadmap and track their progress as marked by a teacher.
+- **Booking**: Book one-on-one sessions with teachers based on their availability.
+- **Directory**: View a directory of all staff members.
+
+### 5.3. Teacher-Specific
+- **Dashboard**: View a dashboard summarizing key metrics for a selected student generation (e.g., student count, pending submissions).
+- **Content Management**: Create, update, and delete announcements, assignments, exercises, and projects for specific generations.
+- **Submission Review**: View all submissions for the academic content they've created.
+- **Grading**: Grade submissions, provide feedback, and award points.
+- **Student Management**: View a list of all students, their profiles, and their academic performance.
+- **Roadmap Management**: Mark curriculum weeks as complete for different generations.
+- **Availability**: Set and manage their own availability for student bookings.
+
+### 5.4. Admin-Specific
+- **Full CRUD Operations**: Admins have full create, read, update, and delete permissions on all data collections (users, content, submissions, etc.).
+- **User Management**: Can view and manage all user accounts and roles.
+- **System Oversight**: Has access to all dashboards and management pages available to teachers, but for all generations.
+
+---
+
+## 6. Non-Functional Requirements
+
+### 6.1. Performance
+- **Page Load Speed**: The application should load quickly, with critical content rendered on the server via Next.js Server Components to minimize client-side JavaScript.
+- **Responsiveness**: The UI must be fully responsive and provide a seamless experience on all device sizes, from mobile phones to desktops.
+- **Real-time Updates**: Chat and notifications should appear instantly without requiring a page refresh, using Firestore's real-time capabilities.
+
+### 6.2. Scalability
+- **Serverless Backend**: The use of Firebase (Firestore, Auth, Storage) ensures that the backend can scale automatically to handle a growing number of users and data without manual intervention.
+- **Efficient Queries**: Firestore queries are indexed and designed to be efficient, fetching only the data necessary for the current view.
+
+### 6.3. Security
+- **Authentication**: All routes (except login/signup) are protected, requiring users to be authenticated.
+- **Authorization (RBAC)**: Access to data and features is strictly controlled based on user roles (`student`, `teacher`, `admin`).
+- **Data Integrity**: Firestore Security Rules are the primary line of defense, enforcing data validation and access control on the server side to prevent unauthorized data manipulation.
+
+### 6.4. Usability & Accessibility
+- **Intuitive Interface**: The UI is designed to be clean, modern, and easy to navigate.
+- **Accessibility**: The use of ShadCN UI components, which are built on Radix UI, ensures that components are WAI-ARIA compliant and accessible to users with disabilities.
+- **Consistency**: The user interface maintains a consistent design language and user experience across all pages.
+
+### 6.5. Reliability
+- **High Availability**: The application relies on Google Cloud's infrastructure via Firebase, which provides high uptime and reliability.
+- **Atomic Operations**: Critical data updates, such as awarding points, use atomic transactions (`increment()`) in Firestore to prevent race conditions and ensure data consistency.
