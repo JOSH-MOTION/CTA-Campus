@@ -5,9 +5,8 @@
 import {useState, useEffect, useRef} from 'react';
 import {useRouter} from 'next/navigation';
 import {createUserWithEmailAndPassword, updateProfile} from 'firebase/auth';
-import {auth, db, storage} from '@/lib/firebase';
+import {auth, db} from '@/lib/firebase';
 import {doc, setDoc} from 'firebase/firestore';
-import {ref, uploadBytes, getDownloadURL} from 'firebase/storage';
 import {Button} from '@/components/ui/button';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
 import {Input} from '@/components/ui/input';
@@ -20,6 +19,7 @@ import {Textarea} from '@/components/ui/textarea';
 import {RadioGroup, RadioGroupItem} from '@/components/ui/radio-group';
 import {Avatar, AvatarImage, AvatarFallback} from '@/components/ui/avatar';
 import Link from 'next/link';
+import { uploadImage } from '@/lib/cloudinary';
 
 const availableGens = ['Gen 28', 'Gen 29', 'Gen 30', 'Gen 31', 'Gen 32'];
 const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -93,9 +93,8 @@ export default function StudentSignupPage() {
 
       let photoURL = '';
       if (selectedFile) {
-          const storageRef = ref(storage, `profile-pictures/${user.uid}/${selectedFile.name}`);
-          const snapshot = await uploadBytes(storageRef, selectedFile);
-          photoURL = await getDownloadURL(snapshot.ref);
+          const uploadResult: any = await uploadImage(selectedFile);
+          photoURL = uploadResult.secure_url;
       }
 
       await updateProfile(user, { displayName: fullName, photoURL });
@@ -104,7 +103,7 @@ export default function StudentSignupPage() {
         uid: user.uid,
         email: user.email,
         displayName: fullName,
-        role: 'student',
+        role: 'student' as 'student',
         gen,
         schoolId,
         lessonDay,
@@ -115,7 +114,6 @@ export default function StudentSignupPage() {
         totalPoints: 0,
       };
 
-      // Explicitly wait for the user document to be created.
       await setDoc(doc(db, 'users', user.uid), userDocData);
 
       setRole('student');

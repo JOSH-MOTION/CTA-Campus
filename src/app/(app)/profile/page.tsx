@@ -9,8 +9,7 @@ import {Input} from '@/components/ui/input';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter} from '@/components/ui/card';
 import {useAuth} from '@/contexts/AuthContext';
 import {Camera, LogOut, Loader2, Linkedin, Github, Clock} from 'lucide-react';
-import {auth, storage, db} from '@/lib/firebase';
-import {ref, uploadBytes, getDownloadURL} from 'firebase/storage';
+import {auth, db} from '@/lib/firebase';
 import {updateProfile} from 'firebase/auth';
 import {doc, updateDoc} from 'firebase/firestore';
 import {useToast} from '@/hooks/use-toast';
@@ -20,6 +19,7 @@ import {zodResolver} from '@hookform/resolvers/zod';
 import {Form, FormControl, FormField, FormItem, FormLabel, FormMessage} from '@/components/ui/form';
 import {Textarea} from '@/components/ui/textarea';
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select';
+import { uploadImage } from '@/lib/cloudinary';
 
 const profileSchema = z.object({
   displayName: z.string().min(1, 'Display name is required.'),
@@ -104,10 +104,9 @@ export default function ProfilePage() {
   const handleSavePicture = async () => {
     if (!selectedFile || !user) return;
     setIsUploading(true);
-    const storageRef = ref(storage, `profile-pictures/${user.uid}/${selectedFile.name}`);
     try {
-      const snapshot = await uploadBytes(storageRef, selectedFile);
-      const downloadURL = await getDownloadURL(snapshot.ref);
+      const uploadResult: any = await uploadImage(selectedFile);
+      const downloadURL = uploadResult.secure_url;
 
       await updateProfile(user, {photoURL: downloadURL});
       const userDocRef = doc(db, 'users', user.uid);
