@@ -7,9 +7,9 @@ This document outlines the system architecture, data model, and core components 
 
 Codetrain Campus is a modern, full-stack web application built on a serverless architecture. It leverages Next.js for the frontend and Firebase for backend services, creating a robust and scalable platform for managing a coding school.
 
--   **Frontend**: A responsive Single Page Application (SPA) built with Next.js and React.
--   **Backend**: A collection of serverless services provided by Google Firebase (BaaS - Backend-as-a-Service).
--   **AI Integration**: Generative AI features are powered by Google's Genkit framework, running as serverless functions.
+-   **Frontend**: A responsive Single Page Application (SPA) built with Next.js and React. This provides a fast, modern user experience with the performance benefits of server-side rendering.
+-   **Backend**: A collection of serverless services provided by Google Firebase (BaaS - Backend-as-a-Service). This choice minimizes infrastructure management, allowing the team to focus on application features while ensuring scalability and reliability.
+-   **AI Integration**: Generative AI features are powered by Google's Genkit framework, running as serverless functions. This provides a structured and maintainable way to integrate powerful AI capabilities.
 
 ![High-Level Architecture Diagram](https://placehold.co/800x400.png?text=Architecture%20Diagram)
 
@@ -19,29 +19,38 @@ Codetrain Campus is a modern, full-stack web application built on a serverless a
 
 ### 2.1. Frontend
 
--   **Framework**: **Next.js 15** with the App Router. This provides Server Components for performance and a modern, file-based routing system.
--   **Language**: **TypeScript** for type safety and improved developer experience.
--   **UI Library**: **React** for building the user interface.
--   **Component Library**: **ShadCN UI** provides a set of accessible and customizable components.
--   **Styling**: **Tailwind CSS** for a utility-first styling approach.
--   **State Management**: **React Context API** is used to manage global state for authentication, academic content, and user data.
+-   **Framework**: **Next.js 15** with the App Router.
+    -   **Why**: The App Router enables the use of **Server Components**, which reduce the amount of JavaScript sent to the client, leading to faster initial page loads and better performance. Its file-based routing is intuitive and simplifies project structure.
+-   **Language**: **TypeScript**.
+    -   **Why**: TypeScript adds static typing to JavaScript, which helps catch errors early in development, improves code quality, and makes the codebase easier to maintain and refactor.
+-   **UI Library**: **React**.
+    -   **Why**: React's component-based architecture is ideal for building complex, interactive user interfaces in a modular and reusable way.
+-   **Component Library**: **ShadCN UI**.
+    -   **Why**: ShadCN provides a set of beautifully designed, accessible, and customizable components that can be copied directly into the project. This gives full control over the code while accelerating UI development.
+-   **Styling**: **Tailwind CSS**.
+    -   **Why**: A utility-first CSS framework that allows for rapid styling directly in the markup without writing custom CSS. This keeps styling consistent and colocated with the components.
+-   **State Management**: **React Context API**.
+    -   **Why**: For managing global state like authentication and user data, the built-in Context API is lightweight and sufficient, avoiding the need for a heavier third-party state management library.
 
 ### 2.2. Backend (Firebase)
 
--   **Authentication**: **Firebase Authentication** handles user sign-up, login, and session management for students, teachers, and admins.
--   **Database**: **Cloud Firestore** is the primary NoSQL database for storing all application data, including user profiles, academic content, submissions, and chat messages.
--   **Storage**: **Firebase Storage** is used to store user-uploaded files, primarily profile pictures.
+-   **Authentication**: **Firebase Authentication**.
+    -   **Why**: It provides a secure, easy-to-implement, and fully managed authentication service with built-in features for email/password sign-in, session management, and user role handling.
+-   **Database**: **Cloud Firestore**.
+    -   **Why**: As a NoSQL, document-based database, Firestore is flexible and scales effortlessly. Its real-time capabilities are perfect for features like chat and notifications, pushing live updates to clients without extra configuration.
+-   **Storage**: **Firebase Storage**.
+    -   **Why**: It offers a simple and secure way to store user-generated content like profile pictures, integrating seamlessly with Firebase Authentication for rule-based access control.
 
 ### 2.3. Generative AI
 
--   **Framework**: **Genkit** (a Google framework for building AI-powered applications) is used to define and manage all AI flows.
--   **Models**: The application leverages various Google AI models (e.g., Gemini) for features like the FAQ chatbot, resource summarization, and contact suggestions.
+-   **Framework**: **Genkit** (a Google framework).
+    -   **Why**: Genkit provides a robust, TypeScript-native framework for defining, managing, and instrumenting AI flows. It simplifies the process of calling different AI models, chaining them together, and adding custom logic, making the AI features more reliable and easier to debug.
 
 ---
 
 ## 3. Data Model (Firestore)
 
-Firestore is structured with top-level collections representing the core entities of the application.
+Firestore is structured with top-level collections representing the core entities of the application. This approach is simple, scalable, and allows for efficient, targeted queries.
 
 -   `users`: Stores profile information for all users.
     -   `uid`: Unique ID from Firebase Auth.
@@ -51,25 +60,21 @@ Firestore is structured with top-level collections representing the core entitie
     -   Teacher-specific fields: `gensTaught`, `availableDays`, `timeSlots`.
     -   Subcollection: `points` (logs individual point transactions for a student).
 
--   `announcements`: School-wide news and updates.
-    -   `title`, `content`, `authorId`, `targetGen`.
-
--   `assignments`, `exercises`, `projects`: Academic tasks for students.
-    -   Structured similarly to `announcements`, with fields for title, description, due dates (for assignments), and target audience (`targetGen`).
+-   `announcements`, `assignments`, `exercises`, `projects`: Academic tasks for students.
+    -   Structured similarly, with fields for title, description, and target audience (`targetGen`). This consistency simplifies data fetching logic.
 
 -   `submissions`: Stores student work submissions.
     -   `studentId`, `assignmentId`, `submissionLink`, `pointCategory`, `grade`.
 
 -   `chats`: Stores all chat messages.
-    -   Each document represents a unique chat (either a DM or a group). The document ID is either a sorted combination of two user UIDs (for DMs) or a group ID (e.g., `group-Gen 30`).
-    -   Subcollection: `messages` (contains all messages for that chat).
+    -   Each document represents a unique chat. Using a combined, sorted UID for DMs creates a predictable and unique ID for every private conversation.
+    -   Subcollection: `messages` (contains all messages for that chat). This is a scalable pattern for handling long conversations.
 
 -   `notifications`: Stores user-specific notifications.
     -   `userId`, `title`, `description`, `href`, `read`.
 
 -   `roadmap_status`: Tracks the completion status of curriculum weeks for each generation.
-    -   Document ID is the `weekId`.
-    -   Each document contains a map where keys are generation names (e.g., "Gen 30") and values are booleans.
+    -   Document ID is the `weekId`. This makes it easy to query the status of any week.
 
 ---
 
@@ -78,37 +83,31 @@ Firestore is structured with top-level collections representing the core entitie
 ### 4.1. Authentication and Authorization
 
 -   **Role-Based Access Control (RBAC)**: The app supports three roles: `student`, `teacher`, and `admin`.
--   **UI Rendering**: The `AuthContext` provides the user's role, which is used to conditionally render navigation items and UI components.
--   **Data Security**: **Firestore Security Rules** enforce data access policies on the backend, ensuring users can only read or write data they are permitted to access.
+    -   **Why**: RBAC is a standard and effective security model. It ensures that users can only access the data and features appropriate for their role.
+-   **UI Rendering**: The `AuthContext` provides the user's role, which is used to conditionally render UI components.
+    -   **Why**: This prevents users from even seeing options they are not permitted to use, creating a cleaner and more secure user experience.
+-   **Data Security**: **Firestore Security Rules** are used to enforce data access policies on the backend.
+    -   **Why**: This is the most critical security layer. While the UI can hide things, server-side rules ensure that even a malicious user cannot directly access or modify data they are not authorized to, guaranteeing data integrity.
 
 ### 4.2. Academic Content Management
 
--   Teachers and admins create content (Announcements, Assignments, etc.).
 -   Each piece of content has a `targetGen` field.
--   The application queries Firestore to fetch only the content relevant to the logged-in user's generation or role.
+    -   **Why**: This allows for efficient querying. The application only fetches content relevant to the logged-in user, which reduces data transfer and improves performance.
 
 ### 4.3. Grading and Points System
 
--   Students submit work via a dialog, creating a `submission` document.
--   Teachers view submissions and can use the `GradeSubmissionDialog`.
--   Grading triggers a Genkit flow (`gradeSubmissionFlow`) which:
-    1.  Awards points by calling the `awardPointsFlow`.
-    2.  Updates the `submission` document with a grade and feedback.
-    3.  Creates a `notification` for the student.
--   A student's `totalPoints` are stored on their `user` document and are updated atomically using `increment()` for reliability.
+-   A student's `totalPoints` are stored on their `user` document and are updated atomically using `increment()`.
+    -   **Why**: Atomic operations are crucial for reliability. They ensure that even if multiple updates happen at the same time, the final point count will be accurate, preventing race conditions and data corruption.
 
 ### 4.4. Real-time Communication
 
 -   The chat feature uses Firestore's real-time listeners (`onSnapshot`).
--   Direct Messages (DMs) use a consistent chat ID generated by sorting the UIDs of the two participants (`getChatId`).
--   Group chats are based on generation (e.g., `group-Gen 30`).
--   When a message is sent, a server-side Genkit flow is triggered to send notifications to the recipient(s).
+    -   **Why**: This is the most efficient way to build real-time features with Firestore. It allows the server to push updates to the client instantly, so messages appear without the need for manual polling or page refreshing.
 
 ### 4.5. State Management
 
 -   **React Context** is the primary method for managing global state.
--   Separate providers (`AuthProvider`, `AssignmentsContext`, etc.) encapsulate related state and logic.
--   This approach keeps component logic clean and centralizes data fetching and manipulation.
+    -   **Why**: Using separate, focused providers (`AuthProvider`, `AssignmentsContext`, etc.) encapsulates related state and logic. This keeps component code clean, prevents "prop drilling," and centralizes data-fetching logic for easier management.
 
 ---
 
@@ -117,55 +116,62 @@ Firestore is structured with top-level collections representing the core entitie
 ### 5.1. General (All Users)
 - **Authentication**: Users must be able to sign up, log in, and log out.
 - **Profile Management**: Users can view and update their own profile information (name, bio, profile picture).
-- **Real-time Chat**: All users can send and receive messages in real-time, both in direct messages and in group chats relevant to them.
-- **Notifications**: Users receive real-time notifications for important events (new messages, grades, announcements).
+- **Real-time Chat**: All users can send and receive messages in real-time.
+- **Notifications**: Users receive real-time notifications for important events.
 
 ### 5.2. Student-Specific
 - **Dashboard**: View a personalized summary of weekly topics, schedule, and recent resources.
-- **Academic Content**: View announcements, assignments, exercises, and projects targeted to their generation.
+- **Academic Content**: View announcements, assignments, etc., targeted to their generation.
 - **Submissions**: Submit links to their work for all academic tasks.
 - **Grading & Points**: View their total points and a breakdown of how they were earned.
-- **Roadmap**: View the academic roadmap and track their progress as marked by a teacher.
-- **Booking**: Book one-on-one sessions with teachers based on their availability.
+- **Roadmap**: Track their progress as marked by a teacher.
+- **Booking**: Book one-on-one sessions with teachers.
 - **Directory**: View a directory of all staff members.
 
 ### 5.3. Teacher-Specific
-- **Dashboard**: View a dashboard summarizing key metrics for a selected student generation (e.g., student count, pending submissions).
-- **Content Management**: Create, update, and delete announcements, assignments, exercises, and projects for specific generations.
+- **Dashboard**: View a summary of key metrics for a selected student generation.
+- **Content Management**: Create, update, and delete announcements, assignments, etc.
 - **Submission Review**: View all submissions for the academic content they've created.
 - **Grading**: Grade submissions, provide feedback, and award points.
-- **Student Management**: View a list of all students, their profiles, and their academic performance.
+- **Student Management**: View a list of all students and their performance.
 - **Roadmap Management**: Mark curriculum weeks as complete for different generations.
-- **Availability**: Set and manage their own availability for student bookings.
+- **Availability**: Set and manage their own availability.
 
 ### 5.4. Admin-Specific
-- **Full CRUD Operations**: Admins have full create, read, update, and delete permissions on all data collections (users, content, submissions, etc.).
+- **Full CRUD Operations**: Admins have full permissions on all data collections.
 - **User Management**: Can view and manage all user accounts and roles.
-- **System Oversight**: Has access to all dashboards and management pages available to teachers, but for all generations.
+- **System Oversight**: Has access to all dashboards and management pages.
 
 ---
 
 ## 6. Non-Functional Requirements
 
 ### 6.1. Performance
-- **Page Load Speed**: The application should load quickly, with critical content rendered on the server via Next.js Server Components to minimize client-side JavaScript.
-- **Responsiveness**: The UI must be fully responsive and provide a seamless experience on all device sizes, from mobile phones to desktops.
-- **Real-time Updates**: Chat and notifications should appear instantly without requiring a page refresh, using Firestore's real-time capabilities.
+- **Page Load Speed**: The application should load quickly.
+    -   **How**: Achieved by using Next.js Server Components to render content on the server, which minimizes the amount of JavaScript sent to the client.
+- **Responsiveness**: The UI must be fully responsive on all device sizes.
+    -   **How**: Achieved using Tailwind CSS, a utility-first framework designed for building responsive layouts.
+- **Real-time Updates**: Chat and notifications should appear instantly.
+    -   **How**: Implemented using Firestore's `onSnapshot` real-time listeners.
 
 ### 6.2. Scalability
-- **Serverless Backend**: The use of Firebase (Firestore, Auth, Storage) ensures that the backend can scale automatically to handle a growing number of users and data without manual intervention.
-- **Efficient Queries**: Firestore queries are indexed and designed to be efficient, fetching only the data necessary for the current view.
+- **Serverless Backend**: The backend must scale automatically with user growth.
+    -   **How**: Firebase services (Firestore, Auth, Storage) are built on Google Cloud's infrastructure and scale automatically without manual intervention.
+- **Efficient Queries**: Database queries must remain fast even with large amounts of data.
+    -   **How**: Firestore queries are indexed by default. The data model is designed to allow for shallow queries that fetch only the necessary data for a given view.
 
 ### 6.3. Security
-- **Authentication**: All routes (except login/signup) are protected, requiring users to be authenticated.
-- **Authorization (RBAC)**: Access to data and features is strictly controlled based on user roles (`student`, `teacher`, `admin`).
-- **Data Integrity**: Firestore Security Rules are the primary line of defense, enforcing data validation and access control on the server side to prevent unauthorized data manipulation.
+- **Authentication**: All sensitive routes must be protected.
+- **Authorization (RBAC)**: Access to data and features must be strictly controlled by role.
+    -   **How**: Firestore Security Rules provide the primary line of defense, enforcing data validation and access control on the server-side to prevent unauthorized data manipulation.
 
 ### 6.4. Usability & Accessibility
-- **Intuitive Interface**: The UI is designed to be clean, modern, and easy to navigate.
-- **Accessibility**: The use of ShadCN UI components, which are built on Radix UI, ensures that components are WAI-ARIA compliant and accessible to users with disabilities.
-- **Consistency**: The user interface maintains a consistent design language and user experience across all pages.
+- **Intuitive Interface**: The UI must be clean, modern, and easy to navigate.
+- **Accessibility**: The application must be usable by people with disabilities.
+    -   **How**: ShadCN UI components are built on Radix UI, which is WAI-ARIA compliant, ensuring a high standard of accessibility out of the box.
 
 ### 6.5. Reliability
-- **High Availability**: The application relies on Google Cloud's infrastructure via Firebase, which provides high uptime and reliability.
-- **Atomic Operations**: Critical data updates, such as awarding points, use atomic transactions (`increment()`) in Firestore to prevent race conditions and ensure data consistency.
+- **High Availability**: The application must have minimal downtime.
+    -   **How**: Relying on Google Cloud's infrastructure via Firebase provides high uptime and reliability.
+- **Atomic Operations**: Critical data updates (like awarding points) must be fail-safe.
+    -   **How**: Achieved by using atomic transactions (`increment()`) in Firestore to prevent race conditions and ensure data consistency.
