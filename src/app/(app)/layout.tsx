@@ -42,6 +42,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ReportsProvider } from '@/contexts/ReportsContext';
 
 const MemoizedProtectedLayout = memo(function ProtectedLayout({children}: {children: ReactNode}) {
   const {user, userData, role, loading} = useAuth();
@@ -104,15 +105,7 @@ const MemoizedProtectedLayout = memo(function ProtectedLayout({children}: {child
 
   const isChatPage = pathname === '/chat';
   
-  if(isChatPage) {
-    return (
-        <NotificationsProvider>
-         {children}
-        </NotificationsProvider>
-    )
-  }
-
-  return (
+  const AppProviders = ({ children }: { children: ReactNode }) => (
     <NotificationsProvider>
       <RoadmapProvider>
         <AnnouncementsProvider>
@@ -120,55 +113,9 @@ const MemoizedProtectedLayout = memo(function ProtectedLayout({children}: {child
             <ExercisesProvider>
               <ProjectsProvider>
                 <ResourcesProvider>
-                  <SidebarProvider>
-                    <Sidebar>
-                      <SidebarContent className="p-4">
-                        <div className="flex items-center justify-between px-2">
-                          <div className="flex items-center gap-2">
-                            <School className="h-6 w-6 text-primary" />
-                            <h1 className="text-xl font-semibold">Codetrain Campus</h1>
-                          </div>
-                        </div>
-                        <SidebarNav />
-                      </SidebarContent>
-                    </Sidebar>
-                    <SidebarInset className="flex flex-col">
-                      <header className="sticky top-0 z-10 flex h-16 items-center justify-between gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:px-6">
-                        <SidebarTrigger className="md:hidden" />
-                        <div className="ml-auto flex items-center gap-2">
-                          <ThemeToggle />
-                          <NotificationBell />
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="rounded-full">
-                                <Avatar className="h-8 w-8">
-                                  <AvatarImage src={userData?.photoURL || undefined} alt={user?.displayName || 'User'} />
-                                  <AvatarFallback>{user?.displayName?.charAt(0)}</AvatarFallback>
-                                </Avatar>
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                               <DropdownMenuLabel>
-                                  <p>{userData?.displayName}</p>
-                                  <p className="text-xs text-muted-foreground font-normal">{userData?.email}</p>
-                                </DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem asChild>
-                                  <Link href="/profile">Profile</Link>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => auth.signOut()}>
-                                  Log out
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </header>
-                      <main className={cn('flex-1 flex flex-col', !isChatPage && 'p-4 sm:p-6 overflow-y-auto')}>
-                        {children}
-                      </main>
-                      <AIAssistant />
-                    </SidebarInset>
-                  </SidebarProvider>
+                  <ReportsProvider>
+                    {children}
+                  </ReportsProvider>
                 </ResourcesProvider>
               </ProjectsProvider>
             </ExercisesProvider>
@@ -176,6 +123,68 @@ const MemoizedProtectedLayout = memo(function ProtectedLayout({children}: {child
         </AnnouncementsProvider>
       </RoadmapProvider>
     </NotificationsProvider>
+  );
+
+  if(isChatPage) {
+    return (
+        <AppProviders>
+         {children}
+        </AppProviders>
+    )
+  }
+
+  return (
+    <AppProviders>
+      <SidebarProvider>
+        <Sidebar>
+          <SidebarContent className="p-4">
+            <div className="flex items-center justify-between px-2">
+              <div className="flex items-center gap-2">
+                <School className="h-6 w-6 text-primary" />
+                <h1 className="text-xl font-semibold">Codetrain Campus</h1>
+              </div>
+            </div>
+            <SidebarNav />
+          </SidebarContent>
+        </Sidebar>
+        <SidebarInset className="flex flex-col">
+          <header className="sticky top-0 z-10 flex h-16 items-center justify-between gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:px-6">
+            <SidebarTrigger className="md:hidden" />
+            <div className="ml-auto flex items-center gap-2">
+              <ThemeToggle />
+              <NotificationBell />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="rounded-full">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={userData?.photoURL || undefined} alt={user?.displayName || 'User'} />
+                      <AvatarFallback>{user?.displayName?.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>
+                      <p>{userData?.displayName}</p>
+                      <p className="text-xs text-muted-foreground font-normal">{userData?.email}</p>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link href="/profile">Profile</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => auth.signOut()}>
+                      Log out
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </header>
+          <main className={cn('flex-1 flex flex-col', !isChatPage && 'p-4 sm:p-6 overflow-y-auto')}>
+            {children}
+          </main>
+          <AIAssistant />
+        </SidebarInset>
+      </SidebarProvider>
+    </AppProviders>
   );
 });
 

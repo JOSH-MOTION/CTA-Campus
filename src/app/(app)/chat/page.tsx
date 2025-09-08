@@ -6,7 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Users, Loader2 } from 'lucide-react';
+import { Search, Users, Loader2, ArrowLeft } from 'lucide-react';
 import { Chat } from '@/components/chat/Chat';
 import { useAuth, UserData } from '@/contexts/AuthContext';
 import { Message, getChatId, sendMessage, onMessages } from '@/services/chat';
@@ -76,16 +76,28 @@ export default function ChatPage() {
 
   const groupChats = useMemo(() => {
     const groups: Omit<ChatEntity, 'type' | 'lastMessage' | 'lastMessageTimestamp' | 'unreadCount'>[] = [];
-    if (role === 'teacher' || role === 'admin') {
-      const allStudents = allUsers.filter((u) => u.role === 'student');
-      const allGens = new Set(allStudents.map((student) => student.gen).filter(Boolean));
-      allGens.forEach((gen) => {
+    const allStudents = allUsers.filter((u) => u.role === 'student');
+    const allGens = new Set(allStudents.map((student) => student.gen).filter(Boolean));
+    
+    if (role === 'admin') {
+       allGens.forEach((gen) => {
         groups.push({
           id: `group-${gen}`,
           name: `${gen} Hub`,
           dataAiHint: 'group students',
         });
       });
+    } else if (role === 'teacher') {
+        const taughtGens = userData?.gensTaught?.split(',').map(g => g.trim()) || [];
+        allGens.forEach((gen) => {
+          if (taughtGens.includes(gen)) {
+            groups.push({
+                id: `group-${gen}`,
+                name: `${gen} Hub`,
+                dataAiHint: 'group students',
+            });
+          }
+        });
     } else if (role === 'student' && userData?.gen) {
       groups.push({
         id: `group-${userData.gen}`,
@@ -199,8 +211,11 @@ export default function ChatPage() {
 
   const ContactList = () => (
     <div className="flex flex-col h-full bg-background border-r">
-      <div className="p-4 border-b shrink-0">
+      <div className="p-4 border-b shrink-0 flex items-center justify-between">
          <h2 className="text-xl font-semibold">Campus Connect</h2>
+         <Button variant="ghost" size="icon" className="md:hidden" onClick={() => router.push('/')}>
+            <ArrowLeft className="h-5 w-5" />
+         </Button>
       </div>
 
       <div className="p-3 shrink-0">

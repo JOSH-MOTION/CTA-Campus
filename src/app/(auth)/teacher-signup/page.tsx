@@ -12,10 +12,11 @@ import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
 import {useToast} from '@/hooks/use-toast';
 import {useAuth} from '@/contexts/AuthContext';
-import {Camera, School, Github, Linkedin} from 'lucide-react';
+import {Camera, School, Github, Linkedin, Loader2} from 'lucide-react';
 import {Textarea} from '@/components/ui/textarea';
 import {Avatar, AvatarImage, AvatarFallback} from '@/components/ui/avatar';
 import Link from 'next/link';
+import { uploadImage } from '@/lib/cloudinary';
 
 export default function TeacherSignupPage() {
   const [email, setEmail] = useState('');
@@ -72,7 +73,13 @@ export default function TeacherSignupPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const {user} = userCredential;
       
-      await updateProfile(user, {displayName: fullName});
+      let photoURL = '';
+      if (selectedFile) {
+          const uploadResult: any = await uploadImage(selectedFile);
+          photoURL = uploadResult.secure_url;
+      }
+      
+      await updateProfile(user, {displayName: fullName, photoURL});
       
       await setDoc(doc(db, 'users', user.uid), {
         uid: user.uid,
@@ -82,7 +89,8 @@ export default function TeacherSignupPage() {
         gensTaught,
         bio,
         linkedin,
-        github
+        github,
+        photoURL,
       });
 
       setRole('teacher');
@@ -187,7 +195,14 @@ export default function TeacherSignupPage() {
               <Textarea id="bio" placeholder="Tell us a little about your teaching experience" value={bio} onChange={e => setBio(e.target.value)} />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Loading...' : 'Sign Up'}
+               {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating Account...
+                </>
+              ) : (
+                'Sign Up'
+              )}
             </Button>
           </form>
           <div className="mt-4 text-center text-sm">

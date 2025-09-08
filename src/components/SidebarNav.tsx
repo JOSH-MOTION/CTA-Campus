@@ -31,7 +31,8 @@ import {
   History,
   Inbox,
   Star,
-  School
+  School,
+  FilePen
 } from 'lucide-react';
 import {SidebarMenu, SidebarMenuItem, SidebarMenuButton} from '@/components/ui/sidebar';
 import Link from 'next/link';
@@ -61,6 +62,7 @@ export const studentNavItems = [
 export const teacherNavItems = [
   {href: '/', label: 'Dashboard', icon: LayoutDashboard},
   {href: '/chat', label: 'Campus Connect', icon: MessageSquare},
+  {href: '/reports', label: 'Weekly Reports', icon: FilePen},
   {href: '/submissions', label: 'All Submissions', icon: Inbox},
   {href: '/students', label: 'Student Management', icon: Users},
   {href: '/rankings', label: 'Rankings', icon: TrendingUp},
@@ -80,8 +82,10 @@ export const teacherNavItems = [
 export const adminNavItems = [
   {href: '/', label: 'Dashboard', icon: LayoutDashboard},
   {href: '/users', label: 'User Management', icon: UserCog},
+  {href: '/teachers', label: 'Teacher Directory', icon: School},
+  {href: '/students', label: 'Student Directory', icon: Users},
+  {href: '/reports', label: 'Weekly Reports', icon: FilePen},
   {href: '/submissions', label: 'All Submissions', icon: Inbox},
-  {href: '/students', label: 'Student Management', icon: Users},
   {href: '/rankings', label: 'Rankings', icon: TrendingUp},
   {href: '/grading', label: 'Grading System', icon: Award},
   {href: '/announcements', label: 'Manage Announcements', icon: Megaphone},
