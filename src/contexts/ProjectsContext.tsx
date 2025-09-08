@@ -83,7 +83,11 @@ export const ProjectsProvider: FC<{children: ReactNode}> = ({children}) => {
         setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+        if (unsubscribe) {
+            unsubscribe();
+        }
+    };
   }, [user, role, userData, authLoading]);
 
   const addProject = useCallback(async (project: ProjectData) => {

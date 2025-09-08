@@ -83,7 +83,11 @@ export const ExercisesProvider: FC<{children: ReactNode}> = ({children}) => {
         setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+        if (unsubscribe) {
+            unsubscribe();
+        }
+    };
   }, [user, role, userData, authLoading]);
 
   const addExercise = useCallback(async (exercise: ExerciseData) => {

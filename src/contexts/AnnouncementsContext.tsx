@@ -106,7 +106,11 @@ export const AnnouncementsProvider: FC<{children: ReactNode}> = ({children}) => 
         setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+        if (unsubscribe) {
+            unsubscribe();
+        }
+    };
   }, [user, role, userData, authLoading]);
 
   const addAnnouncement = useCallback(async (announcement: Omit<Announcement, 'id' | 'date'>) => {

@@ -92,7 +92,11 @@ export const AssignmentsProvider: FC<{children: ReactNode}> = ({children}) => {
         setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, [user, role, userData, authLoading]);
 
 
