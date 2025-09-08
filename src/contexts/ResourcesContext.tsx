@@ -54,7 +54,11 @@ export const ResourcesProvider: FC<{children: ReactNode}> = ({children}) => {
         setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+        if (unsubscribe) {
+            unsubscribe();
+        }
+    };
   }, []);
 
   const addResource = useCallback(async (resource: ResourceData) => {
