@@ -61,7 +61,11 @@ export default function MaterialsPage() {
       setIsLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, [toast]);
   
   const unlockedWeekIds = useMemo(() => {
