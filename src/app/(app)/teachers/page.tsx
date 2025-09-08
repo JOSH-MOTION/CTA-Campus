@@ -1,3 +1,4 @@
+
 // src/app/(app)/teachers/page.tsx
 'use client';
 
@@ -28,7 +29,11 @@ export default function TeachersPage() {
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+        if (unsubscribe) {
+            unsubscribe();
+        }
+    };
   }, []);
 
   const filteredTeachers = useMemo(() => {

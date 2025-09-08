@@ -1,3 +1,4 @@
+
 // src/services/submissions.ts
 import {
     collection,
@@ -142,30 +143,36 @@ export const fetchSubmissions = async (assignmentId: string): Promise<Submission
    * @returns An unsubscribe function to stop the listener.
    */
     export const onSubmissionsForStudent = (studentId: string, callback: (submissions: Submission[], error: string | null) => void) => {
-        const submissionsCol = collection(db, 'submissions');
-        const q = query(
-        submissionsCol,
-        where('studentId', '==', studentId),
-        orderBy('submittedAt', 'desc')
-        );
+        let unsubscribe: () => void = () => {};
+        try {
+            const submissionsCol = collection(db, 'submissions');
+            const q = query(
+            submissionsCol,
+            where('studentId', '==', studentId),
+            orderBy('submittedAt', 'desc')
+            );
 
-        const unsubscribe = onSnapshot(
-            q,
-            (querySnapshot) => {
-                const submissions: Submission[] = querySnapshot.docs.map((doc) => {
-                return { id: doc.id, ...doc.data() } as Submission;
-                });
-                callback(submissions, null);
-            },
-            (error) => {
-                console.error(`Error listening to submissions for student ${studentId}:`, error);
-                let errorMessage = "Could not load submissions. Please try again later.";
-                if (error.code === 'failed-precondition') {
-                    errorMessage = "The required database index is still being built. Please wait a few minutes and try again.";
+            unsubscribe = onSnapshot(
+                q,
+                (querySnapshot) => {
+                    const submissions: Submission[] = querySnapshot.docs.map((doc) => {
+                    return { id: doc.id, ...doc.data() } as Submission;
+                    });
+                    callback(submissions, null);
+                },
+                (error) => {
+                    console.error(`Error listening to submissions for student ${studentId}:`, error);
+                    let errorMessage = "Could not load submissions. Please try again later.";
+                    if (error.code === 'failed-precondition') {
+                        errorMessage = "The required database index is still being built. Please wait a few minutes and try again.";
+                    }
+                    callback([], errorMessage);
                 }
-                callback([], errorMessage);
-            }
-        );
+            );
+        } catch (error: any) {
+            console.error(`Error setting up listener for student ${studentId}:`, error);
+            callback([], "An unexpected error occurred while setting up the data listener.");
+        }
 
         return unsubscribe;
     };

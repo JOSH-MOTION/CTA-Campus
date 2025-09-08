@@ -1,3 +1,4 @@
+
 // src/contexts/RoadmapContext.tsx
 'use client';
 
@@ -463,16 +464,21 @@ export const RoadmapProvider: FC<{children: ReactNode}> = ({children}) => {
   const { user, userData, role } = useAuth();
 
   useEffect(() => {
+    let unsubscribe: () => void;
     if (!user) {
       setLoading(false);
       return;
     }
-    const unsubscribe = onRoadmapStatus((statusMap) => {
+    unsubscribe = onRoadmapStatus((statusMap) => {
         setCompletionMap(statusMap);
         setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+        if (unsubscribe) {
+            unsubscribe();
+        }
+    };
   }, [user]);
 
   const completedWeeks = useMemo(() => {

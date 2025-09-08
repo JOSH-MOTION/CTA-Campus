@@ -1,3 +1,4 @@
+
 // src/app/(app)/students/page.tsx
 'use client';
 
@@ -45,7 +46,11 @@ export default function StudentsPage() {
       setLoading(false);
     });
 
-    return () => unsubscribe(); // Cleanup listener on component unmount
+    return () => {
+        if (unsubscribe) {
+            unsubscribe();
+        }
+    };
   }, []);
 
   const availableGens = useMemo(() => {
