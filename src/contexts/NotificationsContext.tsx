@@ -35,30 +35,30 @@ export const NotificationsProvider: FC<{children: ReactNode}> = ({children}) => 
   const { user } = useAuth();
 
   useEffect(() => {
-    let unsubscribe: () => void;
-    if (!user) {
-        setNotifications([]);
-        return;
-    }
+    let unsubscribe: (() => void) | undefined = undefined;
 
-    const notificationsCol = collection(db, 'notifications');
-    const q = query(
-        notificationsCol, 
-        where('userId', '==', user.uid),
-        orderBy('date', 'desc')
-    );
+    if (user) {
+        const notificationsCol = collection(db, 'notifications');
+        const q = query(
+            notificationsCol,
+            where('userId', '==', user.uid),
+            orderBy('date', 'desc')
+        );
 
-    unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const fetchedNotifications = querySnapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-                id: doc.id,
-                ...data,
-                date: data.date?.toDate().toISOString() || new Date().toISOString(),
-            } as Notification;
+        unsubscribe = onSnapshot(q, (querySnapshot) => {
+            const fetchedNotifications = querySnapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    ...data,
+                    date: data.date?.toDate().toISOString() || new Date().toISOString(),
+                } as Notification;
+            });
+            setNotifications(fetchedNotifications);
         });
-        setNotifications(fetchedNotifications);
-    });
+    } else {
+        setNotifications([]);
+    }
 
     return () => {
         if (unsubscribe) {
