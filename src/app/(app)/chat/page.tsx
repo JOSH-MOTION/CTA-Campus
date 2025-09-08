@@ -164,10 +164,9 @@ export default function ChatPage() {
     setMessages([]);
     markChatAsRead(chatId);
 
-    const unsubscribe = onMessages(chatId, (newMessages) => {
+    messageUnsubscribeRef.current = onMessages(chatId, (newMessages) => {
       setMessages(newMessages);
     });
-    messageUnsubscribeRef.current = unsubscribe;
 
     return () => {
       if (messageUnsubscribeRef.current) {
