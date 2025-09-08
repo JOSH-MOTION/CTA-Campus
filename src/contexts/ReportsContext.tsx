@@ -68,7 +68,7 @@ export const ReportsProvider: FC<{children: ReactNode}> = ({children}) => {
 
   const addReport = useCallback(async (reportData: ReportData) => {
     if (!user || !userData) throw new Error("User not authenticated");
-    if (role === 'student') throw new Error("Students cannot submit reports.");
+    if (role !== 'teacher' && role !== 'admin') throw new Error("Only staff can submit reports.");
 
     const newReportData = {
       ...reportData,

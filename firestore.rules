@@ -48,6 +48,13 @@ service cloud.firestore {
         allow read: if request.auth.uid == userId || isStaff();
       }
     }
+    
+    match /reports/{reportId} {
+        allow read: if isStaff();
+        allow create: if isStaff();
+        // Restrict updates/deletes for now to preserve record
+        allow update, delete: if false; 
+    }
 
     match /announcements/{announcementId} {
       // Any signed in user can read/list announcements. The app's query filters by generation.
@@ -101,18 +108,9 @@ service cloud.firestore {
 
     match /notifications/{notificationId} {
       // A user can only interact with their own notifications.
-      allow read, write, create, delete: if isSignedIn() && request.auth.uid == resource.data.userId;
+      allow read, write, create, delete: if request.auth.uid == resource.data.userId;
       // A user can query for their own notifications.
-      allow list: if isSignedIn() && request.query.where[0][2] == request.auth.uid;
-    }
-    
-    match /reports/{reportId} {
-      // Teachers can create reports.
-      allow create: if isTeacher();
-      // Staff (teachers and admins) can read and list all reports.
-      allow read: if isStaff();
-      // Restrict update/delete for now to preserve record integrity.
-      allow update, delete: if false;
+      allow list: if isSignedIn() && request.query.where.userId == request.auth.uid;
     }
 
     match /chats/{chatId}/{message=**} {

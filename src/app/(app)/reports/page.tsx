@@ -122,7 +122,7 @@ const ReportForm = () => {
 export default function ReportsPage() {
   const { role } = useAuth();
   const { reports, loading } = useReports();
-  const isTeacher = role === 'teacher';
+  const isStaff = role === 'teacher' || role === 'admin';
   
   return (
     <div className="space-y-6">
@@ -183,13 +183,13 @@ export default function ReportsPage() {
                     <Rss className="h-12 w-12 text-muted-foreground" />
                     <h2 className="mt-4 text-xl font-semibold">No reports yet</h2>
                     <p className="mt-1 text-muted-foreground">
-                        {isTeacher ? 'Submit the first report to get started.' : 'Check back later for teacher reports.'}
+                        {isStaff ? 'Submit the first report to get started.' : 'Check back later for staff reports.'}
                     </p>
                 </div>
             )}
         </div>
         
-        {isTeacher && (
+        {isStaff && (
              <div className="lg:col-span-1">
                 <ReportForm />
             </div>
