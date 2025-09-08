@@ -27,6 +27,28 @@ service cloud.firestore {
     function isStaff() {
       return isTeacher() || isAdmin();
     }
+    
+    function getUserData(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data;
+    }
+    
+    function isChatMember(chatId) {
+        // Admins have access to all group chats.
+        if (chatId.startsWith('group-') && isAdmin()) {
+            return true;
+        }
+        
+        let userGen = getUserData(request.auth.uid).gen;
+        
+        // Check if user is part of a generation group chat
+        if (chatId == 'group-' + userGen) {
+            return true;
+        }
+
+        // Check if user is part of a DM chat
+        let dmParticipantIds = chatId.split('-');
+        return request.auth.uid in dmParticipantIds;
+    }
 
     // Collection Rules
     match /users/{userId} {
@@ -47,13 +69,6 @@ service cloud.firestore {
         // Students can read their own points, staff can read any.
         allow read: if request.auth.uid == userId || isStaff();
       }
-    }
-    
-    match /reports/{reportId} {
-        allow read: if isStaff();
-        allow create: if isStaff();
-        // Restrict updates/deletes for now to preserve record
-        allow update, delete: if false; 
     }
 
     match /announcements/{announcementId} {
@@ -108,13 +123,20 @@ service cloud.firestore {
 
     match /notifications/{notificationId} {
       // A user can only interact with their own notifications.
-      allow read, write, create, delete: if request.auth.uid == resource.data.userId;
+      allow read, write, create, delete: if isSignedIn() && request.auth.uid == resource.data.userId;
       // A user can query for their own notifications.
-      allow list: if isSignedIn() && request.query.where.userId == request.auth.uid;
+      allow list: if isSignedIn() && request.query.where[0][2] == request.auth.uid;
+    }
+    
+    match /reports/{reportId} {
+      // Teachers and Admins can create reports
+      allow create: if isStaff();
+      // Teachers and Admins can read/list reports
+      allow read: if isStaff();
     }
 
     match /chats/{chatId}/{message=**} {
-      allow read, write: if isSignedIn();
+      allow read, write: if isSignedIn() && isChatMember(chatId);
     }
   }
 }
