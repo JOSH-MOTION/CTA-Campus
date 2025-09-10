@@ -220,6 +220,17 @@ const roadmapData: RoadmapSubject[] = [
           {id: 'ds-2-6', title: 'Search and replace (intermediate)'},
         ],
       },
+       {
+        title: 'Search Algorithms',
+        topics: [
+          {id: 'ds-2-1', title: 'Big O notation'},
+          {id: 'ds-2-2', title: 'Sort algorithms(bubble sort / quick sort)(intermediate)'},
+          {id: 'ds-2-3', title: 'Search algorithms(linear search,/ binary search)(intermediate)'},
+          {id: 'ds-2-4', title: 'List of even/odd/prime numbers (basic)'},
+          {id: 'ds-2-5', title: 'Sum of even/odd/prime numbers(basic)'},
+          {id: 'ds-2-6', title: 'Search and replace (intermediate)'},
+        ],
+      },
     ],
   },
   {
