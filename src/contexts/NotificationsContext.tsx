@@ -6,7 +6,8 @@ import {createContext, useContext, useState, ReactNode, FC, useCallback, useEffe
 import { v4 as uuidv4 } from 'uuid';
 import { useAuth, UserData } from './AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, query, where, onSnapshot, orderBy, doc, updateDoc, getDocs, writeBatch } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, onSnapshot, orderBy, doc, updateDoc, getDocs, writeBatch, getDoc } from 'firebase/firestore';
+import { sendEmail } from '@/services/email';
 
 export interface Notification {
   id: string;
@@ -76,6 +77,28 @@ export const NotificationsProvider: FC<{children: ReactNode}> = ({children}) => 
           date: serverTimestamp(),
       };
       await addDoc(collection(db, 'notifications'), newNotification);
+
+      // Send email
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      if (userDoc.exists()) {
+        const userData = userDoc.data() as UserData;
+        if(userData.email) {
+            await sendEmail({
+                to: userData.email,
+                subject: notificationData.title,
+                html: `
+                    <h1>Hi ${userData.displayName},</h1>
+                    <p>You have a new notification on Codetrain Campus:</p>
+                    <p><b>${notificationData.title}</b></p>
+                    <p>${notificationData.description}</p>
+                    <p><a href="https://campus-compass-ug6bc.web.app${notificationData.href}">Click here to view it</a></p>
+                    <br/>
+                    <p>Best,</p>
+                    <p>The Codetrain Team</p>
+                `
+            });
+        }
+      }
   }, []);
 
   const addNotificationForGen = useCallback(async (targetGen: string, notificationData: Omit<Notification, 'id' | 'date' | 'read' | 'userId'>) => {
@@ -96,6 +119,7 @@ export const NotificationsProvider: FC<{children: ReactNode}> = ({children}) => 
     const querySnapshot = await getDocs(targetQuery);
 
     querySnapshot.forEach(userDoc => {
+        const userData = userDoc.data() as UserData;
         const newNotification = {
             ...notificationData,
             userId: userDoc.id,
@@ -104,6 +128,24 @@ export const NotificationsProvider: FC<{children: ReactNode}> = ({children}) => 
         };
         const notificationRef = doc(collection(db, 'notifications'));
         batch.set(notificationRef, newNotification);
+
+        // Send email
+        if (userData.email) {
+             sendEmail({
+                to: userData.email,
+                subject: notificationData.title,
+                html: `
+                    <h1>Hi ${userData.displayName},</h1>
+                    <p>You have a new notification on Codetrain Campus:</p>
+                    <p><b>${notificationData.title}</b></p>
+                    <p>${notificationData.description}</p>
+                    <p><a href="https://campus-compass-ug6bc.web.app${notificationData.href}">Click here to view it</a></p>
+                    <br/>
+                    <p>Best,</p>
+                    <p>The Codetrain Team</p>
+                `
+            });
+        }
     });
 
     await batch.commit();
