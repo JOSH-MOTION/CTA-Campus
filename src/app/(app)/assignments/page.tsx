@@ -3,7 +3,7 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import {Button} from '@/components/ui/button';
-import {PlusCircle, ListOrdered, ArrowRight, Clock, Loader2, BookCheck, CheckCircle} from 'lucide-react';
+import {PlusCircle, ListOrdered, ArrowRight, Clock, Loader2, BookCheck, CheckCircle, Eye} from 'lucide-react';
 import {useAuth} from '@/contexts/AuthContext';
 import {useAssignments} from '@/contexts/AssignmentsContext';
 import {Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle} from '@/components/ui/card';
@@ -15,6 +15,7 @@ import { SubmitAssignmentDialog } from '@/components/assignments/SubmitAssignmen
 import { useRouter } from 'next/navigation';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { ViewAssignmentDialog } from '@/components/assignments/ViewAssignmentDialog';
 
 
 export default function AssignmentsPage() {
@@ -47,10 +48,7 @@ export default function AssignmentsPage() {
   }, [user, role, loading]);
 
   const sortedAssignments = [...assignments].sort((a, b) => {
-      const aLatestDate = a.dueDates?.length ? Math.max(...a.dueDates.map(d => new Date(d.dateTime).getTime())) : 0;
-      const bLatestDate = b.dueDates?.length ? Math.max(...b.dueDates.map(d => new Date(d.dateTime).getTime())) : 0;
-      if (aLatestDate === 0 && bLatestDate === 0) return (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0);
-      return bLatestDate - aLatestDate;
+    return (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0);
   });
 
   const isLoading = loading || (role === 'student' && checkingSubmissions);
@@ -86,37 +84,49 @@ export default function AssignmentsPage() {
 
             return (
                 <Card key={assignment.id} className="flex flex-col">
-                <CardHeader>
-                    <div className="flex justify-between items-start">
-                    <div className="flex-1 pr-2">
-                        <CardTitle>{assignment.title}</CardTitle>
-                        {isTeacherOrAdmin && <Badge variant={assignment.targetGen === 'Everyone' ? 'destructive' : assignment.targetGen === 'All Students' ? 'default' : 'secondary'} className="mt-1">{assignment.targetGen}</Badge>}
+                  <ViewAssignmentDialog assignment={assignment}>
+                    <div className="flex-grow cursor-pointer hover:bg-muted/50">
+                        <CardHeader>
+                            <div className="flex justify-between items-start">
+                            <div className="flex-1 pr-2">
+                                <CardTitle>{assignment.title}</CardTitle>
+                                {isTeacherOrAdmin && <Badge variant={assignment.targetGen === 'Everyone' ? 'destructive' : assignment.targetGen === 'All Students' ? 'default' : 'secondary'} className="mt-1">{assignment.targetGen}</Badge>}
+                            </div>
+                            <AssignmentActions assignment={assignment} />
+                            </div>
+                            <CardDescription className="pt-2 line-clamp-2">{assignment.description}</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                            <p className="text-sm font-semibold">Due Date:</p>
+                            <div className="flex flex-wrap gap-2">
+                                {isTeacherOrAdmin ? (
+                                    assignment.dueDates?.length > 0 ? assignment.dueDates.map(dueDate => (
+                                        <Badge key={dueDate.day} variant="secondary" className="flex items-center gap-1.5">
+                                            <Clock className="h-3 w-3" />
+                                            <span>{dueDate.day}: {format(new Date(dueDate.dateTime), 'PP p')}</span>
+                                        </Badge>
+                                    )) : <Badge variant="outline">No due date set</Badge>
+                                ) : studentDueDate ? (
+                                    <Badge variant="secondary" className="flex items-center gap-1.5">
+                                        <Clock className="h-3 w-3" />
+                                        <span>{studentDueDate.day}: {format(new Date(studentDueDate.dateTime), 'PP p')}</span>
+                                    </Badge>
+                                ) : (
+                                    <Badge variant="outline">No due date for your day</Badge>
+                                )}
+                            </div>
+                        </CardContent>
                     </div>
-                    <AssignmentActions assignment={assignment} />
-                    </div>
-                    <CardDescription className="pt-2">{assignment.description}</CardDescription>
-                </CardHeader>
-                <CardContent className="flex-grow space-y-2">
-                    <p className="text-sm font-semibold">Due Date:</p>
-                    <div className="flex flex-wrap gap-2">
-                        {isTeacherOrAdmin ? (
-                             assignment.dueDates?.length > 0 ? assignment.dueDates.map(dueDate => (
-                                <Badge key={dueDate.day} variant="secondary" className="flex items-center gap-1.5">
-                                    <Clock className="h-3 w-3" />
-                                    <span>{dueDate.day}: {format(new Date(dueDate.dateTime), 'PP p')}</span>
-                                </Badge>
-                            )) : <Badge variant="outline">No due date set</Badge>
-                        ) : studentDueDate ? (
-                             <Badge variant="secondary" className="flex items-center gap-1.5">
-                                <Clock className="h-3 w-3" />
-                                <span>{studentDueDate.day}: {format(new Date(studentDueDate.dateTime), 'PP p')}</span>
-                            </Badge>
-                        ) : (
-                            <Badge variant="outline">No due date for your day</Badge>
-                        )}
-                    </div>
-                </CardContent>
-                <CardFooter>
+                  </ViewAssignmentDialog>
+                <CardFooter className="flex flex-col items-start gap-2 pt-4">
+                     {!isTeacherOrAdmin && (
+                        <ViewAssignmentDialog assignment={assignment}>
+                            <Button variant="outline" className="w-full">
+                                <Eye className="mr-2 h-4 w-4" />
+                                View Details
+                            </Button>
+                        </ViewAssignmentDialog>
+                     )}
                     {isTeacherOrAdmin ? (
                     <Button variant="outline" className="w-full" onClick={() => router.push(`/assignments/${assignment.id}`)}>
                         <BookCheck className="mr-2 h-4 w-4" />

@@ -18,7 +18,7 @@ export interface Notification {
   userId: string;
 }
 
-export type NewNotificationData = Omit<Notification, 'id' | 'date' | 'read'>;
+export type NewNotificationData = Omit<Notification, 'id' | 'date' | 'read' | 'userId'>;
 
 interface NotificationsContextType {
   notifications: Notification[];
@@ -33,7 +33,7 @@ const NotificationsContext = createContext<NotificationsContextType | undefined>
 
 export const NotificationsProvider: FC<{children: ReactNode}> = ({children}) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const { user, userData: authorData } = useAuth();
+  const { user, userData: authorData, allUsers } = useAuth();
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined = undefined;
@@ -104,33 +104,26 @@ export const NotificationsProvider: FC<{children: ReactNode}> = ({children}) => 
 
   const addNotificationForGen = useCallback(async (targetGen: string, notificationData: Omit<Notification, 'id' | 'date' | 'read' | 'userId'>, authorId?: string) => {
     const batch = writeBatch(db);
-    const usersCollection = collection(db, 'users');
-    
-    let targetQuery;
-    if (targetGen === 'Everyone') {
-        targetQuery = query(usersCollection);
-    } else if (targetGen === 'All Staff') {
-        targetQuery = query(usersCollection, where('role', 'in', ['teacher', 'admin']));
-    } else if (targetGen === 'All Students') {
-        targetQuery = query(usersCollection, where('role', '==', 'student'));
-    } else {
-        targetQuery = query(usersCollection, where('gen', '==', targetGen));
-    }
-
-    const querySnapshot = await getDocs(targetQuery);
+    const notificationsCol = collection(db, 'notifications');
     const notifiedUsers: { name: string, email: string }[] = [];
 
-    querySnapshot.forEach(userDoc => {
-        const userData = userDoc.data() as UserData;
-        if (userDoc.id === authorId) return; // Don't notify the author
+    const usersToNotify = allUsers.filter(u => {
+        if (u.uid === authorId) return false;
+        if (targetGen === 'Everyone') return true;
+        if (targetGen === 'All Students' && u.role === 'student') return true;
+        if (targetGen === 'All Staff' && (u.role === 'teacher' || u.role === 'admin')) return true;
+        if (u.role === 'student' && u.gen === targetGen) return true;
+        return false;
+    });
 
+    usersToNotify.forEach(userData => {
         const newNotification = {
             ...notificationData,
-            userId: userDoc.id,
+            userId: userData.uid,
             read: false,
             date: serverTimestamp(),
         };
-        const notificationRef = doc(collection(db, 'notifications'));
+        const notificationRef = doc(notificationsCol);
         batch.set(notificationRef, newNotification);
 
         if (userData.email) {
@@ -172,7 +165,7 @@ export const NotificationsProvider: FC<{children: ReactNode}> = ({children}) => 
         });
     }
 
-  }, [authorData]);
+  }, [authorData, allUsers]);
 
   const markAsRead = useCallback(async (notificationId: string) => {
       const notifDoc = doc(db, 'notifications', notificationId);
