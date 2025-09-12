@@ -73,6 +73,9 @@ const MemoizedProtectedLayout = memo(function ProtectedLayout({children}: {child
           if (!allowedPaths.includes('/grading')) {
               allowedPaths.push('/grading');
           }
+          if (!allowedPaths.includes('/attendance')) {
+              allowedPaths.push('/attendance');
+          }
       }
 
       // Allow access to profile page for all roles

@@ -70,6 +70,7 @@ export const teacherNavItems = [
   {href: '/exercises', label: 'Exercises', icon: PencilRuler},
   {href: '/projects', label: 'Projects', icon: BookMarked},
   {href: '/100-days-of-code/submissions', label: '100 Days of Code', icon: Code},
+  {href: '/attendance', label: 'Attendance', icon: UserCheck},
   {href: '/materials', label: 'Class Materials', icon: BookCopy},
   {href: '/roadmap', label: 'Roadmap', icon: Map},
   {href: '/directory', label: 'Directory', icon: Contact},
