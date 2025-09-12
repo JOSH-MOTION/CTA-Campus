@@ -10,11 +10,14 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { CheckCircle, Loader2 } from 'lucide-react';
+import { CheckCircle, Download, Loader2 } from 'lucide-react';
 import { useRoadmap } from '@/contexts/RoadmapContext';
 import { useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { awardPointsFlow } from '@/ai/flows/award-points-flow';
+import { addDoc, collection, getDocs, orderBy, query, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import Papa from 'papaparse';
 
 const attendanceSchema = z.object({
   classId: z.string().nonempty('Please select a class.'),
@@ -28,8 +31,10 @@ type AttendanceFormValues = z.infer<typeof attendanceSchema>;
 export default function AttendancePage() {
   const { toast } = useToast();
   const { roadmapData } = useRoadmap();
-  const { user } = useAuth();
+  const { user, userData, role } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const isTeacherOrAdmin = role === 'teacher' || role === 'admin';
 
   const classSessions = useMemo(() => {
     return roadmapData.flatMap(subject =>
@@ -51,20 +56,74 @@ export default function AttendancePage() {
     },
   });
 
+  const handleDownloadCsv = async () => {
+    setIsDownloading(true);
+    try {
+        const attendanceRef = collection(db, 'attendance');
+        const q = query(attendanceRef, orderBy('submittedAt', 'desc'));
+        const querySnapshot = await getDocs(q);
+        const attendanceRecords = querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                Student: data.studentName,
+                Gen: data.studentGen,
+                Class: data.className,
+                Date: data.submittedAt.toDate().toLocaleDateString(),
+                Learned: data.learned,
+                Challenged: data.challenged,
+                Questions: data.questions,
+            };
+        });
+        
+        const csv = Papa.unparse(attendanceRecords);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'attendance_feedback.csv');
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    } catch (error) {
+        toast({
+            variant: 'destructive',
+            title: 'Download Failed',
+            description: 'Could not download attendance data.'
+        });
+    } finally {
+        setIsDownloading(false);
+    }
+  }
+
   const onSubmit = async (data: AttendanceFormValues) => {
-    if (!user) return;
+    if (!user || !userData) return;
     setIsSubmitting(true);
     try {
       const attendanceDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
       
-      const result = await awardPointsFlow({
+      const awardResult = await awardPointsFlow({
           studentId: user.uid,
           points: 1,
           reason: 'Class Attendance',
           activityId: `attendance-${data.classId}-${attendanceDate}`,
           action: 'award'
       });
-      if (!result.success) throw new Error(result.message);
+      if (!awardResult.success && awardResult.message !== "Points already revoked or never existed." && awardResult.message !== 'duplicate' && !awardResult.message.includes("already awarded")) {
+        throw new Error(awardResult.message);
+      }
+
+      await addDoc(collection(db, 'attendance'), {
+          studentId: user.uid,
+          studentName: userData.displayName,
+          studentGen: userData.gen,
+          classId: data.classId,
+          className: classSessions.find(c => c.id === data.classId)?.name || 'Unknown Class',
+          learned: data.learned,
+          challenged: data.challenged,
+          questions: data.questions,
+          submittedAt: serverTimestamp(),
+      });
 
       toast({
         title: 'Attendance Marked!',
@@ -81,6 +140,29 @@ export default function AttendancePage() {
       setIsSubmitting(false);
     }
   };
+  
+  if (isTeacherOrAdmin) {
+      return (
+        <div className="space-y-6">
+            <div className="space-y-1">
+                <h1 className="text-3xl font-bold tracking-tight">Attendance Records</h1>
+                <p className="text-muted-foreground">Download all student attendance and feedback submissions.</p>
+            </div>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Export Data</CardTitle>
+                    <CardDescription>Download a CSV file containing all attendance records.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Button onClick={handleDownloadCsv} disabled={isDownloading}>
+                        {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                        Download Attendance CSV
+                    </Button>
+                </CardContent>
+            </Card>
+        </div>
+      );
+  }
 
   return (
     <div className="space-y-6">

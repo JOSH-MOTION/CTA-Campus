@@ -25,7 +25,7 @@ interface NotificationsContextType {
   notifications: Notification[];
   unreadCount: number;
   addNotificationForUser: (userId: string, notification: Omit<Notification, 'id' | 'date' | 'read' | 'userId'>) => Promise<void>;
-  addNotificationForGen: (targetGen: string, notification: Omit<Notification, 'id' | 'date' | 'read' | 'userId'>) => Promise<void>;
+  addNotificationForGen: (targetGen: string, notification: Omit<Notification, 'id' | 'date' | 'read' | 'userId'>, authorId?: string) => Promise<void>;
   markAsRead: (notificationId: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
 }
@@ -57,6 +57,8 @@ export const NotificationsProvider: FC<{children: ReactNode}> = ({children}) => 
                 } as Notification;
             });
             setNotifications(fetchedNotifications);
+        }, (error) => {
+            console.error(error);
         });
     } else {
         setNotifications([]);
@@ -101,7 +103,7 @@ export const NotificationsProvider: FC<{children: ReactNode}> = ({children}) => 
       }
   }, []);
 
-  const addNotificationForGen = useCallback(async (targetGen: string, notificationData: Omit<Notification, 'id' | 'date' | 'read' | 'userId'>) => {
+  const addNotificationForGen = useCallback(async (targetGen: string, notificationData: Omit<Notification, 'id' | 'date' | 'read' | 'userId'>, authorId?: string) => {
     const batch = writeBatch(db);
     const usersCollection = collection(db, 'users');
     
@@ -117,9 +119,12 @@ export const NotificationsProvider: FC<{children: ReactNode}> = ({children}) => 
     }
 
     const querySnapshot = await getDocs(targetQuery);
+    const notifiedUsers: { name: string, email: string }[] = [];
 
     querySnapshot.forEach(userDoc => {
         const userData = userDoc.data() as UserData;
+        if (userDoc.id === authorId) return; // Don't notify the author
+
         const newNotification = {
             ...notificationData,
             userId: userDoc.id,
@@ -129,8 +134,8 @@ export const NotificationsProvider: FC<{children: ReactNode}> = ({children}) => 
         const notificationRef = doc(collection(db, 'notifications'));
         batch.set(notificationRef, newNotification);
 
-        // Send email
         if (userData.email) {
+            notifiedUsers.push({ name: userData.displayName, email: userData.email });
              sendEmail({
                 to: userData.email,
                 subject: notificationData.title,
@@ -149,6 +154,30 @@ export const NotificationsProvider: FC<{children: ReactNode}> = ({children}) => 
     });
 
     await batch.commit();
+
+    // Send confirmation email to the author
+    if (authorId) {
+        const authorDoc = await getDoc(doc(db, 'users', authorId));
+        if (authorDoc.exists()) {
+            const authorData = authorDoc.data() as UserData;
+            if (authorData.email) {
+                const userListHtml = notifiedUsers.map(u => `<li>${u.name} (${u.email})</li>`).join('');
+                await sendEmail({
+                    to: authorData.email,
+                    subject: `Confirmation: "${notificationData.title}" Sent`,
+                    html: `
+                        <h1>Confirmation</h1>
+                        <p>Your announcement titled "<b>${notificationData.title}</b>" has been sent to the following ${notifiedUsers.length} user(s):</p>
+                        <ul>
+                            ${userListHtml}
+                        </ul>
+                        <p>Best,</p>
+                        <p>The Codetrain Team</p>
+                    `
+                });
+            }
+        }
+    }
 
   }, []);
 

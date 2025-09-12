@@ -106,7 +106,7 @@ export const ExercisesProvider: FC<{children: ReactNode}> = ({children}) => {
       title: `New Exercise: ${exercise.title}`,
       description: exercise.description,
       href: '/exercises',
-    });
+    }, user.uid);
   }, [user, addNotificationForGen]);
 
   const updateExercise = useCallback(async (id: string, updates: Partial<ExerciseData>) => {

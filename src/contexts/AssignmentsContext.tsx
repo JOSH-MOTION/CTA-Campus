@@ -116,7 +116,7 @@ export const AssignmentsProvider: FC<{children: ReactNode}> = ({children}) => {
       title: `New Assignment: ${assignment.title}`,
       description: assignment.description,
       href: '/assignments',
-    });
+    }, user.uid);
   }, [user, addNotificationForGen]);
 
   const updateAssignment = useCallback(async (id: string, updates: Partial<AssignmentData>) => {

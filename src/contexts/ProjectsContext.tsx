@@ -106,7 +106,7 @@ export const ProjectsProvider: FC<{children: ReactNode}> = ({children}) => {
       title: `New Project: ${project.title}`,
       description: project.description,
       href: '/projects',
-    });
+    }, user.uid);
   }, [user, addNotificationForGen]);
 
   const updateProject = useCallback(async (id: string, updates: Partial<ProjectData>) => {
