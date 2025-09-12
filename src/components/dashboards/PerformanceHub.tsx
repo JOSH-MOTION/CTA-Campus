@@ -3,7 +3,7 @@
 
 import {useState, useMemo, useEffect} from 'react';
 import { Award, CheckCircle, Edit, Projector, Handshake, Presentation, Code, GitBranch, Loader2, TrendingUp } from 'lucide-react';
-import { onSnapshot, collection, doc, Unsubscribe } from 'firebase/firestore';
+import { onSnapshot, collection, doc } from 'firebase/firestore';
 
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
 import {Progress} from '@/components/ui/progress';
@@ -99,12 +99,9 @@ export default function PerformanceHub({ studentId }: { studentId?: string }) {
     }
 
     setLoading(true);
-    
-    let userUnsubscribe: Unsubscribe | null = null;
-    let pointsUnsubscribe: Unsubscribe | null = null;
 
     const userDocRef = doc(db, 'users', targetUserId);
-    userUnsubscribe = onSnapshot(userDocRef, (docSnap) => {
+    const userUnsubscribe = onSnapshot(userDocRef, (docSnap) => {
         const userData = docSnap.data() as UserData;
         setTotalPoints(userData?.totalPoints || 0);
     }, (error) => {
@@ -112,7 +109,7 @@ export default function PerformanceHub({ studentId }: { studentId?: string }) {
     });
 
     const pointsCol = collection(db, 'users', targetUserId, 'points');
-    pointsUnsubscribe = onSnapshot(pointsCol, (querySnapshot) => {
+    const pointsUnsubscribe = onSnapshot(pointsCol, (querySnapshot) => {
       const userPointsByCategory: { [key: string]: number } = {};
       querySnapshot.forEach(doc => {
         const data = doc.data();
@@ -135,12 +132,8 @@ export default function PerformanceHub({ studentId }: { studentId?: string }) {
     });
 
     return () => {
-        if (userUnsubscribe) {
-            userUnsubscribe();
-        }
-        if (pointsUnsubscribe) {
-            pointsUnsubscribe();
-        }
+        userUnsubscribe();
+        pointsUnsubscribe();
     };
   }, [targetUserId]);
 
