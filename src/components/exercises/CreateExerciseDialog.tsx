@@ -38,7 +38,7 @@ interface CreateExerciseDialogProps {
 
 export function CreateExerciseDialog({children}: CreateExerciseDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'creating' | 'notifying'>('idle');
   const {addExercise} = useExercises();
   const {toast} = useToast();
   const {user, fetchAllUsers} = useAuth();
@@ -75,15 +75,15 @@ export function CreateExerciseDialog({children}: CreateExerciseDialogProps) {
 
   const onSubmit = async (data: ExerciseFormValues) => {
     if (!user) return;
-    setIsSubmitting(true);
+    setSubmissionStatus('creating');
     try {
       await addExercise({
         ...data,
         authorId: user.uid,
-      });
+      }, () => setSubmissionStatus('notifying'));
       toast({
         title: 'Exercise Created',
-        description: 'Your exercise has been posted.',
+        description: 'Your exercise has been posted and notifications have been sent.',
       });
       form.reset();
       setIsOpen(false);
@@ -94,9 +94,21 @@ export function CreateExerciseDialog({children}: CreateExerciseDialogProps) {
         description: 'Failed to create exercise. You may not have permission.',
       });
     } finally {
-        setIsSubmitting(false);
+        setSubmissionStatus('idle');
     }
   };
+
+  const getButtonText = () => {
+    switch (submissionStatus) {
+        case 'creating':
+            return 'Creating...';
+        case 'notifying':
+            return 'Sending Notifications...';
+        default:
+            return 'Create';
+    }
+  };
+
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -168,9 +180,9 @@ export function CreateExerciseDialog({children}: CreateExerciseDialogProps) {
               <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Create
+              <Button type="submit" disabled={submissionStatus !== 'idle'}>
+                {submissionStatus !== 'idle' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {getButtonText()}
               </Button>
             </DialogFooter>
           </form>

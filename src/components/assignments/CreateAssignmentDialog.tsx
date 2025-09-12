@@ -60,6 +60,7 @@ const timeSlots = Array.from({ length: 24 * 2 }, (_, i) => {
 export function CreateAssignmentDialog({children}: CreateAssignmentDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'creating' | 'notifying'>('idle');
   const {addAssignment} = useAssignments();
   const {toast} = useToast();
   const {user, fetchAllUsers} = useAuth();
@@ -107,7 +108,7 @@ export function CreateAssignmentDialog({children}: CreateAssignmentDialogProps) 
 
   const onSubmit = async (data: AssignmentFormValues) => {
     if (!user) return;
-    setIsSubmitting(true);
+    setSubmissionStatus('creating');
     const activeDueDates = data.dueDates
         .filter(d => d.enabled && d.date && d.time)
         .map(d => {
@@ -124,10 +125,11 @@ export function CreateAssignmentDialog({children}: CreateAssignmentDialogProps) 
           targetGen: data.targetGen,
           authorId: user.uid,
           dueDates: activeDueDates,
-        });
+        }, () => setSubmissionStatus('notifying'));
+        
         toast({
           title: 'Assignment Created',
-          description: 'Your new assignment has been posted.',
+          description: 'Your new assignment has been posted and notifications have been sent.',
         });
         form.reset();
         setIsOpen(false);
@@ -138,7 +140,18 @@ export function CreateAssignmentDialog({children}: CreateAssignmentDialogProps) 
             description: "Failed to create assignment. You may not have permission.",
         });
     } finally {
-        setIsSubmitting(false);
+        setSubmissionStatus('idle');
+    }
+  };
+
+  const getButtonText = () => {
+    switch (submissionStatus) {
+        case 'creating':
+            return 'Creating...';
+        case 'notifying':
+            return 'Sending Notifications...';
+        default:
+            return 'Create';
     }
   };
 
@@ -305,9 +318,9 @@ export function CreateAssignmentDialog({children}: CreateAssignmentDialogProps) 
               <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Create
+              <Button type="submit" disabled={submissionStatus !== 'idle'}>
+                {submissionStatus !== 'idle' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {getButtonText()}
               </Button>
             </DialogFooter>
           </form>

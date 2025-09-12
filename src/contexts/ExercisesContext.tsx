@@ -20,7 +20,7 @@ export type ExerciseData = Omit<Exercise, 'id' | 'createdAt'>;
 
 interface ExercisesContextType {
   exercises: Exercise[];
-  addExercise: (exercise: ExerciseData) => Promise<void>;
+  addExercise: (exercise: ExerciseData, onNotifying?: () => void) => Promise<void>;
   updateExercise: (id: string, updates: Partial<ExerciseData>) => Promise<void>;
   deleteExercise: (id: string) => Promise<void>;
   loading: boolean;
@@ -91,7 +91,7 @@ export const ExercisesProvider: FC<{children: ReactNode}> = ({children}) => {
     };
   }, [user, role, userData, authLoading]);
 
-  const addExercise = useCallback(async (exercise: ExerciseData) => {
+  const addExercise = useCallback(async (exercise: ExerciseData, onNotifying?: () => void) => {
     if(!user) throw new Error("User not authenticated");
     
     const newExerciseData = {
@@ -101,6 +101,9 @@ export const ExercisesProvider: FC<{children: ReactNode}> = ({children}) => {
 
     await addDoc(collection(db, 'exercises'), newExerciseData);
     
+    if (onNotifying) {
+        onNotifying();
+    }
     try {
         await addNotificationForGen(exercise.targetGen, {
           title: `New Exercise: ${exercise.title}`,

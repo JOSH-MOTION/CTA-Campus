@@ -20,7 +20,7 @@ export type ProjectData = Omit<Project, 'id' | 'createdAt'>;
 
 interface ProjectsContextType {
   projects: Project[];
-  addProject: (project: ProjectData) => Promise<void>;
+  addProject: (project: ProjectData, onNotifying?: () => void) => Promise<void>;
   updateProject: (id: string, updates: Partial<ProjectData>) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
   loading: boolean;
@@ -91,7 +91,7 @@ export const ProjectsProvider: FC<{children: ReactNode}> = ({children}) => {
     };
   }, [user, role, userData, authLoading]);
 
-  const addProject = useCallback(async (project: ProjectData) => {
+  const addProject = useCallback(async (project: ProjectData, onNotifying?: () => void) => {
     if(!user) throw new Error("User not authenticated");
     
     const newProjectData = {
@@ -101,6 +101,9 @@ export const ProjectsProvider: FC<{children: ReactNode}> = ({children}) => {
 
     await addDoc(collection(db, 'projects'), newProjectData);
     
+    if (onNotifying) {
+        onNotifying();
+    }
     try {
       await addNotificationForGen(project.targetGen, {
         title: `New Project: ${project.title}`,

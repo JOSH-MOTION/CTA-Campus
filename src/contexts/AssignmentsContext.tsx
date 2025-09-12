@@ -27,7 +27,7 @@ export type AssignmentData = Omit<Assignment, 'id' | 'createdAt'>;
 
 interface AssignmentsContextType {
   assignments: Assignment[];
-  addAssignment: (assignment: AssignmentData) => Promise<void>;
+  addAssignment: (assignment: AssignmentData, onNotifying?: () => void) => Promise<void>;
   updateAssignment: (id: string, updates: Partial<AssignmentData>) => Promise<void>;
   deleteAssignment: (id: string) => Promise<void>;
   loading: boolean;
@@ -101,7 +101,7 @@ export const AssignmentsProvider: FC<{children: ReactNode}> = ({children}) => {
   }, [user, role, userData, authLoading]);
 
 
-  const addAssignment = useCallback(async (assignment: AssignmentData) => {
+  const addAssignment = useCallback(async (assignment: AssignmentData, onNotifying?: () => void) => {
     if(!user) throw new Error("User not authenticated");
     
     const newAssignmentData = {
@@ -111,6 +111,10 @@ export const AssignmentsProvider: FC<{children: ReactNode}> = ({children}) => {
 
     await addDoc(collection(db, 'assignments'), newAssignmentData);
     
+    if (onNotifying) {
+      onNotifying();
+    }
+
     try {
         await addNotificationForGen(assignment.targetGen, {
             title: `New Assignment: ${assignment.title}`,
