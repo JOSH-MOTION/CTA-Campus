@@ -40,10 +40,7 @@ const assignmentSchema = z.object({
       enabled: z.boolean(),
       date: z.date().optional(),
       time: z.string().optional(),
-  })).refine(value => value.some(d => d.enabled && d.date), {
-      message: "Please set a due date for at least one day.",
-      path: ["dueDates"],
-  }),
+  })),
 });
 
 type AssignmentFormValues = z.infer<typeof assignmentSchema>;
@@ -119,16 +116,6 @@ export function CreateAssignmentDialog({children}: CreateAssignmentDialogProps) 
             date.setHours(hours, minutes);
             return { day: d.day, dateTime: date.toISOString() };
         });
-
-    if (activeDueDates.length === 0) {
-        toast({
-            variant: "destructive",
-            title: "Error",
-            description: "Please set a valid date and time for at least one enabled day.",
-        });
-        setIsSubmitting(false);
-        return;
-    }
 
     try {
         await addAssignment({
@@ -223,7 +210,7 @@ export function CreateAssignmentDialog({children}: CreateAssignmentDialogProps) 
             />
             
             <div className="space-y-4 rounded-md border p-4">
-                <FormLabel>Due Dates</FormLabel>
+                <FormLabel>Due Dates (Optional)</FormLabel>
                 <FormMessage>{form.formState.errors.dueDates?.message}</FormMessage>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                 {fields.map((field, index) => {

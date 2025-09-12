@@ -47,8 +47,9 @@ export default function AssignmentsPage() {
   }, [user, role, loading]);
 
   const sortedAssignments = [...assignments].sort((a, b) => {
-      const aLatestDate = Math.max(...a.dueDates.map(d => new Date(d.dateTime).getTime()));
-      const bLatestDate = Math.max(...b.dueDates.map(d => new Date(d.dateTime).getTime()));
+      const aLatestDate = a.dueDates?.length ? Math.max(...a.dueDates.map(d => new Date(d.dateTime).getTime())) : 0;
+      const bLatestDate = b.dueDates?.length ? Math.max(...b.dueDates.map(d => new Date(d.dateTime).getTime())) : 0;
+      if (aLatestDate === 0 && bLatestDate === 0) return (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0);
       return bLatestDate - aLatestDate;
   });
 
@@ -80,7 +81,7 @@ export default function AssignmentsPage() {
       ) : sortedAssignments.length > 0 ? (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {sortedAssignments.map(assignment => {
-            const studentDueDate = assignment.dueDates.find(d => d.day.toLowerCase() === userData?.lessonDay?.toLowerCase());
+            const studentDueDate = assignment.dueDates?.find(d => d.day.toLowerCase() === userData?.lessonDay?.toLowerCase());
             const hasSubmitted = submittedAssignmentIds.has(assignment.id);
 
             return (
@@ -99,12 +100,12 @@ export default function AssignmentsPage() {
                     <p className="text-sm font-semibold">Due Date:</p>
                     <div className="flex flex-wrap gap-2">
                         {isTeacherOrAdmin ? (
-                             assignment.dueDates.map(dueDate => (
+                             assignment.dueDates?.length > 0 ? assignment.dueDates.map(dueDate => (
                                 <Badge key={dueDate.day} variant="secondary" className="flex items-center gap-1.5">
                                     <Clock className="h-3 w-3" />
                                     <span>{dueDate.day}: {format(new Date(dueDate.dateTime), 'PP p')}</span>
                                 </Badge>
-                            ))
+                            )) : <Badge variant="outline">No due date set</Badge>
                         ) : studentDueDate ? (
                              <Badge variant="secondary" className="flex items-center gap-1.5">
                                 <Clock className="h-3 w-3" />
