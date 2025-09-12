@@ -1,3 +1,4 @@
+
 // src/contexts/NotificationsContext.tsx
 'use client';
 
@@ -79,26 +80,30 @@ export const NotificationsProvider: FC<{children: ReactNode}> = ({children}) => 
       };
       await addDoc(collection(db, 'notifications'), newNotification);
 
-      // Send email
-      const userDoc = await getDoc(doc(db, 'users', userId));
-      if (userDoc.exists()) {
-        const userData = userDoc.data() as UserData;
-        if(userData.email) {
-            await sendEmail({
-                to: userData.email,
-                subject: notificationData.title,
-                html: `
-                    <h1>Hi ${userData.displayName},</h1>
-                    <p>You have a new notification on Codetrain Campus:</p>
-                    <p><b>${notificationData.title}</b></p>
-                    <p>${notificationData.description}</p>
-                    <p><a href="https://campus-compass-ug6bc.web.app${notificationData.href}">Click here to view it</a></p>
-                    <br/>
-                    <p>Best,</p>
-                    <p>The Codetrain Team</p>
-                `
-            });
+      // Send email but don't let it block the main thread if it fails
+      try {
+        const userDoc = await getDoc(doc(db, 'users', userId));
+        if (userDoc.exists()) {
+            const userData = userDoc.data() as UserData;
+            if(userData.email) {
+                await sendEmail({
+                    to: userData.email,
+                    subject: notificationData.title,
+                    html: `
+                        <h1>Hi ${userData.displayName},</h1>
+                        <p>You have a new notification on Codetrain Campus:</p>
+                        <p><b>${notificationData.title}</b></p>
+                        <p>${notificationData.description}</p>
+                        <p><a href="https://campus-compass-ug6bc.web.app${notificationData.href}">Click here to view it</a></p>
+                        <br/>
+                        <p>Best,</p>
+                        <p>The Codetrain Team</p>
+                    `
+                });
+            }
         }
+      } catch (emailError) {
+          console.error("Non-critical error: Failed to send notification email.", emailError);
       }
   }, []);
 
@@ -116,7 +121,7 @@ export const NotificationsProvider: FC<{children: ReactNode}> = ({children}) => 
         return false;
     });
 
-    usersToNotify.forEach(userData => {
+    for (const userData of usersToNotify) {
         const newNotification = {
             ...notificationData,
             userId: userData.uid,
@@ -128,41 +133,49 @@ export const NotificationsProvider: FC<{children: ReactNode}> = ({children}) => 
 
         if (userData.email) {
             notifiedUsers.push({ name: userData.displayName, email: userData.email });
-             sendEmail({
-                to: userData.email,
-                subject: notificationData.title,
+             try {
+                await sendEmail({
+                    to: userData.email,
+                    subject: notificationData.title,
+                    html: `
+                        <h1>Hi ${userData.displayName},</h1>
+                        <p>You have a new notification on Codetrain Campus:</p>
+                        <p><b>${notificationData.title}</b></p>
+                        <p>${notificationData.description}</p>
+                        <p><a href="https://campus-compass-ug6bc.web.app${notificationData.href}">Click here to view it</a></p>
+                        <br/>
+                        <p>Best,</p>
+                        <p>The Codetrain Team</p>
+                    `
+                });
+             } catch (emailError) {
+                 console.error(`Non-critical error: Failed to send notification email to ${userData.email}.`, emailError);
+             }
+        }
+    }
+
+    await batch.commit();
+
+    // Send confirmation email to the author, but don't let it block the flow.
+    if (authorId && authorData && authorData.email) {
+       try {
+            const userListHtml = notifiedUsers.map(u => `<li>${u.name} (${u.email})</li>`).join('');
+            await sendEmail({
+                to: authorData.email,
+                subject: `Confirmation: "${notificationData.title}" Sent`,
                 html: `
-                    <h1>Hi ${userData.displayName},</h1>
-                    <p>You have a new notification on Codetrain Campus:</p>
-                    <p><b>${notificationData.title}</b></p>
-                    <p>${notificationData.description}</p>
-                    <p><a href="https://campus-compass-ug6bc.web.app${notificationData.href}">Click here to view it</a></p>
-                    <br/>
+                    <h1>Confirmation</h1>
+                    <p>Your announcement titled "<b>${notificationData.title}</b>" has been sent to the following ${notifiedUsers.length} user(s):</p>
+                    <ul>
+                        ${userListHtml}
+                    </ul>
                     <p>Best,</p>
                     <p>The Codetrain Team</p>
                 `
             });
-        }
-    });
-
-    await batch.commit();
-
-    // Send confirmation email to the author
-    if (authorId && authorData && authorData.email) {
-        const userListHtml = notifiedUsers.map(u => `<li>${u.name} (${u.email})</li>`).join('');
-        await sendEmail({
-            to: authorData.email,
-            subject: `Confirmation: "${notificationData.title}" Sent`,
-            html: `
-                <h1>Confirmation</h1>
-                <p>Your announcement titled "<b>${notificationData.title}</b>" has been sent to the following ${notifiedUsers.length} user(s):</p>
-                <ul>
-                    ${userListHtml}
-                </ul>
-                <p>Best,</p>
-                <p>The Codetrain Team</p>
-            `
-        });
+       } catch(authorEmailError) {
+           console.error(`Non-critical error: Failed to send confirmation email to author ${authorData.email}.`, authorEmailError);
+       }
     }
 
   }, [authorData, allUsers]);
