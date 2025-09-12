@@ -77,16 +77,15 @@ export default function ChatPage() {
 
   const groupChats = useMemo(() => {
     const groups: Omit<ChatEntity, 'type' | 'lastMessage' | 'lastMessageTimestamp' | 'unreadCount'>[] = [];
-    if (role === 'teacher') {
-      // Find all unique generations this teacher teaches
-      const taughtGens = userData?.gensTaught?.split(',').map(g => g.trim()) || [];
-      taughtGens.forEach((gen) => {
-        groups.push({
-          id: `group-${gen}`,
-          name: `${gen} Hub`,
-          dataAiHint: 'group students',
+    if (role === 'teacher' || role === 'admin') {
+        const studentGens = new Set(allUsers.filter(u => u.role === 'student' && u.gen).map(u => u.gen!));
+        studentGens.forEach(gen => {
+            groups.push({
+                id: `group-${gen}`,
+                name: `${gen} Hub`,
+                dataAiHint: 'group students',
+            });
         });
-      });
     } else if (role === 'student' && userData?.gen) {
       groups.push({
         id: `group-${userData.gen}`,
@@ -95,7 +94,7 @@ export default function ChatPage() {
       });
     }
     return groups.sort((a, b) => a.name.localeCompare(b.name));
-  }, [role, userData, allUsers]);
+  }, [role, userData?.gen, allUsers]);
 
   const markChatAsRead = useCallback((chatId: string) => {
     localStorage.setItem(`lastSeen_${chatId}`, Date.now().toString());
