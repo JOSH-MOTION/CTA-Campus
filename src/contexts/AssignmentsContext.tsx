@@ -1,3 +1,4 @@
+
 // src/contexts/AssignmentsContext.tsx
 'use client';
 
@@ -42,6 +43,7 @@ export const AssignmentsProvider: FC<{children: ReactNode}> = ({children}) => {
   const { user, userData, role, loading: authLoading } = useAuth();
 
   useEffect(() => {
+     let unsubscribe: (() => void) | undefined;
      if (authLoading) {
       setLoading(true);
       return;
@@ -77,7 +79,7 @@ export const AssignmentsProvider: FC<{children: ReactNode}> = ({children}) => {
       );
     }
 
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    unsubscribe = onSnapshot(q, (querySnapshot) => {
         const fetchedAssignments = querySnapshot.docs.map(doc => {
             const data = doc.data();
             return {

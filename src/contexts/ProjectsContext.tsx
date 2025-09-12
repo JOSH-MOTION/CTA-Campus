@@ -1,3 +1,4 @@
+
 // src/contexts/ProjectsContext.tsx
 'use client';
 
@@ -35,6 +36,7 @@ export const ProjectsProvider: FC<{children: ReactNode}> = ({children}) => {
   const { user, userData, role, loading: authLoading } = useAuth();
 
   useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
     if (authLoading) {
       setLoading(true);
       return;
@@ -68,7 +70,7 @@ export const ProjectsProvider: FC<{children: ReactNode}> = ({children}) => {
       );
     }
 
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    unsubscribe = onSnapshot(q, (querySnapshot) => {
         const fetchedProjects = querySnapshot.docs.map(doc => {
             const data = doc.data();
             return {

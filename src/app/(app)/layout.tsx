@@ -42,7 +42,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ReportsProvider } from '@/contexts/ReportsContext';
 
 const MemoizedProtectedLayout = memo(function ProtectedLayout({children}: {children: ReactNode}) {
   const {user, userData, role, loading} = useAuth();
@@ -113,9 +112,7 @@ const MemoizedProtectedLayout = memo(function ProtectedLayout({children}: {child
             <ExercisesProvider>
               <ProjectsProvider>
                 <ResourcesProvider>
-                  <ReportsProvider>
                     {children}
-                  </ReportsProvider>
                 </ResourcesProvider>
               </ProjectsProvider>
             </ExercisesProvider>

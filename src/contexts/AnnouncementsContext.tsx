@@ -1,3 +1,4 @@
+
 // src/contexts/AnnouncementsContext.tsx
 'use client';
 
@@ -37,6 +38,7 @@ export const AnnouncementsProvider: FC<{children: ReactNode}> = ({children}) => 
   const { user, userData, role, loading: authLoading } = useAuth();
 
   useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
     // Wait for auth to finish loading and user to be determined
     if (authLoading) {
       setLoading(true);
@@ -78,7 +80,7 @@ export const AnnouncementsProvider: FC<{children: ReactNode}> = ({children}) => 
     }
 
 
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    unsubscribe = onSnapshot(q, (querySnapshot) => {
       const fetchedAnnouncements = querySnapshot.docs.map(doc => {
         const data = doc.data();
         let dateString: string;

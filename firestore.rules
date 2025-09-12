@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -27,20 +28,6 @@ service cloud.firestore {
     function isStaff() {
       return isTeacher() || isAdmin();
     }
-    
-    function isChatMember(chatId) {
-      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      let isDM = size(chatId.split('-')) == 2;
-      let isGroup = chatId.startsWith('group-');
-
-      return (isDM && request.auth.uid in chatId.split('-')) ||
-             (isGroup && (
-                isAdmin() || 
-                (isStudent() && userDoc.gen == chatId.replace('group-', '')) ||
-                (isTeacher() && userDoc.gensTaught.matches('.*' + chatId.replace('group-', '') + '.*'))
-              ));
-    }
-
 
     // Collection Rules
     match /users/{userId} {
@@ -113,20 +100,15 @@ service cloud.firestore {
       allow write: if isStaff();
     }
 
-    match /reports/{reportId} {
-        allow read, list: if isStaff();
-        allow create: if isStaff();
-    }
-
     match /notifications/{notificationId} {
       // A user can only interact with their own notifications.
       allow read, write, create, delete: if request.auth.uid == resource.data.userId;
       // A user can query for their own notifications.
-      allow list: if isSignedIn() && request.query.where[0][2] == request.auth.uid;
+      allow list: if isSignedIn() && request.query.where.userId == request.auth.uid;
     }
 
     match /chats/{chatId}/{message=**} {
-      allow read, write: if isSignedIn() && isChatMember(chatId);
+      allow read, write: if isSignedIn();
     }
   }
 }

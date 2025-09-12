@@ -1,3 +1,4 @@
+
 // src/app/(app)/chat/page.tsx
 'use client';
 
@@ -76,28 +77,16 @@ export default function ChatPage() {
 
   const groupChats = useMemo(() => {
     const groups: Omit<ChatEntity, 'type' | 'lastMessage' | 'lastMessageTimestamp' | 'unreadCount'>[] = [];
-    const allStudents = allUsers.filter((u) => u.role === 'student');
-    const allGens = new Set(allStudents.map((student) => student.gen).filter(Boolean));
-    
-    if (role === 'admin') {
-       allGens.forEach((gen) => {
+    if (role === 'teacher') {
+      // Find all unique generations this teacher teaches
+      const taughtGens = userData?.gensTaught?.split(',').map(g => g.trim()) || [];
+      taughtGens.forEach((gen) => {
         groups.push({
           id: `group-${gen}`,
           name: `${gen} Hub`,
           dataAiHint: 'group students',
         });
       });
-    } else if (role === 'teacher') {
-        const taughtGens = userData?.gensTaught?.split(',').map(g => g.trim()) || [];
-        allGens.forEach((gen) => {
-          if (taughtGens.includes(gen)) {
-            groups.push({
-                id: `group-${gen}`,
-                name: `${gen} Hub`,
-                dataAiHint: 'group students',
-            });
-          }
-        });
     } else if (role === 'student' && userData?.gen) {
       groups.push({
         id: `group-${userData.gen}`,
@@ -151,10 +140,12 @@ export default function ChatPage() {
   }, [loading, currentUser, allUsers, groupChats, searchParams]);
 
   useEffect(() => {
-    if (!selectedChat || !currentUser) return;
     if (messageUnsubscribeRef.current) {
-      messageUnsubscribeRef.current();
+        messageUnsubscribeRef.current();
+        messageUnsubscribeRef.current = null;
     }
+    if (!selectedChat || !currentUser) return;
+    
     let chatId: string;
     if (selectedChat.type === 'dm') {
       chatId = getChatId(currentUser.uid, selectedChat.id);
