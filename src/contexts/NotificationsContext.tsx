@@ -1,4 +1,3 @@
-
 // src/contexts/NotificationsContext.tsx
 'use client';
 
@@ -34,7 +33,7 @@ const NotificationsContext = createContext<NotificationsContextType | undefined>
 
 export const NotificationsProvider: FC<{children: ReactNode}> = ({children}) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const { user } = useAuth();
+  const { user, userData: authorData } = useAuth();
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined = undefined;
@@ -156,30 +155,24 @@ export const NotificationsProvider: FC<{children: ReactNode}> = ({children}) => 
     await batch.commit();
 
     // Send confirmation email to the author
-    if (authorId) {
-        const authorDoc = await getDoc(doc(db, 'users', authorId));
-        if (authorDoc.exists()) {
-            const authorData = authorDoc.data() as UserData;
-            if (authorData.email) {
-                const userListHtml = notifiedUsers.map(u => `<li>${u.name} (${u.email})</li>`).join('');
-                await sendEmail({
-                    to: authorData.email,
-                    subject: `Confirmation: "${notificationData.title}" Sent`,
-                    html: `
-                        <h1>Confirmation</h1>
-                        <p>Your announcement titled "<b>${notificationData.title}</b>" has been sent to the following ${notifiedUsers.length} user(s):</p>
-                        <ul>
-                            ${userListHtml}
-                        </ul>
-                        <p>Best,</p>
-                        <p>The Codetrain Team</p>
-                    `
-                });
-            }
-        }
+    if (authorId && authorData && authorData.email) {
+        const userListHtml = notifiedUsers.map(u => `<li>${u.name} (${u.email})</li>`).join('');
+        await sendEmail({
+            to: authorData.email,
+            subject: `Confirmation: "${notificationData.title}" Sent`,
+            html: `
+                <h1>Confirmation</h1>
+                <p>Your announcement titled "<b>${notificationData.title}</b>" has been sent to the following ${notifiedUsers.length} user(s):</p>
+                <ul>
+                    ${userListHtml}
+                </ul>
+                <p>Best,</p>
+                <p>The Codetrain Team</p>
+            `
+        });
     }
 
-  }, []);
+  }, [authorData]);
 
   const markAsRead = useCallback(async (notificationId: string) => {
       const notifDoc = doc(db, 'notifications', notificationId);

@@ -1,4 +1,3 @@
-
 // src/contexts/AssignmentsContext.tsx
 'use client';
 
@@ -112,11 +111,16 @@ export const AssignmentsProvider: FC<{children: ReactNode}> = ({children}) => {
 
     await addDoc(collection(db, 'assignments'), newAssignmentData);
     
-    await addNotificationForGen(assignment.targetGen, {
-      title: `New Assignment: ${assignment.title}`,
-      description: assignment.description,
-      href: '/assignments',
-    }, user.uid);
+    try {
+        await addNotificationForGen(assignment.targetGen, {
+            title: `New Assignment: ${assignment.title}`,
+            description: assignment.description,
+            href: '/assignments',
+        }, user.uid);
+    } catch (error) {
+        console.error("Failed to send assignment notifications:", error);
+        // We don't re-throw the error, so the UI doesn't show a failure for the core action
+    }
   }, [user, addNotificationForGen]);
 
   const updateAssignment = useCallback(async (id: string, updates: Partial<AssignmentData>) => {

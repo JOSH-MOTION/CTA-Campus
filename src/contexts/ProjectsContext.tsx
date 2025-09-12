@@ -1,4 +1,3 @@
-
 // src/contexts/ProjectsContext.tsx
 'use client';
 
@@ -102,11 +101,15 @@ export const ProjectsProvider: FC<{children: ReactNode}> = ({children}) => {
 
     await addDoc(collection(db, 'projects'), newProjectData);
     
-    await addNotificationForGen(project.targetGen, {
-      title: `New Project: ${project.title}`,
-      description: project.description,
-      href: '/projects',
-    }, user.uid);
+    try {
+      await addNotificationForGen(project.targetGen, {
+        title: `New Project: ${project.title}`,
+        description: project.description,
+        href: '/projects',
+      }, user.uid);
+    } catch (error) {
+        console.error("Failed to send project notifications:", error);
+    }
   }, [user, addNotificationForGen]);
 
   const updateProject = useCallback(async (id: string, updates: Partial<ProjectData>) => {

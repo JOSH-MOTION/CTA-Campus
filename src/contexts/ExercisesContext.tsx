@@ -1,4 +1,3 @@
-
 // src/contexts/ExercisesContext.tsx
 'use client';
 
@@ -102,11 +101,15 @@ export const ExercisesProvider: FC<{children: ReactNode}> = ({children}) => {
 
     await addDoc(collection(db, 'exercises'), newExerciseData);
     
-    await addNotificationForGen(exercise.targetGen, {
-      title: `New Exercise: ${exercise.title}`,
-      description: exercise.description,
-      href: '/exercises',
-    }, user.uid);
+    try {
+        await addNotificationForGen(exercise.targetGen, {
+          title: `New Exercise: ${exercise.title}`,
+          description: exercise.description,
+          href: '/exercises',
+        }, user.uid);
+    } catch (error) {
+        console.error("Failed to send exercise notifications:", error);
+    }
   }, [user, addNotificationForGen]);
 
   const updateExercise = useCallback(async (id: string, updates: Partial<ExerciseData>) => {
