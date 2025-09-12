@@ -75,7 +75,7 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
         console.error("Error fetching all users:", e);
         return [];
     }
-  }, []);
+  }, [setAllUsers]);
 
   const fetchAllStudents = useCallback(async (): Promise<UserData[]> => {
     try {
