@@ -1,3 +1,4 @@
+
 // src/ai/dev.ts
 import { config } from 'dotenv';
 config();
@@ -12,3 +13,4 @@ import '@/ai/flows/suggested-contact-method.ts';
 import '@/ai/flows/award-points-flow.ts';
 import '@/ai/flows/clear-all-submissions-flow.ts';
 import '@/ai/flows/grade-submission-flow.ts';
+import '@genkit-ai/firebase';
