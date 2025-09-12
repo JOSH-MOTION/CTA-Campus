@@ -49,7 +49,7 @@ export const awardPointsFlow = ai.defineFlow(
         
         // If the point has already been awarded, consider it a success and do nothing.
         if (pointDocSnap.exists()) {
-            return { success: true, message: 'Points already awarded for this activity.' };
+            return { success: false, message: 'Points already awarded for this activity.' };
         }
 
         // Atomically increment the totalPoints on the user document

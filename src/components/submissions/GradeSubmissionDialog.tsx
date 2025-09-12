@@ -90,7 +90,7 @@ export function GradeSubmissionDialog({ children, submission, onGraded }: GradeS
             assignmentTitle: submission.assignmentTitle,
         });
 
-        if (!awardResult.success) {
+        if (!awardResult.success && awardResult.message !== 'Points already awarded for this activity.') {
             throw new Error(awardResult.message);
         }
 
