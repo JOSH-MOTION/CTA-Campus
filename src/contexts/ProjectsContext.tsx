@@ -104,7 +104,7 @@ export const ProjectsProvider: FC<{children: ReactNode}> = ({children}) => {
     
     await addNotificationForGen(project.targetGen, {
       title: `New Project: ${project.title}`,
-      description: `A new project has been posted.`,
+      description: project.description,
       href: '/projects',
     });
   }, [user, addNotificationForGen]);

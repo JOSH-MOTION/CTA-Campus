@@ -104,7 +104,7 @@ export const ExercisesProvider: FC<{children: ReactNode}> = ({children}) => {
     
     await addNotificationForGen(exercise.targetGen, {
       title: `New Exercise: ${exercise.title}`,
-      description: `A new exercise has been posted.`,
+      description: exercise.description,
       href: '/exercises',
     });
   }, [user, addNotificationForGen]);

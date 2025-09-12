@@ -114,7 +114,7 @@ export const AssignmentsProvider: FC<{children: ReactNode}> = ({children}) => {
     
     await addNotificationForGen(assignment.targetGen, {
       title: `New Assignment: ${assignment.title}`,
-      description: `A new assignment has been posted.`,
+      description: assignment.description,
       href: '/assignments',
     });
   }, [user, addNotificationForGen]);
