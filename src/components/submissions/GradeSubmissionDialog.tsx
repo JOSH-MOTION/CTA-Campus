@@ -91,10 +91,7 @@ export function GradeSubmissionDialog({ children, submission, onGraded }: GradeS
         });
 
         if (!awardResult.success) {
-            // Allow duplicates to proceed to grading without showing an error
-            if (awardResult.message !== 'duplicate') {
-                throw new Error(awardResult.message);
-            }
+            throw new Error(awardResult.message);
         }
 
         // Then, update the submission document with grade and feedback
