@@ -3,7 +3,7 @@
 
 import {useState, useEffect} from 'react';
 import {useRouter} from 'next/navigation';
-import {signInWithEmailAndPassword} from 'firebase/auth';
+import {signInWithEmailAndPassword, sendPasswordResetEmail} from 'firebase/auth';
 import {auth} from '@/lib/firebase';
 import {Button} from '@/components/ui/button';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card';
@@ -46,6 +46,33 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+  
+  const handleForgotPassword = async () => {
+    if (!email) {
+      toast({
+        variant: 'destructive',
+        title: 'Email Required',
+        description: 'Please enter your email address to reset your password.',
+      });
+      return;
+    }
+    setLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      toast({
+        title: 'Password Reset Email Sent',
+        description: 'Check your inbox for a link to reset your password.',
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.message,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (user) return null; // Don't render anything if user is already logged in (and redirecting)
 
@@ -74,7 +101,12 @@ export default function LoginPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+               <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <Button variant="link" type="button" onClick={handleForgotPassword} className="h-auto p-0 text-xs">
+                  Forgot Password?
+                </Button>
+              </div>
               <Input
                 id="password"
                 type="password"
@@ -91,9 +123,6 @@ export default function LoginPage() {
             Don't have an account?
             <Button variant="link" asChild>
               <Link href="/student-signup">Sign up as Student</Link>
-            </Button>
-             or <Button variant="link" asChild>
-              <Link href="/teacher-signup">Sign up as Teacher</Link>
             </Button>
           </div>
         </CardContent>
