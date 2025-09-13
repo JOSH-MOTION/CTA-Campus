@@ -30,57 +30,44 @@ service cloud.firestore {
 
     // Collection Rules
     match /users/{userId} {
-      // Allow a user to read their own profile or any profile if they are staff.
       allow read: if request.auth.uid == userId || isStaff();
-      // Allow any signed-in user to list users (for directory, etc.)
       allow list: if isSignedIn();
-      // Allow a user to update their own profile, but not change their role.
-      allow update: if (request.auth.uid == userId && request.resource.data.role == resource.data.role) ||
-                       // Allow server-side flows (like awarding points) or staff to update any user profile.
-                       isStaff() || request.auth == null;
-      // Allow anyone to create a user document (signup)
       allow create: if true;
+      // Allow user to update their own profile (but not their role)
+      // OR allow staff to update any profile.
+      allow update: if (request.auth.uid == userId && request.resource.data.role == resource.data.role) || isStaff();
 
       match /points/{pointId} {
-        // Only the server flow (request.auth == null) or staff can create/update/delete point entries.
-        allow write: if isStaff() || request.auth == null;
-        // Students can read their own points, staff can read any.
+        allow write: if isStaff();
         allow read: if request.auth.uid == userId || isStaff();
       }
     }
 
     match /announcements/{announcementId} {
-      // Any signed in user can read/list announcements. The app's query filters by generation.
       allow read: if isSignedIn();
       allow write, delete: if isStaff();
     }
 
     match /assignments/{assignmentId} {
-      // Any signed in user can read/list assignments. The app's query filters by generation.
       allow read: if isSignedIn();
       allow write, delete: if isStaff();
     }
     
     match /exercises/{exerciseId} {
-      // Any signed in user can read/list exercises. The app's query filters by generation.
       allow read: if isSignedIn();
       allow write, delete: if isStaff();
     }
     
     match /projects/{projectId} {
-      // Any signed in user can read/list projects. The app's query filters by generation.
       allow read: if isSignedIn();
       allow write, delete: if isStaff();
     }
     
     match /submissions/{submissionId} {
       allow read: if isStaff() || request.auth.uid == resource.data.studentId;
-      // Allow staff to list all submissions.
       allow list: if isStaff();
-      // A user can create a submission for themselves, or a staff member can create one.
       allow create: if isStaff() || request.auth.uid == request.resource.data.studentId;
-      // Staff or a server-side flow can update submissions with grades/feedback
-      allow update: if isStaff() || request.auth == null;
+      allow update: if isStaff();
       allow delete: if isStaff();
     }
     
@@ -98,19 +85,15 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isStaff();
     }
-    
-    match /attendance/{attendanceId} {
-      // Any signed-in user can create an attendance record for themselves.
-      allow create: if isSignedIn() && request.auth.uid == request.resource.data.studentId;
-      // Staff can read/list all attendance records.
-      allow read, list: if isStaff();
-    }
 
     match /notifications/{notificationId} {
-      // A user can only interact with their own notifications.
       allow read, write, create, delete: if request.auth.uid == resource.data.userId;
-      // A user can query for their own notifications.
       allow list: if isSignedIn() && request.query.where.userId == request.auth.uid;
+    }
+    
+    match /attendance/{attendanceId} {
+      allow read, list: if isStaff();
+      allow create: if isSignedIn();
     }
 
     match /chats/{chatId}/{message=**} {
