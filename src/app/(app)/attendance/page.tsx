@@ -14,10 +14,10 @@ import { CheckCircle, Download, Loader2 } from 'lucide-react';
 import { useRoadmap } from '@/contexts/RoadmapContext';
 import { useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { awardPointsFlow } from '@/ai/flows/award-points-flow';
-import { addDoc, collection, getDocs, orderBy, query, serverTimestamp } from 'firebase/firestore';
+import { getDocs, collection, query, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import Papa from 'papaparse';
+import { markAttendanceFlow } from '@/ai/flows/mark-attendance-flow';
 
 const attendanceSchema = z.object({
   classId: z.string().nonempty('Please select a class.'),
@@ -103,48 +103,31 @@ export default function AttendancePage() {
     if (!user || !userData) return;
     setIsSubmitting(true);
     try {
-      const attendanceDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-      
-      const awardResult = await awardPointsFlow({
-          studentId: user.uid,
-          points: 1,
-          reason: 'Class Attendance',
-          activityId: `attendance-${data.classId}-${attendanceDate}`,
-          action: 'award'
+      const result = await markAttendanceFlow({
+        studentId: user.uid,
+        studentName: userData.displayName,
+        studentGen: userData.gen || 'N/A',
+        classId: data.classId,
+        className: classSessions.find(c => c.id === data.classId)?.name || 'Unknown Class',
+        learned: data.learned,
+        challenged: data.challenged,
+        questions: data.questions,
       });
-      
-      if (!awardResult.success) {
-        // This is the key fix: We check for specific non-error messages from the flow.
-        // If points were already awarded, we don't treat it as a hard error.
-        const isDuplicate = awardResult.message.includes("already awarded") || awardResult.message.includes("duplicate");
-        if (!isDuplicate) {
-          throw new Error(awardResult.message);
-        }
-      }
 
-      // This part now runs even if points were already awarded.
-      await addDoc(collection(db, 'attendance'), {
-          studentId: user.uid,
-          studentName: userData.displayName,
-          studentGen: userData.gen,
-          classId: data.classId,
-          className: classSessions.find(c => c.id === data.classId)?.name || 'Unknown Class',
-          learned: data.learned,
-          challenged: data.challenged,
-          questions: data.questions,
-          submittedAt: serverTimestamp(),
-      });
+      if (!result.success) {
+        throw new Error(result.message);
+      }
 
       toast({
         title: 'Attendance Marked!',
-        description: 'You have been awarded 1 point for submitting your feedback.',
+        description: result.message,
       });
       form.reset();
     } catch(error: any) {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: error.message === 'duplicate' ? 'You have already marked attendance for this session today.' : `Could not submit attendance. ${error.message}`,
+        description: error.message || 'Could not submit attendance.',
       });
     } finally {
       setIsSubmitting(false);
