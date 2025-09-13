@@ -90,8 +90,12 @@ export const markAttendanceFlow = ai.defineFlow(
 
     } catch (error: any) {
       console.error("Error processing attendance in flow:", error);
+      // Firestore permission errors have a specific code.
+      if (error.code === 'permission-denied') {
+          return { success: false, message: "Server error: Could not process points. Reason: Missing or insufficient permissions." };
+      }
       const errorMessage = error.message || "An unexpected error occurred.";
-      return { success: false, message: `Server error: Could not process attendance. Reason: ${errorMessage}` };
+      return { success: false, message: `Server error: Could not process points. Reason: ${errorMessage}` };
     }
   }
 );
