@@ -49,7 +49,7 @@ export function SubmitExerciseDialog({ children, exercise, onSubmissionSuccess }
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedData, setSubmittedData] = useState<SubmissionFormValues & { imageUrl?: string } | null>(null);
   const { toast } = useToast();
-  const { user, userData, allUsers } = useAuth();
+  const { user, userData } = useAuth();
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -113,7 +113,7 @@ export function SubmitExerciseDialog({ children, exercise, onSubmissionSuccess }
         submissionNotes: data.submissionNotes || '',
         pointCategory: 'Class Exercises',
         imageUrl: imageUrl,
-      }, allUsers);
+      });
 
       toast({
         title: 'Exercise Submitted!',
