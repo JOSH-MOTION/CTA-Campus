@@ -37,6 +37,13 @@ export const awardPointsFlow = ai.defineFlow(
     name: 'awardPointsFlow',
     inputSchema: AwardPointsFlowInputSchema,
     outputSchema: AwardPointsFlowOutputSchema,
+    auth: (auth, input) => {
+        // Any authenticated user can trigger this flow.
+        // The flow itself runs with server credentials.
+        if (!auth) {
+            throw new Error("Authentication is required to award points.");
+        }
+    }
   },
   async (input) => {
     const { studentId, points, reason, activityId, action, assignmentTitle } = input;

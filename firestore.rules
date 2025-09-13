@@ -27,30 +27,6 @@ service cloud.firestore {
     function isStaff() {
       return isTeacher() || isAdmin();
     }
-    
-    function isChatMember(chatId) {
-      let userData = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      
-      // Helper for Direct Messages
-      function isDirectMessageMember() {
-        let uids = chatId.split('-');
-        return request.auth.uid in uids;
-      }
-      
-      // Helper for Group Messages
-      function isGroupMember() {
-        let gen = chatId.replace('group-', '');
-        // Students can access their own gen's chat.
-        // Teachers can access chats for gens they teach.
-        // Admins can access any group chat.
-        return (userData.role == 'student' && userData.gen == gen) ||
-               (userData.role == 'teacher' && userData.gensTaught.matches('.*' + gen + '.*')) ||
-               (userData.role == 'admin');
-      }
-      
-      return (chatId.startsWith('group-') && isGroupMember()) || 
-             (!chatId.startsWith('group-') && isDirectMessageMember());
-    }
 
     // Collection Rules
     match /users/{userId} {
@@ -122,16 +98,23 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isStaff();
     }
+    
+    match /attendance/{attendanceId} {
+      // Any signed-in user can create an attendance record for themselves.
+      allow create: if isSignedIn() && request.auth.uid == request.resource.data.studentId;
+      // Staff can read/list all attendance records.
+      allow read, list: if isStaff();
+    }
 
     match /notifications/{notificationId} {
       // A user can only interact with their own notifications.
       allow read, write, create, delete: if request.auth.uid == resource.data.userId;
       // A user can query for their own notifications.
-      allow list: if isSignedIn() && request.query.where[0][2] == request.auth.uid;
+      allow list: if isSignedIn() && request.query.where.userId == request.auth.uid;
     }
 
     match /chats/{chatId}/{message=**} {
-      allow read, write: if isChatMember(chatId);
+      allow read, write: if isSignedIn();
     }
   }
 }
