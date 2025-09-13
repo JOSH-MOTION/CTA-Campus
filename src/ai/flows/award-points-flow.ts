@@ -43,8 +43,13 @@ export const awardPointsFlow = ai.defineFlow(
     const userDocRef = doc(db, 'users', studentId);
     
     try {
+      const pointDocRef = doc(db, 'users', studentId, 'points', activityId);
+
       if (action === 'award') {
-        const pointDocRef = doc(db, 'users', studentId, 'points', activityId);
+        const docSnap = await getDoc(pointDocRef);
+        if (docSnap.exists()) {
+            return { success: true, message: "Points already awarded for this activity." };
+        }
 
         // Atomically increment the totalPoints on the user document
         await updateDoc(userDocRef, {
@@ -63,9 +68,7 @@ export const awardPointsFlow = ai.defineFlow(
         return { success: true, message: 'Points awarded successfully.' };
 
       } else { // action === 'revoke'
-        const pointToRevokeRef = doc(db, 'users', studentId, 'points', activityId);
-        
-        const docSnap = await getDoc(pointToRevokeRef);
+        const docSnap = await getDoc(pointDocRef);
         if (docSnap.exists()) {
             const pointsToRevoke = docSnap.data().points || 0;
             
@@ -75,7 +78,7 @@ export const awardPointsFlow = ai.defineFlow(
             });
 
             // Delete the log entry
-            await deleteDoc(pointToRevokeRef);
+            await deleteDoc(pointDocRef);
             return { success: true, message: "Points revoked successfully." };
         }
         
