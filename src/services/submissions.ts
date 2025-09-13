@@ -44,6 +44,11 @@ import type { UserData } from '@/contexts/AuthContext';
   export const addSubmission = async (submissionData: NewSubmissionData): Promise<{ id: string }> => {
     const { pointsToAward, ...restOfSubmissionData } = submissionData;
     
+    // Either a link or an image url must exist.
+    if (!restOfSubmissionData.submissionLink && !restOfSubmissionData.imageUrl) {
+        throw new Error("A submission link or an image is required.");
+    }
+
     const is100Days = submissionData.assignmentId === '100-days-of-code';
 
     // For "100 Days of Code", check by title. For others, check by assignment ID.

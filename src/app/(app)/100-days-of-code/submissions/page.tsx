@@ -151,11 +151,13 @@ export default function HundredDaysSubmissionsPage() {
                                 <TableCell>{submission.assignmentTitle.replace('100 Days of Code - ', '')}</TableCell>
                                 <TableCell>{formatDistanceToNow(submission.submittedAt.toDate(), { addSuffix: true })}</TableCell>
                                 <TableCell>
+                                    {submission.submissionLink &&
                                     <Button variant="link" asChild className="p-0 h-auto">
                                         <Link href={submission.submissionLink} target="_blank" rel="noopener noreferrer">
                                             View Post <ExternalLink className="ml-2 h-3 w-3" />
                                         </Link>
                                     </Button>
+                                    }
                                 </TableCell>
                                 <TableCell className="text-right space-x-2">
                                     {submission.grade ? (

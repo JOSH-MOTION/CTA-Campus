@@ -31,8 +31,8 @@ import Image from 'next/image';
 const submissionSchema = z.object({
   submissionLink: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
   submissionNotes: z.string().optional(),
-}).refine(data => data.submissionLink, {
-    message: "A submission link is required.",
+}).refine(data => data.submissionLink || 'image_uploaded', {
+    message: "A submission link or an image is required.",
     path: ["submissionLink"],
 });
 
@@ -71,6 +71,8 @@ export function SubmitProjectDialog({ children, project, onSubmissionSuccess }: 
         setImagePreview(reader.result as string);
       };
       reader.readAsDataURL(file);
+      // Let zod know that an image has been uploaded
+      form.setValue('submissionLink', form.getValues('submissionLink') || 'image_uploaded');
     }
   };
 
@@ -87,6 +89,12 @@ export function SubmitProjectDialog({ children, project, onSubmissionSuccess }: 
 
   const onSubmit = async (data: SubmissionFormValues) => {
     if (!user || !userData) return;
+    
+    if (!data.submissionLink && !imageFile) {
+        form.setError("submissionLink", { type: "manual", message: "A submission link or an image is required." });
+        return;
+    }
+
     setIsSubmitting(true);
     let imageUrl = '';
     try {
@@ -101,7 +109,7 @@ export function SubmitProjectDialog({ children, project, onSubmissionSuccess }: 
         studentGen: userData.gen || 'N/A',
         assignmentId: project.id,
         assignmentTitle: project.title,
-        submissionLink: data.submissionLink,
+        submissionLink: data.submissionLink === 'image_uploaded' ? '' : data.submissionLink,
         submissionNotes: data.submissionNotes || '',
         pointCategory: 'Weekly Projects',
         imageUrl: imageUrl,
@@ -139,7 +147,7 @@ export function SubmitProjectDialog({ children, project, onSubmissionSuccess }: 
           <DialogTitle>Submit: {project.title}</DialogTitle>
           {!submittedData && (
             <DialogDescription>
-                Provide a link to your work and any notes for your instructor.
+                Provide a link to your work, upload an image, or both.
             </DialogDescription>
           )}
         </DialogHeader>
@@ -154,7 +162,7 @@ export function SubmitProjectDialog({ children, project, onSubmissionSuccess }: 
                     </AlertDescription>
                 </Alert>
                 <div className="space-y-3 rounded-md border p-4">
-                    {submittedData.submissionLink && (
+                    {submittedData.submissionLink && submittedData.submissionLink !== 'image_uploaded' && (
                         <p className="text-sm font-medium">
                             Submission Link:{' '}
                             <Link href={submittedData.submissionLink} target="_blank" rel="noopener noreferrer" className="text-primary underline">
@@ -181,11 +189,16 @@ export function SubmitProjectDialog({ children, project, onSubmissionSuccess }: 
                 <FormField
                 control={form.control}
                 name="submissionLink"
-                render={({ field }) => (
+                render={({ field: { onChange, value, ...restField } }) => (
                     <FormItem>
-                    <FormLabel>Submission Link</FormLabel>
+                    <FormLabel>Submission Link (Optional)</FormLabel>
                     <FormControl>
-                        <Input placeholder="https://github.com/your-repo" {...field} />
+                        <Input
+                          placeholder="https://github.com/your-repo"
+                          value={value === 'image_uploaded' ? '' : value}
+                          onChange={onChange}
+                          {...restField}
+                        />
                     </FormControl>
                     <FormMessage />
                     </FormItem>
@@ -227,7 +240,7 @@ export function SubmitProjectDialog({ children, project, onSubmissionSuccess }: 
                 )}
                 />
                 <DialogFooter>
-                <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>
+                <Button type="button" variant="ghost" onClick={() => handleOpenChange(false)}>
                     Cancel
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
@@ -240,7 +253,7 @@ export function SubmitProjectDialog({ children, project, onSubmissionSuccess }: 
         )}
         {submittedData && (
             <DialogFooter>
-                <Button type="button" onClick={() => setIsOpen(false)}>
+                <Button type="button" onClick={() => handleOpenChange(false)}>
                     Close
                 </Button>
             </DialogFooter>

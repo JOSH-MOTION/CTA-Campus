@@ -23,6 +23,7 @@ import Papa from 'papaparse';
 import { GradeSubmissionDialog } from '@/components/submissions/GradeSubmissionDialog';
 import { gradeSubmissionFlow } from '@/ai/flows/grade-submission-flow';
 import Image from 'next/image';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 const submissionCategories = ['All', 'Class Assignments', 'Class Exercises', 'Weekly Projects', '100 Days of Code'];
 

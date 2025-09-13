@@ -93,7 +93,7 @@ export function GradeSubmissionDialog({ children, submission, onGraded }: GradeS
 
         if (!awardResult.success) {
             // Allow duplicates to proceed to grading without showing an error
-            if (awardResult.message !== 'duplicate') {
+            if (awardResult.message !== 'Points already revoked or never existed.' && !awardResult.message.includes('already awarded')) {
                 throw new Error(awardResult.message);
             }
         }
