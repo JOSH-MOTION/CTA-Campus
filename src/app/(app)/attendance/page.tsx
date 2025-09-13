@@ -78,14 +78,17 @@ export default function AttendancePage() {
         const csv = Papa.unparse(attendanceRecords);
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', 'attendance_feedback.csv');
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'attendance_feedback.csv');
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
     } catch (error) {
+        console.error("Error downloading CSV: ", error);
         toast({
             variant: 'destructive',
             title: 'Download Failed',
@@ -109,10 +112,17 @@ export default function AttendancePage() {
           activityId: `attendance-${data.classId}-${attendanceDate}`,
           action: 'award'
       });
-      if (!awardResult.success && awardResult.message !== "Points already revoked or never existed." && awardResult.message !== 'duplicate' && !awardResult.message.includes("already awarded")) {
-        throw new Error(awardResult.message);
+      
+      if (!awardResult.success) {
+        // This is the key fix: We check for specific non-error messages from the flow.
+        // If points were already awarded, we don't treat it as a hard error.
+        const isDuplicate = awardResult.message.includes("already awarded") || awardResult.message.includes("duplicate");
+        if (!isDuplicate) {
+          throw new Error(awardResult.message);
+        }
       }
 
+      // This part now runs even if points were already awarded.
       await addDoc(collection(db, 'attendance'), {
           studentId: user.uid,
           studentName: userData.displayName,
@@ -134,7 +144,7 @@ export default function AttendancePage() {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: error.message === 'duplicate' ? 'You have already marked attendance for this session today.' : 'Could not submit attendance.',
+        description: error.message === 'duplicate' ? 'You have already marked attendance for this session today.' : `Could not submit attendance. ${error.message}`,
       });
     } finally {
       setIsSubmitting(false);
