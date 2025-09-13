@@ -134,26 +134,7 @@ const roadmapData: RoadmapSubject[] = [
       },
     ],
   },
-  // {
-  //   title: 'Git',
-  //   duration: '2 weeks',
-  //   weeks: [
-  //     {
-  //       title: 'Week 1',
-  //       topics: [
-  //         {id: 'git-1-1', title: 'Installing git'},
-  //         {id: 'git-1-2', title: 'Initialize git in repo'},
-  //         {id: 'git-1-3', title: 'Staging'},
-  //         {id: 'git-1-4', title: 'Committing'},
-  //       ],
-  //     },
-  //     {title: 'Week 2', topics: [
-  //         {id: 'git-2-1', title: 'Pushing'}, 
-  //         {id: 'git-2-2', title: 'Branching'}, 
-  //         {id: 'git-2-3', title: 'Pulling'}
-  //     ]},
-  //   ],
-  // },
+ 
   {
     title: 'JS',
     duration: '5 weeks',
@@ -196,6 +177,19 @@ const roadmapData: RoadmapSubject[] = [
           {id: 'js-5-3', title: 'DOM manipulation'},
         ],
       },
+    ],
+  },
+   {
+    title: 'System Design',
+    duration: '1 week',
+    weeks: [
+      {
+        title: 'Week 1',
+        topics: [
+          {id: 'System Design-1-1', title: 'System Design'},
+        ],
+      },
+  
     ],
   },
   {
