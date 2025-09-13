@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
-import { ExternalLink, Loader2, Search, Trash2, CheckCircle, XCircle, Download } from 'lucide-react';
+import { ExternalLink, Loader2, Search, Trash2, CheckCircle, XCircle, Download, Image as ImageIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 import Papa from 'papaparse';
 import { GradeSubmissionDialog } from '@/components/submissions/GradeSubmissionDialog';
 import { gradeSubmissionFlow } from '@/ai/flows/grade-submission-flow';
+import Image from 'next/image';
 
 const submissionCategories = ['All', 'Class Assignments', 'Class Exercises', 'Weekly Projects', '100 Days of Code'];
 
@@ -311,6 +312,7 @@ export default function AllSubmissionsPage() {
                   <TableHead>Assignment</TableHead>
                   <TableHead>Submitted</TableHead>
                   <TableHead>Link</TableHead>
+                  <TableHead>Image</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -327,11 +329,37 @@ export default function AllSubmissionsPage() {
                             </TableCell>
                             <TableCell>{formatDistanceToNow(submission.submittedAt.toDate(), { addSuffix: true })}</TableCell>
                             <TableCell>
-                                <Button variant="ghost" asChild size="icon">
-                                    <Link href={submission.submissionLink} target="_blank" rel="noopener noreferrer">
-                                        <ExternalLink className="h-4 w-4" />
-                                    </Link>
-                                </Button>
+                                {submission.submissionLink ? (
+                                    <Button variant="ghost" asChild size="icon">
+                                        <Link href={submission.submissionLink} target="_blank" rel="noopener noreferrer">
+                                            <ExternalLink className="h-4 w-4" />
+                                        </Link>
+                                    </Button>
+                                ) : (
+                                    <span className="text-muted-foreground text-xs">N/A</span>
+                                )}
+                            </TableCell>
+                             <TableCell>
+                                {submission.imageUrl && (
+                                     <Dialog>
+                                        <DialogTrigger asChild>
+                                            <Button variant="ghost" size="icon">
+                                                <ImageIcon className="h-4 w-4" />
+                                            </Button>
+                                        </DialogTrigger>
+                                        <DialogContent className="max-w-3xl">
+                                            <DialogHeader>
+                                                <DialogTitle>Submitted Image</DialogTitle>
+                                                <DialogDescription>
+                                                    Image submitted by {submission.studentName} for {submission.assignmentTitle}.
+                                                </DialogDescription>
+                                            </DialogHeader>
+                                            <div className="flex justify-center p-4">
+                                               <Image src={submission.imageUrl} alt="Submission image" width={800} height={600} className="rounded-md object-contain max-h-[70vh]" />
+                                            </div>
+                                        </DialogContent>
+                                    </Dialog>
+                                )}
                             </TableCell>
                             <TableCell className="text-right space-x-2">
                                 {submission.grade ? (
@@ -367,7 +395,7 @@ export default function AllSubmissionsPage() {
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center">
+                    <TableCell colSpan={7} className="h-24 text-center">
                       No submissions match your filters.
                     </TableCell>
                   </TableRow>

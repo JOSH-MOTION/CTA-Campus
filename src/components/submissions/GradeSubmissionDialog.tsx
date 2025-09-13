@@ -26,6 +26,7 @@ import { Alert, AlertTitle, AlertDescription } from '../ui/alert';
 import Link from 'next/link';
 import { Input } from '../ui/input';
 import { awardPointsFlow } from '@/ai/flows/award-points-flow';
+import Image from 'next/image';
 
 const gradingSchema = z.object({
   feedback: z.string().optional(),
@@ -131,7 +132,7 @@ export function GradeSubmissionDialog({ children, submission, onGraded }: GradeS
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Grade: {submission.assignmentTitle}</DialogTitle>
           <DialogDescription>
@@ -139,15 +140,25 @@ export function GradeSubmissionDialog({ children, submission, onGraded }: GradeS
           </DialogDescription>
         </DialogHeader>
         
-        <div className="space-y-4 py-2">
-            <p className="text-sm font-medium">
-                Submission Link:{' '}
-                <Button variant="link" asChild className="p-0 h-auto">
-                    <Link href={submission.submissionLink} target="_blank" rel="noopener noreferrer">
-                       View Submission <ExternalLink className="ml-2 h-3 w-3" />
-                    </Link>
-                </Button>
-            </p>
+        <div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto pr-2">
+            {submission.submissionLink && (
+                <p className="text-sm font-medium">
+                    Submission Link:{' '}
+                    <Button variant="link" asChild className="p-0 h-auto">
+                        <Link href={submission.submissionLink} target="_blank" rel="noopener noreferrer">
+                        View Submission <ExternalLink className="ml-2 h-3 w-3" />
+                        </Link>
+                    </Button>
+                </p>
+            )}
+             {submission.imageUrl && (
+                <div className="space-y-2">
+                    <p className="text-sm font-medium">Submitted Image:</p>
+                    <div className="flex justify-center p-2 border rounded-md">
+                        <Image src={submission.imageUrl} alt="Submission image" width={400} height={300} className="rounded-md object-contain max-h-[40vh]" />
+                    </div>
+                </div>
+            )}
             {submission.submissionNotes && (
                 <div className="space-y-1">
                     <p className="text-sm font-medium">Student Notes:</p>

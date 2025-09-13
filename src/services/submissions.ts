@@ -1,4 +1,3 @@
-
 // src/services/submissions.ts
 import {
     collection,
@@ -26,12 +25,13 @@ import type { UserData } from '@/contexts/AuthContext';
     studentGen: string;
     assignmentId: string;
     assignmentTitle: string;
-    submissionLink: string;
+    submissionLink?: string;
     submissionNotes: string;
     submittedAt: Timestamp;
     pointCategory: string;
     grade?: string;
     feedback?: string;
+    imageUrl?: string;
   }
   
   export interface NewSubmissionData extends Omit<Submission, 'id' | 'submittedAt' | 'grade' | 'feedback'> {

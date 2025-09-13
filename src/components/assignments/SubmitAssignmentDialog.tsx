@@ -1,7 +1,7 @@
 // src/components/assignments/SubmitAssignmentDialog.tsx
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useState, type ReactNode, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -20,15 +20,20 @@ import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, CheckCircle } from 'lucide-react';
+import { Loader2, CheckCircle, UploadCloud } from 'lucide-react';
 import { type Assignment } from '@/contexts/AssignmentsContext';
 import { addSubmission } from '@/services/submissions';
 import { Alert, AlertTitle, AlertDescription } from '../ui/alert';
 import Link from 'next/link';
+import { uploadImage } from '@/lib/cloudinary';
+import Image from 'next/image';
 
 const submissionSchema = z.object({
-  submissionLink: z.string().url('Please enter a valid URL (e.g., https://github.com/...)'),
+  submissionLink: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
   submissionNotes: z.string().optional(),
+}).refine(data => data.submissionLink, {
+    message: "A submission link is required.",
+    path: ["submissionLink"],
 });
 
 type SubmissionFormValues = z.infer<typeof submissionSchema>;
@@ -42,9 +47,12 @@ interface SubmitAssignmentDialogProps {
 export function SubmitAssignmentDialog({ children, assignment, onSubmissionSuccess }: SubmitAssignmentDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submittedData, setSubmittedData] = useState<SubmissionFormValues | null>(null);
+  const [submittedData, setSubmittedData] = useState<SubmissionFormValues & { imageUrl?: string } | null>(null);
   const { toast } = useToast();
   const { user, userData, allUsers } = useAuth();
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<SubmissionFormValues>({
     resolver: zodResolver(submissionSchema),
@@ -53,21 +61,40 @@ export function SubmitAssignmentDialog({ children, assignment, onSubmissionSucce
       submissionNotes: '',
     },
   });
+  
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open);
     if (!open) {
-        // Reset state when dialog is closed
         form.reset();
         setSubmittedData(null);
         setIsSubmitting(false);
+        setImageFile(null);
+        setImagePreview(null);
     }
   }
 
   const onSubmit = async (data: SubmissionFormValues) => {
     if (!user || !userData) return;
     setIsSubmitting(true);
+    let imageUrl = '';
     try {
+        if (imageFile) {
+            const uploadResult: any = await uploadImage(imageFile);
+            imageUrl = uploadResult.secure_url;
+        }
+
       await addSubmission({
         studentId: user.uid,
         studentName: userData.displayName,
@@ -77,6 +104,7 @@ export function SubmitAssignmentDialog({ children, assignment, onSubmissionSucce
         submissionLink: data.submissionLink,
         submissionNotes: data.submissionNotes || '',
         pointCategory: 'Class Assignments',
+        imageUrl: imageUrl,
       }, allUsers);
 
       toast({
@@ -84,7 +112,7 @@ export function SubmitAssignmentDialog({ children, assignment, onSubmissionSucce
         description: 'Your work has been sent to your teacher for grading.',
       });
       onSubmissionSuccess();
-      setSubmittedData(data);
+      setSubmittedData({ ...data, imageUrl });
     } catch (error: any) {
       const isDuplicate = error.message === 'duplicate';
       toast({
@@ -106,7 +134,7 @@ export function SubmitAssignmentDialog({ children, assignment, onSubmissionSucce
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Submit: {assignment.title}</DialogTitle>
            {!submittedData && (
@@ -126,12 +154,20 @@ export function SubmitAssignmentDialog({ children, assignment, onSubmissionSucce
                     </AlertDescription>
                 </Alert>
                 <div className="space-y-3 rounded-md border p-4">
-                    <p className="text-sm font-medium">
-                        Submission Link:{' '}
-                        <Link href={submittedData.submissionLink} target="_blank" rel="noopener noreferrer" className="text-primary underline">
-                            {submittedData.submissionLink}
-                        </Link>
-                    </p>
+                    {submittedData.submissionLink && (
+                        <p className="text-sm font-medium">
+                            Submission Link:{' '}
+                            <Link href={submittedData.submissionLink} target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                                {submittedData.submissionLink}
+                            </Link>
+                        </p>
+                    )}
+                    {submittedData.imageUrl && (
+                        <div className="space-y-2">
+                            <p className="text-sm font-medium">Submitted Image:</p>
+                            <Image src={submittedData.imageUrl} alt="Submitted image" width={200} height={150} className="rounded-md border" />
+                        </div>
+                    )}
                     {submittedData.submissionNotes && (
                         <p className="text-sm font-medium">
                             Notes: <span className="font-normal text-muted-foreground">{submittedData.submissionNotes}</span>
@@ -155,6 +191,28 @@ export function SubmitAssignmentDialog({ children, assignment, onSubmissionSucce
                     </FormItem>
                 )}
                 />
+                 <FormItem>
+                    <FormLabel>Image (Optional)</FormLabel>
+                    <FormControl>
+                        <div 
+                        className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-md cursor-pointer"
+                        onClick={() => fileInputRef.current?.click()}
+                        >
+                        <div className="space-y-1 text-center">
+                            {imagePreview ? (
+                            <Image src={imagePreview} alt="Preview" width={200} height={100} className="mx-auto h-24 object-contain" />
+                            ) : (
+                            <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground" />
+                            )}
+                            <div className="flex text-sm text-muted-foreground">
+                            <p className="pl-1">Click to upload an image</p>
+                            <Input ref={fileInputRef} id="file-upload" name="file-upload" type="file" className="sr-only" onChange={handleImageChange} accept="image/*" />
+                            </div>
+                            <p className="text-xs text-muted-foreground">PNG, JPG, GIF up to 10MB</p>
+                        </div>
+                        </div>
+                    </FormControl>
+                 </FormItem>
                 <FormField
                 control={form.control}
                 name="submissionNotes"
