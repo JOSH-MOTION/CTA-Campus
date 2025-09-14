@@ -3,9 +3,8 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { v4 as uuidv4 } from 'uuid';
-import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, deleteDoc, serverTimestamp, updateDoc, increment, runTransaction } from 'firebase/firestore';
+import { firebase } from '@genkit-ai/firebase';
+import { serverTimestamp, increment } from 'firebase-admin/firestore';
 
 const AwardPointsFlowInputSchema = z.object({
     studentId: z.string().describe("The UID of the student to award points to."),
@@ -31,16 +30,17 @@ export const awardPointsFlow = ai.defineFlow(
     name: 'awardPointsFlow',
     inputSchema: AwardPointsFlowInputSchema,
     outputSchema: AwardPointsFlowOutputSchema,
-    auth: (auth, input) => {
-      if (!auth) {
-        throw new Error('Authentication is required to award points.');
-      }
-      if (!auth.role || (auth.role !== 'teacher' && auth.role !== 'admin')) {
-        throw new Error('You do not have permission to award points.');
-      }
-    }
+    auth: firebase(),
   },
   async (input, context) => {
+    // Authorize the request
+    if (!context.auth) {
+      throw new Error('Authentication is required to award points.');
+    }
+    if (!context.auth.role || (context.auth.role !== 'teacher' && context.auth.role !== 'admin')) {
+      throw new Error('You do not have permission to award points.');
+    }
+
     const { studentId, points, reason, activityId, action, assignmentTitle } = input;
     
     try {
@@ -67,7 +67,7 @@ export const awardPointsFlow = ai.defineFlow(
           }
           
           transaction.update(userDocRef, {
-            totalPoints: currentTotalPoints + points
+            totalPoints: increment(points)
           });
 
           transaction.set(pointDocRef, {
@@ -100,7 +100,7 @@ export const awardPointsFlow = ai.defineFlow(
           const pointsToRevoke = pointDoc.data()?.points || 0;
           
           transaction.update(userDocRef, {
-            totalPoints: currentTotalPoints - pointsToRevoke
+            totalPoints: increment(-pointsToRevoke)
           });
 
           transaction.delete(pointToRevokeRef);
