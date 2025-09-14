@@ -10,20 +10,25 @@ if (!process.env.GOOGLE_AI_API_KEY) {
 // IMPORTANT: This must be the first import to ensure Firebase Admin is initialized
 // before any of the AI flows that depend on it are loaded.
 try {
-  await import('@/lib/firebase-admin');
+  require('@/lib/firebase-admin');
+  console.log('Firebase Admin initialized successfully');
 } catch (error) {
   console.error('Failed to initialize Firebase Admin:', error);
-  process.exit(1);
+  // Don't exit in development, just warn
+  console.warn('Continuing without Firebase Admin...');
 }
 
 // Import AI flows
-import '@/ai/flows/resource-summarizer';
-import '@/ai/flows/faq-chatbot';
-import '@/ai/flows/suggested-contact-method';
-import '@/ai/flows/award-points-flow';
-import '@/ai/flows/clear-all-submissions-flow';
-import '@/ai/flows/grade-submission-flow';
-import '@/ai/flows/mark-attendance-flow';
-import '@genkit-ai/firebase';
+try {
+  require('@/ai/flows/resource-summarizer');
+  require('@/ai/flows/faq-chatbot');
+  require('@/ai/flows/suggested-contact-method');
+  require('@/ai/flows/award-points-flow');
+  require('@/ai/flows/clear-all-submissions-flow');
+  require('@/ai/flows/grade-submission-flow');
+  console.log('All AI flows loaded successfully');
+} catch (error) {
+  console.error('Error loading AI flows:', error);
+}
 
-console.log('All AI flows loaded successfully');
+console.log('Genkit development server ready');
