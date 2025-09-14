@@ -38,7 +38,14 @@ export const awardPointsFlow = ai.defineFlow(
     name: 'awardPointsFlow',
     inputSchema: AwardPointsFlowInputSchema,
     outputSchema: AwardPointsFlowOutputSchema,
-    auth: firebase(),
+    auth: firebase(async (auth) => {
+        if (!auth) {
+            throw new Error('Authentication is required.');
+        }
+        if (auth.role !== 'teacher' && auth.role !== 'admin') {
+            throw new Error('You do not have permission to perform this action.');
+        }
+    }),
   },
   async (input) => {
     const { studentId, points, reason, activityId, action, assignmentTitle } = input;
@@ -89,7 +96,7 @@ export const awardPointsFlow = ai.defineFlow(
     } catch (error: any) {
       console.error("Error processing points in flow:", error);
       // Firestore permission errors have a specific code.
-      if (error.code === 'permission-denied') {
+      if (error.code === 'permission-denied' || error.code === 7) {
           return { success: false, message: "Server error: Could not process points. Reason: Missing or insufficient permissions." };
       }
       const errorMessage = error.message || "An unexpected error occurred.";
