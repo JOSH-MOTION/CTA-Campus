@@ -39,12 +39,12 @@ export const awardPointsFlow = ai.defineFlow(
     inputSchema: AwardPointsFlowInputSchema,
     outputSchema: AwardPointsFlowOutputSchema,
     auth: firebase(async (auth) => {
-        if (!auth) {
-            throw new Error('Authentication is required.');
-        }
-        if (auth.role !== 'teacher' && auth.role !== 'admin') {
-            throw new Error('You do not have permission to perform this action.');
-        }
+      if (!auth) {
+        throw new Error('Authentication is required.');
+      }
+      if (auth.role !== 'teacher' && auth.role !== 'admin') {
+        throw new Error('You do not have permission to perform this action.');
+      }
     }),
   },
   async (input) => {
