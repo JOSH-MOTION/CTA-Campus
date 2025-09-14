@@ -39,7 +39,10 @@ export const markAttendanceFlow = ai.defineFlow(
     outputSchema: MarkAttendanceFlowOutputSchema,
     auth: firebase(),
   },
-  async (input) => {
+  async (input, context) => {
+    if (!context.auth) {
+      throw new Error('Authentication is required to mark attendance.');
+    }
     const { studentId, studentName, studentGen, classId, className, learned, challenged, questions } = input;
     const attendanceDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
     const activityId = `attendance-${classId}-${attendanceDate}`;
