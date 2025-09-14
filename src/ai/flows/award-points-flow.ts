@@ -1,15 +1,11 @@
 // src/ai/flows/award-points-flow.ts
 'use server';
-/**
- * @fileOverview A secure flow for awarding or revoking points for a student.
- */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, deleteDoc, serverTimestamp, updateDoc, increment, runTransaction } from 'firebase/firestore';
-import { firebase } from '@genkit-ai/firebase';
 
 const AwardPointsFlowInputSchema = z.object({
     studentId: z.string().describe("The UID of the student to award points to."),
@@ -35,45 +31,50 @@ export const awardPointsFlow = ai.defineFlow(
     name: 'awardPointsFlow',
     inputSchema: AwardPointsFlowInputSchema,
     outputSchema: AwardPointsFlowOutputSchema,
-    auth: firebase(),
+    // Add authentication check for staff members
+    auth: (auth, input) => {
+      if (!auth) {
+        throw new Error('Authentication is required to award points.');
+      }
+      if (!auth.role || (auth.role !== 'teacher' && auth.role !== 'admin')) {
+        throw new Error('You do not have permission to award points.');
+      }
+    }
   },
   async (input, context) => {
-    if (!context.auth) {
-        throw new Error('Authentication is required.');
-    }
-    if (context.auth.role !== 'teacher' && context.auth.role !== 'admin') {
-        throw new Error('You do not have permission to perform this action.');
-    }
-    
     const { studentId, points, reason, activityId, action, assignmentTitle } = input;
     
     try {
-      const result = await runTransaction(db, async (transaction) => {
-        const userDocRef = doc(db, 'users', studentId);
+      // Use Firebase Admin SDK for server-side operations
+      const { getFirestore } = await import('firebase-admin/firestore');
+      const adminDb = getFirestore();
+      
+      const result = await adminDb.runTransaction(async (transaction) => {
+        const userDocRef = adminDb.collection('users').doc(studentId);
         const userDoc = await transaction.get(userDocRef);
         
         // Ensure user document exists
-        if (!userDoc.exists()) {
+        if (!userDoc.exists) {
           transaction.set(userDocRef, {
             totalPoints: 0,
             createdAt: serverTimestamp(),
           });
         }
         
-        const currentTotalPoints = userDoc.exists() ? (userDoc.data().totalPoints || 0) : 0;
+        const currentTotalPoints = userDoc.exists ? (userDoc.data()?.totalPoints || 0) : 0;
         
         if (action === 'award') {
-          const pointDocRef = doc(db, 'users', studentId, 'points', activityId);
+          const pointDocRef = userDocRef.collection('points').doc(activityId);
           
           // Check if points for this activity already exist
           const existingPointDoc = await transaction.get(pointDocRef);
-          if (existingPointDoc.exists()) {
+          if (existingPointDoc.exists) {
             throw new Error('Points for this activity have already been awarded');
           }
           
           // Update total points
           transaction.update(userDocRef, {
-            totalPoints: increment(points)
+            totalPoints: currentTotalPoints + points
           });
 
           // Create point log entry
@@ -83,6 +84,7 @@ export const awardPointsFlow = ai.defineFlow(
             assignmentTitle: assignmentTitle || reason,
             activityId,
             awardedAt: serverTimestamp(),
+            awardedBy: context.auth?.uid || 'system',
           });
           
           return { 
@@ -92,10 +94,10 @@ export const awardPointsFlow = ai.defineFlow(
           };
 
         } else { // action === 'revoke'
-          const pointToRevokeRef = doc(db, 'users', studentId, 'points', activityId);
+          const pointToRevokeRef = userDocRef.collection('points').doc(activityId);
           const pointDoc = await transaction.get(pointToRevokeRef);
           
-          if (!pointDoc.exists()) {
+          if (!pointDoc.exists) {
             return { 
               success: true, 
               message: "Points already revoked or never existed.",
@@ -103,11 +105,11 @@ export const awardPointsFlow = ai.defineFlow(
             };
           }
           
-          const pointsToRevoke = pointDoc.data().points || 0;
+          const pointsToRevoke = pointDoc.data()?.points || 0;
           
           // Update total points
           transaction.update(userDocRef, {
-            totalPoints: increment(-pointsToRevoke)
+            totalPoints: currentTotalPoints - pointsToRevoke
           });
 
           // Delete the point log entry
@@ -127,11 +129,17 @@ export const awardPointsFlow = ai.defineFlow(
       console.error("Error processing points in flow:", error);
       
       if (error.code === 'permission-denied') {
-        return { success: false, message: "Server error: Could not process points. Reason: Missing or insufficient permissions." };
+        return { 
+          success: false, 
+          message: "Server error: Could not process points. Reason: Missing or insufficient permissions." 
+        };
       }
       
       const errorMessage = error.message || "An unexpected error occurred.";
-      return { success: false, message: `Server error: Could not process points. Reason: ${errorMessage}` };
+      return { 
+        success: false, 
+        message: `Server error: Could not process points. Reason: ${errorMessage}` 
+      };
     }
   }
 );
