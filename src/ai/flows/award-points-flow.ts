@@ -13,6 +13,7 @@ import { z } from 'genkit';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, deleteDoc, serverTimestamp, updateDoc, increment } from 'firebase/firestore';
+import { firebase } from '@genkit-ai/firebase';
 
 
 const AwardPointsFlowInputSchema = z.object({
@@ -37,13 +38,7 @@ export const awardPointsFlow = ai.defineFlow(
     name: 'awardPointsFlow',
     inputSchema: AwardPointsFlowInputSchema,
     outputSchema: AwardPointsFlowOutputSchema,
-    auth: (auth, input) => {
-        // Any authenticated user can trigger this flow.
-        // The flow itself runs with server credentials.
-        if (!auth) {
-            throw new Error("Authentication is required to award points.");
-        }
-    }
+    auth: firebase(),
   },
   async (input) => {
     const { studentId, points, reason, activityId, action, assignmentTitle } = input;

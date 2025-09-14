@@ -12,6 +12,7 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, updateDoc, increment, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { firebase } from '@genkit-ai/firebase';
 
 const MarkAttendanceFlowInputSchema = z.object({
     studentId: z.string().describe("The UID of the student."),
@@ -36,13 +37,7 @@ export const markAttendanceFlow = ai.defineFlow(
     name: 'markAttendanceFlow',
     inputSchema: MarkAttendanceFlowInputSchema,
     outputSchema: MarkAttendanceFlowOutputSchema,
-    auth: (auth, input) => {
-        // Any authenticated user can trigger this flow.
-        // The flow itself runs with server credentials.
-        if (!auth) {
-            throw new Error("Authentication is required to mark attendance.");
-        }
-    }
+    auth: firebase(),
   },
   async (input) => {
     const { studentId, studentName, studentGen, classId, className, learned, challenged, questions } = input;
