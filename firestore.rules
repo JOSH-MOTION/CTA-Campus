@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -8,12 +9,8 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function getUserData(userId) {
-      return get(/databases/$(database)/documents/users/$(userId)).data;
-    }
-
     function isRole(role) {
-      return isSignedIn() && getUserData(request.auth.uid).role == role;
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
     }
 
     function isStudent() {
@@ -39,9 +36,9 @@ service cloud.firestore {
       // Allow any signed-in user to list users (for directory, etc.)
       allow list: if isSignedIn();
       // Allow a user to update their own profile, but not change their role.
-      // Allow staff to update any user's profile.
-      // A server-side process with no auth can also update users (for point increments).
-      allow update: if request.auth.uid == userId || isStaff() || request.auth == null;
+      allow update: if (request.auth.uid == userId && request.resource.data.role == resource.data.role) ||
+                       // Allow server-side flows (like awarding points) or staff to update any user profile.
+                       isStaff() || request.auth == null;
       // Allow anyone to create a user document (signup)
       allow create: if true;
 
@@ -51,13 +48,6 @@ service cloud.firestore {
         // Students can read their own points, staff can read any.
         allow read: if request.auth.uid == userId || isStaff();
       }
-    }
-    
-    match /attendance/{attendanceId} {
-        // Any signed in user can create an attendance record.
-        allow create: if isSignedIn();
-        // Only staff can read attendance records.
-        allow read, list: if isStaff();
     }
 
     match /announcements/{announcementId} {
@@ -109,14 +99,21 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isStaff();
     }
-
+    
+  match /attendance/{attendanceId} {
+      // Any signed-in user can create an attendance record for themselves.
+      allow create: if (isSignedIn() && request.auth.uid == request.resource.data.studentId) || request.auth == null;
+      // Staff can read/list all attendance records.
+      allow read, list: if isStaff();
+    }
+    
     match /notifications/{notificationId} {
-        // A user can only read/write their own notifications
-        allow read, write: if request.auth.uid == resource.data.userId;
-        // Staff can create notifications for other users through a server-side flow.
-        allow create: if isStaff() || request.auth == null;
-        // A user can list their own notifications
-        allow list: if isSignedIn() && request.query.filters.length > 0 && request.query.filters[0].value == request.auth.uid;
+      // A user can only interact with their own notifications.
+      allow read, write, delete: if request.auth.uid == resource.data.userId;
+      // A user can query for their own notifications.
+      allow list: if isSignedIn() && request.query.where.userId == request.auth.uid;
+      // Allow server-side processes to create notifications
+      allow create: if request.auth == null || request.auth.uid == request.resource.data.userId;
     }
 
     match /chats/{chatId}/{message=**} {

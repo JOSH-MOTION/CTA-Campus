@@ -55,7 +55,19 @@ export const markAttendanceFlow = ai.defineFlow(
       const pointDocSnap = await getDoc(pointDocRef);
 
       if (pointDocSnap.exists()) {
-        return { success: true, message: "Attendance already marked for this session today." };
+        // If points exist, we can still save the feedback, but we don't award more points.
+        await addDoc(collection(db, 'attendance'), {
+          studentId,
+          studentName,
+          studentGen,
+          classId,
+          className,
+          learned,
+          challenged,
+          questions,
+          submittedAt: serverTimestamp(),
+        });
+        return { success: true, message: "Attendance already marked for this session today, but your feedback was saved." };
       }
 
       // 2. Atomically increment the totalPoints on the user document
