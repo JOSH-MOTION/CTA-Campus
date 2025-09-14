@@ -1,16 +1,10 @@
 // src/ai/flows/clear-all-submissions-flow.ts
 'use server';
-/**
- * @fileOverview A flow to clear all submissions.
- *
- * - clearAllSubmissionsFlow - A function that handles deleting all submissions.
- */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { collection, getDocs, writeBatch } from 'firebase/firestore';
+import { collection, getDocs, writeBatch, query, limit, startAfter, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Submission } from '@/services/submissions';
 
 const ClearAllSubmissionsOutputSchema = z.object({
   success: z.boolean(),
@@ -27,23 +21,44 @@ export const clearAllSubmissionsFlow = ai.defineFlow(
   async () => {
     try {
       const submissionsRef = collection(db, 'submissions');
-      const querySnapshot = await getDocs(submissionsRef);
-      
-      if (querySnapshot.empty) {
+      const BATCH_SIZE = 500; // Firestore batch limit
+      let totalDeleted = 0;
+      let lastDoc = null;
+
+      do {
+        // Build query with pagination
+        let q = query(submissionsRef, orderBy('__name__'), limit(BATCH_SIZE));
+        if (lastDoc) {
+          q = query(submissionsRef, orderBy('__name__'), startAfter(lastDoc), limit(BATCH_SIZE));
+        }
+
+        const querySnapshot = await getDocs(q);
+        
+        if (querySnapshot.empty) {
+          break;
+        }
+
+        const batch = writeBatch(db);
+        querySnapshot.forEach(doc => {
+          batch.delete(doc.ref);
+        });
+
+        await batch.commit();
+        totalDeleted += querySnapshot.size;
+        
+        // Update lastDoc for pagination
+        lastDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
+        
+      } while (lastDoc);
+
+      if (totalDeleted === 0) {
         return { success: true, deletedCount: 0, message: 'No submissions to delete.' };
       }
 
-      const batch = writeBatch(db);
-      querySnapshot.forEach(doc => {
-        batch.delete(doc.ref);
-      });
-
-      await batch.commit();
-
       return { 
         success: true, 
-        deletedCount: querySnapshot.size,
-        message: 'All submissions have been successfully deleted.' 
+        deletedCount: totalDeleted,
+        message: `Successfully deleted ${totalDeleted} submission(s).` 
       };
 
     } catch (error: any) {

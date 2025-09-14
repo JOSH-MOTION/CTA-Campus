@@ -8,7 +8,7 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { db } from '@/lib/firebase';
 import { doc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { auth } from '@/lib/firebase'; // Import auth directly from firebase.ts
+import { firebase } from '@genkit-ai/firebase';
 
 const GradeSubmissionInputSchema = z.object({
   submissionId: z.string().describe("The ID of the submission document to grade."),
@@ -30,7 +30,7 @@ export const gradeSubmissionFlow = ai.defineFlow(
     name: 'gradeSubmissionFlow',
     inputSchema: GradeSubmissionInputSchema,
     outputSchema: GradeSubmissionOutputSchema,
-    auth: auth, // Use the auth instance from firebase.ts
+    auth: firebase(),
   },
   async (input, context) => {
     if (!context.auth) {
