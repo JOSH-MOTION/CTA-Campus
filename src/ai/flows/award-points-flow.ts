@@ -31,7 +31,6 @@ export const awardPointsFlow = ai.defineFlow(
     name: 'awardPointsFlow',
     inputSchema: AwardPointsFlowInputSchema,
     outputSchema: AwardPointsFlowOutputSchema,
-    // Add authentication check for staff members
     auth: (auth, input) => {
       if (!auth) {
         throw new Error('Authentication is required to award points.');
@@ -53,31 +52,24 @@ export const awardPointsFlow = ai.defineFlow(
         const userDocRef = adminDb.collection('users').doc(studentId);
         const userDoc = await transaction.get(userDocRef);
         
-        // Ensure user document exists
         if (!userDoc.exists) {
-          transaction.set(userDocRef, {
-            totalPoints: 0,
-            createdAt: serverTimestamp(),
-          });
+          throw new Error('Student user document not found.');
         }
         
-        const currentTotalPoints = userDoc.exists ? (userDoc.data()?.totalPoints || 0) : 0;
+        const currentTotalPoints = userDoc.data()?.totalPoints || 0;
         
         if (action === 'award') {
           const pointDocRef = userDocRef.collection('points').doc(activityId);
           
-          // Check if points for this activity already exist
           const existingPointDoc = await transaction.get(pointDocRef);
           if (existingPointDoc.exists) {
             throw new Error('Points for this activity have already been awarded');
           }
           
-          // Update total points
           transaction.update(userDocRef, {
             totalPoints: currentTotalPoints + points
           });
 
-          // Create point log entry
           transaction.set(pointDocRef, {
             points,
             reason,
@@ -107,12 +99,10 @@ export const awardPointsFlow = ai.defineFlow(
           
           const pointsToRevoke = pointDoc.data()?.points || 0;
           
-          // Update total points
           transaction.update(userDocRef, {
             totalPoints: currentTotalPoints - pointsToRevoke
           });
 
-          // Delete the point log entry
           transaction.delete(pointToRevokeRef);
           
           return { 
@@ -127,13 +117,6 @@ export const awardPointsFlow = ai.defineFlow(
       
     } catch (error: any) {
       console.error("Error processing points in flow:", error);
-      
-      if (error.code === 'permission-denied') {
-        return { 
-          success: false, 
-          message: "Server error: Could not process points. Reason: Missing or insufficient permissions." 
-        };
-      }
       
       const errorMessage = error.message || "An unexpected error occurred.";
       return { 
