@@ -2,10 +2,6 @@
 'use server';
 /**
  * @fileOverview A secure flow for grading a student's submission.
- *
- * - gradeSubmissionFlow - A function that handles grading a submission.
- * - GradeSubmissionInput - The input type for the gradeSubmissionFlow function.
- * - GradeSubmissionOutput - The return type for the gradeSubmissionFlow function.
  */
 
 import { ai } from '@/ai/genkit';
@@ -29,7 +25,6 @@ const GradeSubmissionOutputSchema = z.object({
 });
 export type GradeSubmissionOutput = z.infer<typeof GradeSubmissionOutputSchema>;
 
-// This flow is now secured by an auth policy.
 export const gradeSubmissionFlow = ai.defineFlow(
   {
     name: 'gradeSubmissionFlow',
@@ -40,9 +35,9 @@ export const gradeSubmissionFlow = ai.defineFlow(
             throw new Error('Authentication is required.');
         }
         if (auth.role !== 'teacher' && auth.role !== 'admin') {
-            throw new Error('You do not have permission to grade submissions.');
+            throw new Error('You do not have permission to perform this action.');
         }
-    })
+    }),
   },
   async (input, context) => {
     const { submissionId, studentId, grade, feedback, assignmentTitle } = input;
@@ -54,14 +49,16 @@ export const gradeSubmissionFlow = ai.defineFlow(
       await updateDoc(submissionRef, {
         grade: grade,
         feedback: feedback || '',
+        gradedAt: serverTimestamp(),
+        gradedBy: context.auth?.uid,
       });
 
       // Create a notification for the student
       const notification = {
         userId: studentId,
         title: `Graded: ${assignmentTitle}`,
-        description: `Your submission has been graded by ${context.auth?.displayName || 'your teacher'}.`,
-        href: `/submissions`, // Simple link, can be improved to point to the exact item
+        description: `Your submission has been graded by ${context.auth?.name || 'your teacher'}.`,
+        href: `/submissions`,
         read: false,
         date: serverTimestamp(),
       };
@@ -70,6 +67,12 @@ export const gradeSubmissionFlow = ai.defineFlow(
       return { success: true, message: 'Submission graded successfully.' };
     } catch (error: any) {
       console.error("Error grading submission in flow:", error);
+      
+      // Handle Firestore permission errors
+      if (error.code === 'permission-denied' || error.code === 7) {
+        return { success: false, message: "Server error: Could not grade submission. Reason: Missing or insufficient permissions." };
+      }
+      
       const errorMessage = error.message || "An unexpected error occurred.";
       return { success: false, message: `Server error: Could not grade submission. Reason: ${errorMessage}` };
     }

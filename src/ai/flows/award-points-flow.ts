@@ -5,16 +5,14 @@
  *
  * - awardPointsFlow - A function that handles awarding or revoking points.
  * - AwardPointsFlowInput - The input type for the awardPointsFlow function.
- * - AwardPointsFlowOutput - The return type for the awardPointsFlow function.
+ * - AwardPointsFlowOutput - The return type for the awardPointsFlowOutput function.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { v4 as uuidv4 } from 'uuid';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, deleteDoc, serverTimestamp, updateDoc, increment } from 'firebase/firestore';
 import { firebase } from '@genkit-ai/firebase';
-
 
 const AwardPointsFlowInputSchema = z.object({
     studentId: z.string().describe("The UID of the student to award points to."),
@@ -32,22 +30,21 @@ const AwardPointsFlowOutputSchema = z.object({
 });
 export type AwardPointsFlowOutput = z.infer<typeof AwardPointsFlowOutputSchema>;
 
-
 export const awardPointsFlow = ai.defineFlow(
   {
     name: 'awardPointsFlow',
     inputSchema: AwardPointsFlowInputSchema,
     outputSchema: AwardPointsFlowOutputSchema,
     auth: firebase(async (auth) => {
-      if (!auth) {
-        throw new Error('Authentication is required.');
-      }
-      if (auth.role !== 'teacher' && auth.role !== 'admin') {
-        throw new Error('You do not have permission to perform this action.');
-      }
+        if (!auth) {
+            throw new Error('Authentication is required.');
+        }
+        if (auth.role !== 'teacher' && auth.role !== 'admin') {
+            throw new Error('You do not have permission to perform this action.');
+        }
     }),
   },
-  async (input) => {
+  async (input, context) => {
     const { studentId, points, reason, activityId, action, assignmentTitle } = input;
     const userDocRef = doc(db, 'users', studentId);
     
@@ -72,6 +69,7 @@ export const awardPointsFlow = ai.defineFlow(
             assignmentTitle: assignmentTitle || reason, // Fallback to reason if title not provided
             activityId,
             awardedAt: serverTimestamp(),
+            awardedBy: context.auth?.uid,
         });
         
         return { success: true, message: 'Points awarded successfully.' };
