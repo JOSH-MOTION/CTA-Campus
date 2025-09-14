@@ -5,6 +5,7 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { firebase } from '@genkit-ai/firebase';
 import { serverTimestamp, increment } from 'firebase-admin/firestore';
+import { adminDb } from '@/lib/firebase-admin';
 
 const AwardPointsFlowInputSchema = z.object({
     studentId: z.string().describe("The UID of the student to award points to."),
@@ -40,14 +41,13 @@ export const awardPointsFlow = ai.defineFlow(
     if (!context.auth.role || (context.auth.role !== 'teacher' && context.auth.role !== 'admin')) {
       throw new Error('You do not have permission to award points.');
     }
+    if (!adminDb) {
+      throw new Error('Firebase Admin DB is not initialized.');
+    }
 
     const { studentId, points, reason, activityId, action, assignmentTitle } = input;
     
     try {
-      // Use Firebase Admin SDK for server-side operations
-      const { getFirestore } = await import('firebase-admin/firestore');
-      const adminDb = getFirestore();
-      
       const result = await adminDb.runTransaction(async (transaction) => {
         const userDocRef = adminDb.collection('users').doc(studentId);
         const userDoc = await transaction.get(userDocRef);
@@ -63,7 +63,11 @@ export const awardPointsFlow = ai.defineFlow(
           
           const existingPointDoc = await transaction.get(pointDocRef);
           if (existingPointDoc.exists) {
-            throw new Error('Points for this activity have already been awarded');
+            return { 
+              success: true,
+              message: 'Points for this activity have already been awarded',
+              totalPoints: currentTotalPoints
+            };
           }
           
           transaction.update(userDocRef, {

@@ -8,6 +8,7 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { firebase } from '@genkit-ai/firebase';
 import { serverTimestamp } from 'firebase-admin/firestore';
+import { adminDb } from '@/lib/firebase-admin';
 
 const GradeSubmissionInputSchema = z.object({
   submissionId: z.string().describe("The ID of the submission document to grade."),
@@ -39,14 +40,13 @@ export const gradeSubmissionFlow = ai.defineFlow(
     if (context.auth.role !== 'teacher' && context.auth.role !== 'admin') {
       throw new Error('You do not have permission to perform this action.');
     }
+    if (!adminDb) {
+      throw new Error('Firebase Admin DB is not initialized.');
+    }
 
     const { submissionId, studentId, grade, feedback, assignmentTitle } = input;
 
     try {
-      // Use Firebase Admin SDK for server-side operations
-      const { getFirestore } = await import('firebase-admin/firestore');
-      const adminDb = getFirestore();
-
       const submissionRef = adminDb.collection('submissions').doc(submissionId);
 
       // Update the submission document with the grade and feedback

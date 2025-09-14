@@ -18,14 +18,15 @@ try {
   console.warn('Continuing without Firebase Admin...');
 }
 
-// Import AI flows
+// Import AI flows so they are registered with the Genkit server
 try {
-  require('@/ai/flows/resource-summarizer');
-  require('@/ai/flows/faq-chatbot');
-  require('@/ai/flows/suggested-contact-method');
   require('@/ai/flows/award-points-flow');
   require('@/ai/flows/clear-all-submissions-flow');
+  require('@/ai/flows/faq-chatbot');
   require('@/ai/flows/grade-submission-flow');
+  require('@/ai/flows/mark-attendance-flow');
+  require('@/ai/flows/resource-summarizer');
+  require('@/ai/flows/suggested-contact-method');
   console.log('All AI flows loaded successfully');
 } catch (error) {
   console.error('Error loading AI flows:', error);

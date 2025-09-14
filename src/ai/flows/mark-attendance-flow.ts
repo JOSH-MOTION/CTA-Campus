@@ -8,6 +8,7 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { firebase } from '@genkit-ai/firebase';
 import { serverTimestamp, increment } from 'firebase-admin/firestore';
+import { adminDb } from '@/lib/firebase-admin';
 
 const MarkAttendanceFlowInputSchema = z.object({
   studentId: z.string().describe("The UID of the student."),
@@ -38,15 +39,15 @@ export const markAttendanceFlow = ai.defineFlow(
     if (!context.auth) {
       throw new Error('Authentication is required to mark attendance.');
     }
+    if (!adminDb) {
+      throw new Error('Firebase Admin DB is not initialized.');
+    }
+    
     const { studentId, studentName, studentGen, classId, className, learned, challenged, questions } = input;
     const attendanceDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
     const activityId = `attendance-${classId}-${attendanceDate}`;
 
     try {
-      // Use Firebase Admin SDK for server-side operations
-      const { getFirestore } = await import('firebase-admin/firestore');
-      const adminDb = getFirestore();
-
       const pointDocRef = adminDb.collection('users').doc(studentId).collection('points').doc(activityId);
       const pointDocSnap = await pointDocRef.get();
 
