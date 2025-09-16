@@ -101,19 +101,6 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
                 setRole(data.role);
                 localStorage.setItem('userRole', data.role);
                 
-                // Create session cookie after getting user role
-                const idToken = await user.getIdToken(true);
-                try {
-                  await fetch('/api/auth/session', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ idToken }),
-                    credentials: 'include', // Include credentials
-                  });
-                } catch (e) {
-                   console.error("Failed to create session cookie:", e);
-                }
-                
                 await fetchAllUsers();
                 setLoading(false);
             } else {
@@ -125,7 +112,6 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
             setUserData(null);
             setRole(null);
             localStorage.removeItem('userRole');
-            document.cookie = '__session=;path=/;expires=Thu, 01 Jan 1970 00:00:01 GMT;';
             setLoading(false);
         });
         
@@ -136,7 +122,6 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
         setUserData(null);
         setRole(null);
         localStorage.removeItem('userRole');
-        document.cookie = '__session=;path=/;expires=Thu, 01 Jan 1970 00:00:01 GMT;';
         setLoading(false);
       }
     });

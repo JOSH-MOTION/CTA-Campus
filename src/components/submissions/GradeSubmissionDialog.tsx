@@ -24,6 +24,7 @@ import { Alert, AlertTitle, AlertDescription } from '../ui/alert';
 import Link from 'next/link';
 import { awardPointsAction, gradeSubmissionAction } from '@/app/actions/grading-actions';
 import Image from 'next/image';
+import { useAuth } from '@/contexts/AuthContext';
 
 const gradingSchema = z.object({
   feedback: z.string().optional(),
@@ -56,6 +57,7 @@ export function GradeSubmissionDialog({ children, submission, onGraded }: GradeS
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const form = useForm<GradingFormValues>({
     resolver: zodResolver(gradingSchema),
@@ -74,8 +76,13 @@ export function GradeSubmissionDialog({ children, submission, onGraded }: GradeS
   const pointsToAward = submission.pointCategory === '100 Days of Code' ? 0.5 : 1;
 
   const onSubmit = async (data: GradingFormValues) => {
+    if (!user) {
+        toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to perform this action.' });
+        return;
+    }
     setIsSubmitting(true);
     try {
+        const idToken = await user.getIdToken(true);
         const activityId = getActivityIdForSubmission(submission);
         
         // Award points first
@@ -86,6 +93,7 @@ export function GradeSubmissionDialog({ children, submission, onGraded }: GradeS
             activityId,
             action: 'award',
             assignmentTitle: submission.assignmentTitle,
+            idToken,
         });
 
         if (!awardResult.success) {
@@ -102,6 +110,7 @@ export function GradeSubmissionDialog({ children, submission, onGraded }: GradeS
             assignmentTitle: submission.assignmentTitle,
             grade: 'Complete',
             feedback: data.feedback,
+            idToken,
         });
 
         if (!gradeResult.success) {

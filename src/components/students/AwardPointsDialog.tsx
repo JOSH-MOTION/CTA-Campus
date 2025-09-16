@@ -21,7 +21,7 @@ import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-import { UserData } from '@/contexts/AuthContext';
+import { UserData, useAuth } from '@/contexts/AuthContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { awardPointsAction } from '@/app/actions/grading-actions';
 
@@ -58,6 +58,7 @@ export function AwardPointsDialog({ children, student }: AwardPointsDialogProps)
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const form = useForm<AwardFormValues>({
     resolver: zodResolver(awardSchema),
@@ -69,8 +70,13 @@ export function AwardPointsDialog({ children, student }: AwardPointsDialogProps)
   });
 
   const onSubmit = async (data: AwardFormValues) => {
+    if (!user) {
+        toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to perform this action.' });
+        return;
+    }
     setIsSubmitting(true);
     try {
+        const idToken = await user.getIdToken(true);
         const activityId = `manual-award-${uuidv4()}`;
         const result = await awardPointsAction({
             studentId: student.uid,
@@ -79,6 +85,7 @@ export function AwardPointsDialog({ children, student }: AwardPointsDialogProps)
             activityId: activityId,
             action: 'award',
             assignmentTitle: data.notes || data.reason,
+            idToken,
         });
 
       if (!result.success) {

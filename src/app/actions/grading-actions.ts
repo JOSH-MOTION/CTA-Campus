@@ -4,19 +4,18 @@
 import { awardPointsFlow, AwardPointsFlowInput } from "@/ai/flows/award-points-flow";
 import { gradeSubmissionFlow, GradeSubmissionInput } from "@/ai/flows/grade-submission-flow";
 import { adminAuth } from "@/lib/firebase-admin";
-import { cookies } from 'next/headers';
 
-type AwardPointsServerInput = Omit<AwardPointsFlowInput, 'awardedBy'>;
-type GradeSubmissionServerInput = Omit<GradeSubmissionInput, 'gradedBy' | 'graderName'>;
+// Update the input types to include the idToken
+type AwardPointsServerInput = Omit<AwardPointsFlowInput, 'awardedBy'> & { idToken: string };
+type GradeSubmissionServerInput = Omit<GradeSubmissionInput, 'gradedBy' | 'graderName'> & { idToken: string };
 
-async function getVerifiedUser() {
-    const sessionCookie = cookies().get('__session')?.value || '';
-    if (!sessionCookie) {
-        throw new Error('User not authenticated.');
+async function getVerifiedUser(idToken: string) {
+    if (!idToken) {
+        throw new Error('Authentication token is missing.');
     }
     
     try {
-        const decodedToken = await adminAuth.verifySessionCookie(sessionCookie, true);
+        const decodedToken = await adminAuth.verifyIdToken(idToken);
         const role = decodedToken.role;
 
         if (role !== 'teacher' && role !== 'admin') {
@@ -29,26 +28,28 @@ async function getVerifiedUser() {
             role: role
         };
     } catch (error) {
-        console.error("Error verifying session cookie:", error);
+        console.error("Error verifying ID token:", error);
         throw new Error("Session invalid. Please log in again.");
     }
 }
 
 
 export async function awardPointsAction(input: AwardPointsServerInput) {
-    const user = await getVerifiedUser();
+    const { idToken, ...flowInput } = input;
+    const user = await getVerifiedUser(idToken);
 
     return await awardPointsFlow({
-        ...input,
+        ...flowInput,
         awardedBy: user.uid,
     });
 }
 
 export async function gradeSubmissionAction(input: GradeSubmissionServerInput) {
-    const user = await getVerifiedUser();
+    const { idToken, ...flowInput } = input;
+    const user = await getVerifiedUser(idToken);
     
     return await gradeSubmissionFlow({
-        ...input,
+        ...flowInput,
         gradedBy: user.uid,
         graderName: user.name,
     });
