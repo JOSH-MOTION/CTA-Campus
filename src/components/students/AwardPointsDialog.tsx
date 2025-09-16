@@ -21,9 +21,9 @@ import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-import { UserData, useAuth } from '@/contexts/AuthContext';
-import { awardPointsFlow } from '@/ai/flows/award-points-flow';
+import { UserData } from '@/contexts/AuthContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { awardPointsAction } from '@/app/actions/grading-actions';
 
 const awardSchema = z.object({
   points: z.coerce.number().min(0.1, 'Points must be greater than 0.'),
@@ -58,7 +58,6 @@ export function AwardPointsDialog({ children, student }: AwardPointsDialogProps)
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  const { user } = useAuth();
 
   const form = useForm<AwardFormValues>({
     resolver: zodResolver(awardSchema),
@@ -70,22 +69,16 @@ export function AwardPointsDialog({ children, student }: AwardPointsDialogProps)
   });
 
   const onSubmit = async (data: AwardFormValues) => {
-    if (!user) {
-        toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to award points.' });
-        return;
-    }
     setIsSubmitting(true);
     try {
-        const idToken = await user.getIdToken(true);
         const activityId = `manual-award-${uuidv4()}`;
-        const result = await awardPointsFlow({
+        const result = await awardPointsAction({
             studentId: student.uid,
             points: data.points,
             reason: data.reason,
             activityId: activityId,
             action: 'award',
             assignmentTitle: data.notes || data.reason,
-            idToken,
         });
 
       if (!result.success) {

@@ -93,6 +93,12 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
     const authUnsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setUser(user);
+        const idToken = await user.getIdToken(true);
+        const date = new Date();
+        date.setTime(date.getTime() + (24 * 60 * 60 * 1000));
+        const expires = "; expires=" + date.toUTCString();
+        document.cookie = `__session=${idToken};path=/;expires=${expires}`;
+
         const docRef = doc(db, 'users', user.uid);
         const userDocUnsubscribe = onSnapshot(docRef, async (docSnap) => {
             if (docSnap.exists()) {
@@ -115,6 +121,7 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
             setUserData(null);
             setRole(null);
             localStorage.removeItem('userRole');
+            document.cookie = '__session=;path=/;expires=Thu, 01 Jan 1970 00:00:01 GMT;';
             setLoading(false);
         });
         
@@ -125,6 +132,7 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
         setUserData(null);
         setRole(null);
         localStorage.removeItem('userRole');
+        document.cookie = '__session=;path=/;expires=Thu, 01 Jan 1970 00:00:01 GMT;';
         setLoading(false);
       }
     });

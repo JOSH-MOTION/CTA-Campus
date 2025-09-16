@@ -14,8 +14,8 @@ import { ArrowLeft, ExternalLink, Loader2, Trash2, CheckCircle, XCircle } from '
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { awardPointsFlow } from '@/ai/flows/award-points-flow';
 import { GradeSubmissionDialog } from '@/components/submissions/GradeSubmissionDialog';
+import { awardPointsAction, gradeSubmissionAction } from '@/app/actions/grading-actions';
 
 const HUNDRED_DAYS_OF_CODE_ASSIGNMENT_ID = '100-days-of-code';
 
@@ -56,15 +56,13 @@ export default function HundredDaysSubmissionsPage() {
   const handleRevoke = async (submission: Submission) => {
     if (!user) return;
     try {
-        const idToken = await user.getIdToken(true);
         const activityId = `100-days-of-code-${submission.assignmentTitle.replace('100 Days of Code - ', '')}`;
-        await awardPointsFlow({
+        await awardPointsAction({
             studentId: submission.studentId,
             points: 0, // points are retrieved from the doc, so 0 is fine here.
             reason: '100 Days of Code',
             activityId: activityId,
             action: 'revoke',
-            idToken,
         });
 
         toast({

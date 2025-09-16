@@ -7,7 +7,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { serverTimestamp } from 'firebase-admin/firestore';
-import { adminDb, adminAuth } from '@/lib/firebase-admin';
+import { adminDb } from '@/lib/firebase-admin';
 
 const GradeSubmissionInputSchema = z.object({
   submissionId: z.string().describe("The ID of the submission document to grade."),
@@ -15,7 +15,8 @@ const GradeSubmissionInputSchema = z.object({
   assignmentTitle: z.string().describe("The title of the assignment being graded."),
   grade: z.string().optional().describe("The grade to award for the submission."),
   feedback: z.string().optional().describe("Optional feedback for the student."),
-  idToken: z.string().describe("The Firebase ID token of the user making the request for authorization."),
+  gradedBy: z.string().describe("The UID of the user grading the submission."),
+  graderName: z.string().describe("The display name of the user grading the submission."),
 });
 export type GradeSubmissionInput = z.infer<typeof GradeSubmissionInputSchema>;
 
@@ -32,20 +33,11 @@ export const gradeSubmissionFlow = ai.defineFlow(
     outputSchema: GradeSubmissionOutputSchema,
   },
   async (input) => {
-    const { submissionId, studentId, grade, feedback, assignmentTitle, idToken } = input;
+    const { submissionId, studentId, grade, feedback, assignmentTitle, gradedBy, graderName } = input;
 
     try {
-      if (!adminDb || !adminAuth) {
+      if (!adminDb) {
         throw new Error('Firebase Admin SDK not initialized.');
-      }
-
-      // Verify the token and get the user's custom claims (including role)
-      const decodedToken = await adminAuth.verifyIdToken(idToken);
-      const role = decodedToken.role;
-
-      // Authorize the request
-      if (role !== 'teacher' && role !== 'admin') {
-        throw new Error('You do not have permission to perform this action.');
       }
       
       const submissionRef = adminDb.collection('submissions').doc(submissionId);
@@ -55,14 +47,14 @@ export const gradeSubmissionFlow = ai.defineFlow(
         grade: grade,
         feedback: feedback || '',
         gradedAt: serverTimestamp(),
-        gradedBy: decodedToken.uid,
+        gradedBy: gradedBy,
       });
 
       // Create a notification for the student
       const notification = {
         userId: studentId,
         title: `Graded: ${assignmentTitle}`,
-        description: `Your submission has been graded by ${decodedToken.name || 'your teacher'}.`,
+        description: `Your submission has been graded by ${graderName}.`,
         href: `/submissions`,
         read: false,
         date: serverTimestamp(),

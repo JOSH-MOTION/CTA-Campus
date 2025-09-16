@@ -17,11 +17,10 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { clearAllSubmissionsFlow } from '@/ai/flows/clear-all-submissions-flow';
-import { awardPointsFlow } from '@/ai/flows/award-points-flow';
 import { cn } from '@/lib/utils';
 import Papa from 'papaparse';
 import { GradeSubmissionDialog } from '@/components/submissions/GradeSubmissionDialog';
-import { gradeSubmissionFlow } from '@/ai/flows/grade-submission-flow';
+import { awardPointsAction } from '@/app/actions/grading-actions';
 import Image from 'next/image';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
@@ -108,28 +107,19 @@ export default function AllSubmissionsPage() {
     const activityId = getActivityIdForSubmission(submission);
     
     try {
-      const idToken = await user.getIdToken(true);
-      const result = await awardPointsFlow({
+      const result = await awardPointsAction({
           studentId: submission.studentId,
           points: 0, // points are retrieved from the doc, so 0 is fine here.
           reason: submission.pointCategory,
           activityId: activityId,
           action: 'revoke',
           assignmentTitle: submission.assignmentTitle,
-          idToken,
       });
 
        if (!result.success) throw new Error(result.message);
        
-      await gradeSubmissionFlow({
-            submissionId: submission.id,
-            studentId: submission.studentId,
-            assignmentTitle: submission.assignmentTitle,
-            grade: undefined, // Set grade to undefined to mark as not graded
-            feedback: "Points revoked.",
-            idToken,
-      });
-
+      // No need to call gradeSubmissionFlow here to revoke, the points flow handles it.
+      // We just need to update the local state.
       await fetchData();
       
       toast({

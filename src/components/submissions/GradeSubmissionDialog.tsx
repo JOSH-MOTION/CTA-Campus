@@ -17,15 +17,12 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, CheckCircle, ExternalLink, Award } from 'lucide-react';
+import { Loader2, ExternalLink, Award } from 'lucide-react';
 import { type Submission } from '@/services/submissions';
-import { gradeSubmissionFlow } from '@/ai/flows/grade-submission-flow';
 import { Alert, AlertTitle, AlertDescription } from '../ui/alert';
 import Link from 'next/link';
-import { Input } from '../ui/input';
-import { awardPointsFlow } from '@/ai/flows/award-points-flow';
+import { awardPointsAction, gradeSubmissionAction } from '@/app/actions/grading-actions';
 import Image from 'next/image';
 
 const gradingSchema = z.object({
@@ -59,7 +56,6 @@ export function GradeSubmissionDialog({ children, submission, onGraded }: GradeS
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  const { user } = useAuth();
 
   const form = useForm<GradingFormValues>({
     resolver: zodResolver(gradingSchema),
@@ -78,24 +74,18 @@ export function GradeSubmissionDialog({ children, submission, onGraded }: GradeS
   const pointsToAward = submission.pointCategory === '100 Days of Code' ? 0.5 : 1;
 
   const onSubmit = async (data: GradingFormValues) => {
-    if (!user) {
-        toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to grade.' });
-        return;
-    }
     setIsSubmitting(true);
     try {
-        const idToken = await user.getIdToken(true);
         const activityId = getActivityIdForSubmission(submission);
         
         // Award points first
-        const awardResult = await awardPointsFlow({
+        const awardResult = await awardPointsAction({
             studentId: submission.studentId,
             points: pointsToAward,
             reason: submission.pointCategory,
             activityId,
             action: 'award',
             assignmentTitle: submission.assignmentTitle,
-            idToken,
         });
 
         if (!awardResult.success) {
@@ -106,13 +96,12 @@ export function GradeSubmissionDialog({ children, submission, onGraded }: GradeS
         }
 
         // Then, update the submission document with grade and feedback
-        const gradeResult = await gradeSubmissionFlow({
+        const gradeResult = await gradeSubmissionAction({
             submissionId: submission.id,
             studentId: submission.studentId,
             assignmentTitle: submission.assignmentTitle,
             grade: 'Complete',
             feedback: data.feedback,
-            idToken,
         });
 
         if (!gradeResult.success) {
