@@ -49,51 +49,56 @@ const MemoizedProtectedLayout = memo(function ProtectedLayout({children}: {child
   const pathname = usePathname();
 
   useEffect(() => {
-    if (!loading && !user) {
+    // Only run the redirection logic once the initial loading is complete.
+    if (loading) {
+      return;
+    }
+
+    // If loading is finished and there's still no user, redirect to login.
+    if (!user) {
       router.push('/login');
       return;
     }
 
-    if (!loading && user) {
-      let allowedPaths: string[] = [];
-      switch (role) {
-        case 'student':
-          allowedPaths = studentNavItems.map(item => item.href);
-          break;
-        case 'teacher':
-          allowedPaths = teacherNavItems.map(item => item.href);
-          break;
-        case 'admin':
-          allowedPaths = adminNavItems.map(item => item.href);
-          break;
-      }
-      
-      // Allow access to grading page for teachers and admins
-      if (role === 'teacher' || role === 'admin') {
-          if (!allowedPaths.includes('/grading')) {
-              allowedPaths.push('/grading');
-          }
-          if (!allowedPaths.includes('/attendance')) {
-              allowedPaths.push('/attendance');
-          }
-      }
+    // If a user exists, check their role and path permissions.
+    let allowedPaths: string[] = [];
+    switch (role) {
+      case 'student':
+        allowedPaths = studentNavItems.map(item => item.href);
+        break;
+      case 'teacher':
+        allowedPaths = teacherNavItems.map(item => item.href);
+        break;
+      case 'admin':
+        allowedPaths = adminNavItems.map(item => item.href);
+        break;
+    }
+    
+    // Allow access to grading page for teachers and admins
+    if (role === 'teacher' || role === 'admin') {
+        if (!allowedPaths.includes('/grading')) {
+            allowedPaths.push('/grading');
+        }
+        if (!allowedPaths.includes('/attendance')) {
+            allowedPaths.push('/attendance');
+        }
+    }
 
-      // Allow access to profile page for all roles
-      if (!allowedPaths.includes('/profile')) {
-        allowedPaths.push('/profile');
-      }
+    // Allow access to profile page for all roles
+    if (!allowedPaths.includes('/profile')) {
+      allowedPaths.push('/profile');
+    }
 
-      // Allow access to chat page for all roles
-      if (!allowedPaths.includes('/chat')) {
-        allowedPaths.push('/chat');
-      }
+    // Allow access to chat page for all roles
+    if (!allowedPaths.includes('/chat')) {
+      allowedPaths.push('/chat');
+    }
 
-      const isAllowed = allowedPaths.some(path => pathname === path || (path !== '/' && pathname.startsWith(path)));
+    const isAllowed = allowedPaths.some(path => pathname === path || (path !== '/' && pathname.startsWith(path)));
 
-      if (!isAllowed) {
-        // Redirect to the role's default dashboard page if current path is not allowed
-        router.push('/'); 
-      }
+    if (!isAllowed) {
+      // Redirect to the role's default dashboard page if current path is not allowed
+      router.push('/'); 
     }
   }, [user, role, loading, router, pathname]);
 
