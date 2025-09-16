@@ -1,3 +1,4 @@
+
 // src/app/(auth)/student-signup/page.tsx
 'use client';
 
@@ -86,9 +87,15 @@ export default function StudentSignupPage() {
     }
 
     try {
-      localStorage.setItem('userRole', 'student');
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const {user} = userCredential;
+
+      // Now set the role via the API route to establish custom claims
+      await fetch('/api/auth/set-role', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: user.uid, role: 'student' }),
+      });
 
       let photoURL = '';
       if (selectedFile) {
@@ -115,10 +122,12 @@ export default function StudentSignupPage() {
 
       await setDoc(doc(db, 'users', user.uid), userDocData);
 
+      // Force refresh the token on the client to get the new claims.
+      await user.getIdToken(true);
+
       setRole('student');
       toast({title: 'Sign Up Successful', description: 'Your account has been created.'});
     } catch (error: any) {
-      localStorage.removeItem('userRole');
       toast({
         variant: 'destructive',
         title: 'Authentication Error',

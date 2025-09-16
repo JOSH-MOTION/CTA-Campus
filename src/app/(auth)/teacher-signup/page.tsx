@@ -1,3 +1,4 @@
+
 // src/app/(auth)/teacher-signup/page.tsx
 'use client';
 
@@ -69,9 +70,15 @@ export default function TeacherSignupPage() {
     setLoading(true);
 
     try {
-      localStorage.setItem('userRole', 'teacher');
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const {user} = userCredential;
+
+      // Now set the role via the API route to establish custom claims
+      await fetch('/api/auth/set-role', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: user.uid, role: 'teacher' }),
+      });
       
       let photoURL = '';
       if (selectedFile) {
@@ -93,10 +100,12 @@ export default function TeacherSignupPage() {
         photoURL,
       });
 
+      // Force refresh the token on the client to get the new claims.
+      await user.getIdToken(true);
+
       setRole('teacher');
       toast({title: 'Sign Up Successful', description: 'Your teacher account has been created.'});
     } catch (error: any) {
-      localStorage.removeItem('userRole');
       toast({
         variant: 'destructive',
         title: 'Authentication Error',

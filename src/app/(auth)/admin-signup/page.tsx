@@ -1,3 +1,4 @@
+
 // src/app/(auth)/admin-signup/page.tsx
 'use client';
 
@@ -35,9 +36,15 @@ export default function AdminSignupPage() {
     setLoading(true);
 
     try {
-      localStorage.setItem('userRole', 'admin');
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const {user} = userCredential;
+
+      // Now set the role via the API route to establish custom claims
+      await fetch('/api/auth/set-role', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: user.uid, role: 'admin' }),
+      });
       
       await updateProfile(user, {displayName: fullName});
       
@@ -48,10 +55,12 @@ export default function AdminSignupPage() {
         role: 'admin',
       });
       
+      // Force refresh the token on the client to get the new claims.
+      await user.getIdToken(true);
+      
       setRole('admin');
       toast({title: 'Sign Up Successful', description: 'Your admin account has been created.'});
     } catch (error: any) {
-      localStorage.removeItem('userRole');
       toast({
         variant: 'destructive',
         title: 'Authentication Error',

@@ -1,3 +1,4 @@
+
 // src/app/actions/grading-actions.ts
 'use server';
 
@@ -24,7 +25,7 @@ async function getVerifiedUser(idToken: string) {
         
         return {
             uid: decodedToken.uid,
-            name: decodedToken.name || decodedToken.email, // Fallback to email if name is not on token
+            name: decodedToken.name || decodedToken.email || 'Unnamed User',
             role: role
         };
     } catch (error) {

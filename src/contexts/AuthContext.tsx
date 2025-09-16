@@ -1,3 +1,4 @@
+
 // src/contexts/AuthContext.tsx
 'use client';
 
@@ -94,16 +95,20 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
       if (user) {
         setUser(user);
         
+        // When auth state changes, get a fresh ID token which will have the latest claims.
+        await user.getIdToken(true);
+
         const userDocUnsubscribe = onSnapshot(doc(db, 'users', user.uid), async (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data() as UserData;
                 setUserData(data);
                 setRole(data.role);
-                localStorage.setItem('userRole', data.role);
                 
                 await fetchAllUsers();
                 setLoading(false);
             } else {
+                // If user is authenticated but no doc exists, it's likely a fresh signup.
+                // The signup process will create the doc. We'll wait.
                 setLoading(true);
             }
         }, (error) => {
@@ -111,7 +116,6 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
             setUser(null);
             setUserData(null);
             setRole(null);
-            localStorage.removeItem('userRole');
             setLoading(false);
         });
         
@@ -121,7 +125,6 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
         setUser(null);
         setUserData(null);
         setRole(null);
-        localStorage.removeItem('userRole');
         setLoading(false);
       }
     });
@@ -131,19 +134,23 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
 
 
   const handleSetRole = async (newRole: UserRole) => {
-    setRole(newRole);
-    localStorage.setItem('userRole', newRole);
-    if (user) {
-      const docRef = doc(db, 'users', user.uid);
-      try {
-        await setDoc(docRef, { role: newRole }, { merge: true });
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          setUserData(docSnap.data() as UserData);
+    if (user && user.uid) {
+        try {
+            await fetch('/api/auth/set-role', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ uid: user.uid, role: newRole }),
+            });
+            // Force refresh the token on the client to get the new claims.
+            await user.getIdToken(true);
+            // Update local state
+            setRole(newRole);
+            const docRef = doc(db, 'users', user.uid);
+            await setDoc(docRef, { role: newRole }, { merge: true });
+
+        } catch (error) {
+            console.error("Failed to set custom claims or update role in Firestore:", error);
         }
-      } catch (error) {
-        console.error("Failed to update role in Firestore:", error);
-      }
     }
   };
 
