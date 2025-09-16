@@ -15,18 +15,23 @@ async function getVerifiedUser() {
         throw new Error('User not authenticated.');
     }
     
-    const decodedToken = await adminAuth.verifySessionCookie(sessionCookie, true);
-    const role = decodedToken.role;
+    try {
+        const decodedToken = await adminAuth.verifySessionCookie(sessionCookie, true);
+        const role = decodedToken.role;
 
-    if (role !== 'teacher' && role !== 'admin') {
-        throw new Error('You do not have permission to perform this action.');
+        if (role !== 'teacher' && role !== 'admin') {
+            throw new Error('You do not have permission to perform this action.');
+        }
+        
+        return {
+            uid: decodedToken.uid,
+            name: decodedToken.name || decodedToken.email, // Fallback to email if name is not on token
+            role: role
+        };
+    } catch (error) {
+        console.error("Error verifying session cookie:", error);
+        throw new Error("Session invalid. Please log in again.");
     }
-    
-    return {
-        uid: decodedToken.uid,
-        name: decodedToken.name,
-        role: role
-    };
 }
 
 

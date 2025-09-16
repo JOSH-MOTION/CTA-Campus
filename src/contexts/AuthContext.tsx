@@ -93,26 +93,29 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
     const authUnsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setUser(user);
-        const idToken = await user.getIdToken(true);
-        const date = new Date();
-        date.setTime(date.getTime() + (24 * 60 * 60 * 1000));
-        const expires = "; expires=" + date.toUTCString();
-        document.cookie = `__session=${idToken};path=/;expires=${expires}`;
-
-        const docRef = doc(db, 'users', user.uid);
-        const userDocUnsubscribe = onSnapshot(docRef, async (docSnap) => {
+        
+        const userDocUnsubscribe = onSnapshot(doc(db, 'users', user.uid), async (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data() as UserData;
                 setUserData(data);
                 setRole(data.role);
                 localStorage.setItem('userRole', data.role);
                 
-                // Fetch all users after getting individual user data
+                // Create session cookie after getting user role
+                const idToken = await user.getIdToken(true);
+                try {
+                  await fetch('/api/auth/session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ idToken }),
+                  });
+                } catch (e) {
+                   console.error("Failed to create session cookie:", e);
+                }
+                
                 await fetchAllUsers();
                 setLoading(false);
             } else {
-                // This case handles the delay between user creation and document creation
-                // We'll keep loading until we get the document.
                 setLoading(true);
             }
         }, (error) => {
