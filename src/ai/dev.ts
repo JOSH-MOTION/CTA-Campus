@@ -2,11 +2,6 @@
 import { config } from 'dotenv';
 config();
 
-// Validate required environment variables
-if (!process.env.GOOGLE_AI_API_KEY) {
-  console.warn('Warning: GOOGLE_AI_API_KEY not found in environment variables');
-}
-
 // IMPORTANT: This must be the first import to ensure Firebase Admin is initialized
 // before any of the AI flows that depend on it are loaded.
 try {
