@@ -1,7 +1,4 @@
 // src/app/api/genkit/[...flow]/route.ts
-import { genkit } from 'genkit';
-import { googleAI } from '@genkit-ai/googleai';
-import { firebase } from '@genkit-ai/firebase';
 import { NextRequest } from 'next/server';
 import { nextHandler } from '@genkit-ai/next';
 
@@ -23,21 +20,10 @@ import '@/ai/flows/mark-attendance-flow';
 import '@/ai/flows/resource-summarizer';
 import '@/ai/flows/suggested-contact-method';
 
-export const ai = genkit({
-  plugins: [
-    firebase(),
-    googleAI({
-      apiKey: process.env.GOOGLE_AI_API_KEY,
-    }),
-  ],
-  model: 'googleai/gemini-2.0-flash',
-  telemetry: {
-    instrumentation: 'genkit',
-    logger: 'genkit',
-  },
-});
+// Use the centrally configured ai instance
+import { ai } from '@/ai/genkit';
 
-const handler = nextHandler();
+const handler = nextHandler(ai);
 
 export async function POST(req: NextRequest) {
   return handler(req);
