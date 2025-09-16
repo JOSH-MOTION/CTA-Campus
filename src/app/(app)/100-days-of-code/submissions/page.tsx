@@ -21,7 +21,7 @@ const HUNDRED_DAYS_OF_CODE_ASSIGNMENT_ID = '100-days-of-code';
 
 export default function HundredDaysSubmissionsPage() {
   const router = useRouter();
-  const { role } = useAuth();
+  const { user, role } = useAuth();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -54,14 +54,17 @@ export default function HundredDaysSubmissionsPage() {
   }
   
   const handleRevoke = async (submission: Submission) => {
+    if (!user) return;
     try {
+        const idToken = await user.getIdToken(true);
         const activityId = `100-days-of-code-${submission.assignmentTitle.replace('100 Days of Code - ', '')}`;
         await awardPointsFlow({
             studentId: submission.studentId,
             points: 0, // points are retrieved from the doc, so 0 is fine here.
             reason: '100 Days of Code',
             activityId: activityId,
-            action: 'revoke'
+            action: 'revoke',
+            idToken,
         });
 
         toast({

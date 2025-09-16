@@ -103,6 +103,7 @@ export default function AttendancePage() {
     if (!user || !userData) return;
     setIsSubmitting(true);
     try {
+      const idToken = await user.getIdToken(true);
       const result = await markAttendanceFlow({
         studentId: user.uid,
         studentName: userData.displayName,
@@ -112,6 +113,7 @@ export default function AttendancePage() {
         learned: data.learned,
         challenged: data.challenged,
         questions: data.questions,
+        idToken,
       });
 
       if (!result.success) {

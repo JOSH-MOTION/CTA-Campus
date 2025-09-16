@@ -6,9 +6,8 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { firebase } from '@genkit-ai/firebase';
 import { serverTimestamp } from 'firebase-admin/firestore';
-import { adminDb } from '@/lib/firebase-admin';
+import { adminDb, adminAuth } from '@/lib/firebase-admin';
 
 const GradeSubmissionInputSchema = z.object({
   submissionId: z.string().describe("The ID of the submission document to grade."),
@@ -16,6 +15,7 @@ const GradeSubmissionInputSchema = z.object({
   assignmentTitle: z.string().describe("The title of the assignment being graded."),
   grade: z.string().optional().describe("The grade to award for the submission."),
   feedback: z.string().optional().describe("Optional feedback for the student."),
+  idToken: z.string().describe("The Firebase ID token of the user making the request for authorization."),
 });
 export type GradeSubmissionInput = z.infer<typeof GradeSubmissionInputSchema>;
 
@@ -30,23 +30,24 @@ export const gradeSubmissionFlow = ai.defineFlow(
     name: 'gradeSubmissionFlow',
     inputSchema: GradeSubmissionInputSchema,
     outputSchema: GradeSubmissionOutputSchema,
-    auth: firebase(),
   },
-  async (input, context) => {
-    // Authorize the request
-    if (!context.auth) {
-      throw new Error('Authentication is required.');
-    }
-    if (context.auth.role !== 'teacher' && context.auth.role !== 'admin') {
-      throw new Error('You do not have permission to perform this action.');
-    }
-    if (!adminDb) {
-      throw new Error('Firebase Admin DB is not initialized.');
-    }
-
-    const { submissionId, studentId, grade, feedback, assignmentTitle } = input;
+  async (input) => {
+    const { submissionId, studentId, grade, feedback, assignmentTitle, idToken } = input;
 
     try {
+      if (!adminDb || !adminAuth) {
+        throw new Error('Firebase Admin SDK not initialized.');
+      }
+
+      // Verify the token and get the user's custom claims (including role)
+      const decodedToken = await adminAuth.verifyIdToken(idToken);
+      const role = decodedToken.role;
+
+      // Authorize the request
+      if (role !== 'teacher' && role !== 'admin') {
+        throw new Error('You do not have permission to perform this action.');
+      }
+      
       const submissionRef = adminDb.collection('submissions').doc(submissionId);
 
       // Update the submission document with the grade and feedback
@@ -54,14 +55,14 @@ export const gradeSubmissionFlow = ai.defineFlow(
         grade: grade,
         feedback: feedback || '',
         gradedAt: serverTimestamp(),
-        gradedBy: context.auth?.uid,
+        gradedBy: decodedToken.uid,
       });
 
       // Create a notification for the student
       const notification = {
         userId: studentId,
         title: `Graded: ${assignmentTitle}`,
-        description: `Your submission has been graded by ${context.auth?.name || 'your teacher'}.`,
+        description: `Your submission has been graded by ${decodedToken.name || 'your teacher'}.`,
         href: `/submissions`,
         read: false,
         date: serverTimestamp(),

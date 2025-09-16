@@ -59,6 +59,7 @@ export function GradeSubmissionDialog({ children, submission, onGraded }: GradeS
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const form = useForm<GradingFormValues>({
     resolver: zodResolver(gradingSchema),
@@ -77,8 +78,13 @@ export function GradeSubmissionDialog({ children, submission, onGraded }: GradeS
   const pointsToAward = submission.pointCategory === '100 Days of Code' ? 0.5 : 1;
 
   const onSubmit = async (data: GradingFormValues) => {
+    if (!user) {
+        toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to grade.' });
+        return;
+    }
     setIsSubmitting(true);
     try {
+        const idToken = await user.getIdToken(true);
         const activityId = getActivityIdForSubmission(submission);
         
         // Award points first
@@ -89,6 +95,7 @@ export function GradeSubmissionDialog({ children, submission, onGraded }: GradeS
             activityId,
             action: 'award',
             assignmentTitle: submission.assignmentTitle,
+            idToken,
         });
 
         if (!awardResult.success) {
@@ -105,6 +112,7 @@ export function GradeSubmissionDialog({ children, submission, onGraded }: GradeS
             assignmentTitle: submission.assignmentTitle,
             grade: 'Complete',
             feedback: data.feedback,
+            idToken,
         });
 
         if (!gradeResult.success) {

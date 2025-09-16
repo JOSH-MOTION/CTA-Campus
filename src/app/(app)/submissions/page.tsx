@@ -45,7 +45,7 @@ const getActivityIdForSubmission = (submission: Submission): string => {
 
 export default function AllSubmissionsPage() {
   const router = useRouter();
-  const { role, fetchAllUsers } = useAuth();
+  const { user, role, fetchAllUsers } = useAuth();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [allStudents, setAllStudents] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -104,9 +104,11 @@ export default function AllSubmissionsPage() {
   }, [submissions, allStudents, searchTerm, selectedGen, selectedCategory]);
 
   const handleRevoke = async (submission: Submission) => {
+    if (!user) return;
     const activityId = getActivityIdForSubmission(submission);
     
     try {
+      const idToken = await user.getIdToken(true);
       const result = await awardPointsFlow({
           studentId: submission.studentId,
           points: 0, // points are retrieved from the doc, so 0 is fine here.
@@ -114,6 +116,7 @@ export default function AllSubmissionsPage() {
           activityId: activityId,
           action: 'revoke',
           assignmentTitle: submission.assignmentTitle,
+          idToken,
       });
 
        if (!result.success) throw new Error(result.message);
@@ -124,6 +127,7 @@ export default function AllSubmissionsPage() {
             assignmentTitle: submission.assignmentTitle,
             grade: undefined, // Set grade to undefined to mark as not graded
             feedback: "Points revoked.",
+            idToken,
       });
 
       await fetchData();

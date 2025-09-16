@@ -6,9 +6,8 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { firebase } from '@genkit-ai/firebase';
 import { serverTimestamp, increment } from 'firebase-admin/firestore';
-import { adminDb } from '@/lib/firebase-admin';
+import { adminDb, adminAuth } from '@/lib/firebase-admin';
 
 const MarkAttendanceFlowInputSchema = z.object({
   studentId: z.string().describe("The UID of the student."),
@@ -19,6 +18,7 @@ const MarkAttendanceFlowInputSchema = z.object({
   learned: z.string().describe("What the student learned."),
   challenged: z.string().describe("What the student found challenging."),
   questions: z.string().optional().describe("Any questions the student has."),
+  idToken: z.string().describe("The Firebase ID token of the user making the request for authorization."),
 });
 export type MarkAttendanceFlowInput = z.infer<typeof MarkAttendanceFlowInputSchema>;
 
@@ -33,73 +33,73 @@ export const markAttendanceFlow = ai.defineFlow(
     name: 'markAttendanceFlow',
     inputSchema: MarkAttendanceFlowInputSchema,
     outputSchema: MarkAttendanceFlowOutputSchema,
-    auth: firebase(),
   },
-  async (input, context) => {
-    if (!context.auth) {
-      throw new Error('Authentication is required to mark attendance.');
-    }
-    if (!adminDb) {
-      throw new Error('Firebase Admin DB is not initialized.');
-    }
+  async (input) => {
+    const { studentId, studentName, studentGen, classId, className, learned, challenged, questions, idToken } = input;
     
-    const { studentId, studentName, studentGen, classId, className, learned, challenged, questions } = input;
-    const attendanceDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-    const activityId = `attendance-${classId}-${attendanceDate}`;
-
     try {
-      const pointDocRef = adminDb.collection('users').doc(studentId).collection('points').doc(activityId);
-      const pointDocSnap = await pointDocRef.get();
+        if (!adminDb || !adminAuth) {
+            throw new Error('Firebase Admin SDK not initialized.');
+        }
 
-      if (pointDocSnap.exists()) {
-        // If points exist, we can still save the feedback, but we don't award more points.
-        await adminDb.collection('attendance').add({
-          studentId,
-          studentName,
-          studentGen,
-          classId,
-          className,
-          learned,
-          challenged,
-          questions,
-          submittedAt: serverTimestamp(),
-        });
-        return { success: true, message: "Attendance already marked for this session today, but your feedback was saved." };
-      }
-
-      const userDocRef = adminDb.collection('users').doc(studentId);
-      
-      // Atomically increment points and save attendance records
-      await adminDb.runTransaction(async (transaction) => {
-        transaction.update(userDocRef, { totalPoints: increment(1) });
+        // Verify the token to ensure the request is coming from an authenticated user.
+        await adminAuth.verifyIdToken(idToken);
         
-        transaction.set(pointDocRef, {
-          points: 1,
-          reason: 'Class Attendance',
-          assignmentTitle: `Attendance: ${className}`,
-          activityId: activityId,
-          awardedAt: serverTimestamp(),
-        });
+        const attendanceDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+        const activityId = `attendance-${classId}-${attendanceDate}`;
         
-        const attendanceRef = adminDb.collection('attendance').doc();
-        transaction.set(attendanceRef, {
-          studentId,
-          studentName,
-          studentGen,
-          classId,
-          className,
-          learned,
-          challenged,
-          questions,
-          submittedAt: serverTimestamp(),
-        });
-      });
+        const pointDocRef = adminDb.collection('users').doc(studentId).collection('points').doc(activityId);
+        const pointDocSnap = await pointDocRef.get();
 
-      return { success: true, message: 'Attendance marked and 1 point awarded!' };
+        if (pointDocSnap.exists()) {
+            // If points exist, we can still save the feedback, but we don't award more points.
+            await adminDb.collection('attendance').add({
+            studentId,
+            studentName,
+            studentGen,
+            classId,
+            className,
+            learned,
+            challenged,
+            questions,
+            submittedAt: serverTimestamp(),
+            });
+            return { success: true, message: "Attendance already marked for this session today, but your feedback was saved." };
+        }
+
+        const userDocRef = adminDb.collection('users').doc(studentId);
+        
+        // Atomically increment points and save attendance records
+        await adminDb.runTransaction(async (transaction) => {
+            transaction.update(userDocRef, { totalPoints: increment(1) });
+            
+            transaction.set(pointDocRef, {
+            points: 1,
+            reason: 'Class Attendance',
+            assignmentTitle: `Attendance: ${className}`,
+            activityId: activityId,
+            awardedAt: serverTimestamp(),
+            });
+            
+            const attendanceRef = adminDb.collection('attendance').doc();
+            transaction.set(attendanceRef, {
+            studentId,
+            studentName,
+            studentGen,
+            classId,
+            className,
+            learned,
+            challenged,
+            questions,
+            submittedAt: serverTimestamp(),
+            });
+        });
+
+        return { success: true, message: 'Attendance marked and 1 point awarded!' };
     } catch (error: any) {
-      console.error("Error processing attendance in flow:", error);
-      const errorMessage = error.message || "An unexpected error occurred.";
-      return { success: false, message: `Server error: Could not process points. Reason: ${errorMessage}` };
+        console.error("Error processing attendance in flow:", error);
+        const errorMessage = error.message || "An unexpected error occurred.";
+        return { success: false, message: `Server error: Could not process points. Reason: ${errorMessage}` };
     }
   }
 );

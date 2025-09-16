@@ -3,9 +3,8 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { firebase } from '@genkit-ai/firebase';
 import { serverTimestamp, increment } from 'firebase-admin/firestore';
-import { adminDb } from '@/lib/firebase-admin';
+import { adminDb, adminAuth } from '@/lib/firebase-admin';
 
 const AwardPointsFlowInputSchema = z.object({
     studentId: z.string().describe("The UID of the student to award points to."),
@@ -14,6 +13,7 @@ const AwardPointsFlowInputSchema = z.object({
     activityId: z.string().describe("A unique ID for the specific activity."),
     action: z.enum(['award', 'revoke']).describe("Whether to award or revoke the points."),
     assignmentTitle: z.string().optional().describe("The title of the assignment or activity."),
+    idToken: z.string().describe("The Firebase ID token of the user making the request for authorization."),
 });
 
 export type AwardPointsFlowInput = z.infer<typeof AwardPointsFlowInputSchema>;
@@ -31,23 +31,24 @@ export const awardPointsFlow = ai.defineFlow(
     name: 'awardPointsFlow',
     inputSchema: AwardPointsFlowInputSchema,
     outputSchema: AwardPointsFlowOutputSchema,
-    auth: firebase(),
   },
-  async (input, context) => {
-    // Authorize the request
-    if (!context.auth) {
-      throw new Error('Authentication is required to award points.');
-    }
-    if (!context.auth.role || (context.auth.role !== 'teacher' && context.auth.role !== 'admin')) {
-      throw new Error('You do not have permission to award points.');
-    }
-    if (!adminDb) {
-      throw new Error('Firebase Admin DB is not initialized.');
-    }
-
-    const { studentId, points, reason, activityId, action, assignmentTitle } = input;
+  async (input) => {
+    const { studentId, points, reason, activityId, action, assignmentTitle, idToken } = input;
     
     try {
+      if (!adminDb || !adminAuth) {
+        throw new Error('Firebase Admin SDK not initialized.');
+      }
+      
+      // Verify the token and get the user's custom claims (including role)
+      const decodedToken = await adminAuth.verifyIdToken(idToken);
+      const role = decodedToken.role;
+
+      // Authorize the request
+      if (role !== 'teacher' && role !== 'admin') {
+        throw new Error('You do not have permission to award points.');
+      }
+
       const result = await adminDb.runTransaction(async (transaction) => {
         const userDocRef = adminDb.collection('users').doc(studentId);
         const userDoc = await transaction.get(userDocRef);
@@ -80,7 +81,7 @@ export const awardPointsFlow = ai.defineFlow(
             assignmentTitle: assignmentTitle || reason,
             activityId,
             awardedAt: serverTimestamp(),
-            awardedBy: context.auth?.uid || 'system',
+            awardedBy: decodedToken.uid || 'system',
           });
           
           return { 
