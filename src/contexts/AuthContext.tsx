@@ -39,7 +39,7 @@ interface AuthContextType {
   setUserData: React.Dispatch<React.SetStateAction<UserData | null>> | null;
   role: UserRole | null;
   loading: boolean;
-  setRole: (role: UserRole) => void;
+  setRole: (role: UserRole) => Promise<void>;
   fetchAllUsers: () => Promise<UserData[]>;
   fetchAllStudents: () => Promise<UserData[]>;
   allUsers: UserData[];
@@ -51,7 +51,7 @@ const AuthContext = createContext<AuthContextType>({
     setUserData: null,
     role: null,
     loading: true,
-    setRole: () => {},
+    setRole: async () => {},
     fetchAllUsers: async () => [],
     fetchAllStudents: async () => [],
     allUsers: [],
@@ -90,19 +90,50 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
     }
   }, []);
   
+  const handleSetRole = useCallback(async (newRole: UserRole) => {
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+        try {
+            // Call API to set custom claim
+            await fetch('/api/auth/set-role', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ uid: currentUser.uid, role: newRole }),
+            });
+            // Force refresh the token on the client to get the new claims.
+            await currentUser.getIdToken(true);
+            
+            // Update local state
+            setRole(newRole);
+            const docRef = doc(db, 'users', currentUser.uid);
+            // This merge might be redundant if the signup process already creates this field,
+            // but it's safe to have for consistency.
+            await setDoc(docRef, { role: newRole }, { merge: true });
+
+        } catch (error) {
+            console.error("Failed to set custom claims or update role in Firestore:", error);
+            // Optionally re-throw or handle the error in UI
+            throw error;
+        }
+    } else {
+        throw new Error("No user is currently authenticated.");
+    }
+  }, []);
+
   useEffect(() => {
     const authUnsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setUser(user);
         
         // When auth state changes, get a fresh ID token which will have the latest claims.
-        await user.getIdToken(true);
+        const tokenResult = await user.getIdTokenResult(true);
+        const userRole = tokenResult.claims.role as UserRole | undefined;
 
         const userDocUnsubscribe = onSnapshot(doc(db, 'users', user.uid), async (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data() as UserData;
                 setUserData(data);
-                setRole(data.role);
+                setRole(data.role || userRole || null); // Prioritize DB role, then token, then null
                 
                 await fetchAllUsers();
                 setLoading(false);
@@ -131,28 +162,6 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
 
     return () => authUnsubscribe();
   }, [fetchAllUsers]);
-
-
-  const handleSetRole = async (newRole: UserRole) => {
-    if (user && user.uid) {
-        try {
-            await fetch('/api/auth/set-role', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ uid: user.uid, role: newRole }),
-            });
-            // Force refresh the token on the client to get the new claims.
-            await user.getIdToken(true);
-            // Update local state
-            setRole(newRole);
-            const docRef = doc(db, 'users', user.uid);
-            await setDoc(docRef, { role: newRole }, { merge: true });
-
-        } catch (error) {
-            console.error("Failed to set custom claims or update role in Firestore:", error);
-        }
-    }
-  };
 
   return (
     <AuthContext.Provider value={{user, userData, setUserData, role, loading, setRole: handleSetRole, fetchAllUsers, fetchAllStudents, allUsers}}>

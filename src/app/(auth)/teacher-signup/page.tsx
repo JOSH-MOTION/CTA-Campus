@@ -73,12 +73,8 @@ export default function TeacherSignupPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const {user} = userCredential;
 
-      // Now set the role via the API route to establish custom claims
-      await fetch('/api/auth/set-role', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid: user.uid, role: 'teacher' }),
-      });
+      // Set role and custom claims
+      await setRole('teacher');
       
       let photoURL = '';
       if (selectedFile) {
@@ -99,12 +95,9 @@ export default function TeacherSignupPage() {
         github,
         photoURL,
       });
-
-      // Force refresh the token on the client to get the new claims.
-      await user.getIdToken(true);
-
-      setRole('teacher');
+      
       toast({title: 'Sign Up Successful', description: 'Your teacher account has been created.'});
+      // AuthContext will handle navigation
     } catch (error: any) {
       toast({
         variant: 'destructive',
