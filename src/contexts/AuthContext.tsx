@@ -108,6 +108,7 @@ export const AuthProvider: FC<{children: ReactNode}> = ({children}) => {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ idToken }),
+                    credentials: 'include', // Include credentials
                   });
                 } catch (e) {
                    console.error("Failed to create session cookie:", e);
