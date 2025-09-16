@@ -4,7 +4,7 @@
 
 import { awardPointsFlow, AwardPointsFlowInput } from "@/ai/flows/award-points-flow";
 import { gradeSubmissionFlow, GradeSubmissionInput } from "@/ai/flows/grade-submission-flow";
-import { adminAuth } from "@/lib/firebase-admin";
+import { adminAuth, adminDb } from "@/lib/firebase-admin";
 
 // Update the input types to include the idToken
 type AwardPointsServerInput = Omit<AwardPointsFlowInput, 'awardedBy'> & { idToken: string };
@@ -15,21 +15,36 @@ async function getVerifiedUser(idToken: string) {
         throw new Error('Authentication token is missing.');
     }
     
+    if (!adminDb || !adminAuth) {
+        throw new Error('Firebase Admin SDK is not initialized on the server.');
+    }
+
     try {
         const decodedToken = await adminAuth.verifyIdToken(idToken);
-        const role = decodedToken.role;
+        const uid = decodedToken.uid;
+        
+        // Instead of relying on the token's custom claim, which can be stale,
+        // fetch the user's document directly from Firestore to get the authoritative role.
+        const userDoc = await adminDb.collection('users').doc(uid).get();
+
+        if (!userDoc.exists) {
+             throw new Error('User document not found in database.');
+        }
+
+        const userData = userDoc.data();
+        const role = userData?.role;
 
         if (role !== 'teacher' && role !== 'admin') {
             throw new Error('You do not have permission to perform this action.');
         }
         
         return {
-            uid: decodedToken.uid,
-            name: decodedToken.name || decodedToken.email || 'Unnamed User',
+            uid: uid,
+            name: userData?.displayName || decodedToken.email || 'Unnamed User',
             role: role
         };
-    } catch (error) {
-        console.error("Error verifying ID token:", error);
+    } catch (error: any) {
+        console.error("Error verifying ID token or fetching user role:", error);
         throw new Error("Session invalid. Please log in again.");
     }
 }
