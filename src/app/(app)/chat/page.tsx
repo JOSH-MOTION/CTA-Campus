@@ -1,4 +1,3 @@
-
 // src/app/(app)/chat/page.tsx
 'use client';
 
@@ -7,7 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Users, Loader2, ArrowLeft } from 'lucide-react';
+import { Search, Users, Loader2 } from 'lucide-react';
 import { Chat } from '@/components/chat/Chat';
 import { useAuth, UserData } from '@/contexts/AuthContext';
 import { Message, getChatId, sendMessage, onMessages } from '@/services/chat';
@@ -78,14 +77,15 @@ export default function ChatPage() {
   const groupChats = useMemo(() => {
     const groups: Omit<ChatEntity, 'type' | 'lastMessage' | 'lastMessageTimestamp' | 'unreadCount'>[] = [];
     if (role === 'teacher' || role === 'admin') {
-        const studentGens = new Set(allUsers.filter(u => u.role === 'student' && u.gen).map(u => u.gen!));
-        studentGens.forEach(gen => {
-            groups.push({
-                id: `group-${gen}`,
-                name: `${gen} Hub`,
-                dataAiHint: 'group students',
-            });
+      const allStudents = allUsers.filter((u) => u.role === 'student');
+      const allGens = new Set(allStudents.map((student) => student.gen).filter(Boolean));
+      allGens.forEach((gen) => {
+        groups.push({
+          id: `group-${gen}`,
+          name: `${gen} Hub`,
+          dataAiHint: 'group students',
         });
+      });
     } else if (role === 'student' && userData?.gen) {
       groups.push({
         id: `group-${userData.gen}`,
@@ -94,7 +94,7 @@ export default function ChatPage() {
       });
     }
     return groups.sort((a, b) => a.name.localeCompare(b.name));
-  }, [role, userData?.gen, allUsers]);
+  }, [role, userData, allUsers]);
 
   const markChatAsRead = useCallback((chatId: string) => {
     localStorage.setItem(`lastSeen_${chatId}`, Date.now().toString());
@@ -139,12 +139,10 @@ export default function ChatPage() {
   }, [loading, currentUser, allUsers, groupChats, searchParams]);
 
   useEffect(() => {
-    if (messageUnsubscribeRef.current) {
-        messageUnsubscribeRef.current();
-        messageUnsubscribeRef.current = null;
-    }
     if (!selectedChat || !currentUser) return;
-    
+    if (messageUnsubscribeRef.current) {
+      messageUnsubscribeRef.current();
+    }
     let chatId: string;
     if (selectedChat.type === 'dm') {
       chatId = getChatId(currentUser.uid, selectedChat.id);
@@ -154,9 +152,10 @@ export default function ChatPage() {
     setMessages([]);
     markChatAsRead(chatId);
 
-    messageUnsubscribeRef.current = onMessages(chatId, (newMessages) => {
+    const unsubscribe = onMessages(chatId, (newMessages) => {
       setMessages(newMessages);
     });
+    messageUnsubscribeRef.current = unsubscribe;
 
     return () => {
       if (messageUnsubscribeRef.current) {
@@ -200,11 +199,8 @@ export default function ChatPage() {
 
   const ContactList = () => (
     <div className="flex flex-col h-full bg-background border-r">
-      <div className="p-4 border-b shrink-0 flex items-center justify-between">
+      <div className="p-4 border-b shrink-0">
          <h2 className="text-xl font-semibold">Campus Connect</h2>
-         <Button variant="ghost" size="icon" className="md:hidden" onClick={() => router.push('/')}>
-            <ArrowLeft className="h-5 w-5" />
-         </Button>
       </div>
 
       <div className="p-3 shrink-0">
