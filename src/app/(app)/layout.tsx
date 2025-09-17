@@ -134,7 +134,7 @@ const MemoizedProtectedLayout = memo(function ProtectedLayout({children}: {child
                         <div className="flex items-center justify-between px-2">
                           <div className="flex items-center gap-2">
                             <School className="h-6 w-6 text-primary" />
-                            <h1 className="text-xl font-semibold">Codetrain Campus</h1>
+                            <h1 className="text-xl font-semibold">Campus Compass</h1>
                           </div>
                         </div>
                         <SidebarNav />
