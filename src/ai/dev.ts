@@ -1,7 +1,4 @@
 // src/ai/dev.ts
-import { config } from 'dotenv';
-config();
-
 // IMPORTANT: This must be the first import to ensure Firebase Admin is initialized
 // before any of the AI flows that depend on it are loaded.
 try {

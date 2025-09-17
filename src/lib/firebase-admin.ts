@@ -1,6 +1,10 @@
 // src/lib/firebase-admin.ts
 import * as admin from 'firebase-admin';
 import { Agent } from 'http';
+import { config } from 'dotenv';
+
+// IMPORTANT: This must be run before any other code to ensure environment variables are loaded.
+config();
 
 // Check if the GOOGLE_APPLICATION_CREDENTIALS environment variable is set
 if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
@@ -12,7 +16,12 @@ if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
 
 if (!admin.apps.length) {
   try {
+    const serviceAccount = JSON.parse(
+        Buffer.from(process.env.GOOGLE_APPLICATION_CREDENTIALS_BASE64!, 'base64').toString('ascii')
+    );
+
     admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
       // The SDK will automatically pick up the service account credentials
       // from the environment variables (GOOGLE_APPLICATION_CREDENTIALS)
       // or from the application default credentials in a deployed environment.
