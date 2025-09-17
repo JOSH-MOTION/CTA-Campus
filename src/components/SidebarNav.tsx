@@ -32,7 +32,6 @@ import {
   Inbox,
   Star,
   School,
-  TestTube,
 } from 'lucide-react';
 import {SidebarMenu, SidebarMenuItem, SidebarMenuButton} from '@/components/ui/sidebar';
 import Link from 'next/link';
@@ -77,7 +76,6 @@ export const teacherNavItems = [
   {href: '/directory', label: 'Directory', icon: Contact},
   {href: '/availability', label: 'Manage Availability', icon: CalendarClock},
   {href: '/profile', label: 'Profile', icon: User},
-  {href: '/diag/grading', label: 'Diagnostics', icon: TestTube},
 ];
 
 export const adminNavItems = [
@@ -97,7 +95,6 @@ export const adminNavItems = [
   {href: '/directory', label: 'Directory', icon: Contact},
   {href: '/career', label: 'Career Module', icon: GraduationCap},
   {href: '/profile', label: 'Profile', icon: User},
-  {href: '/diag/grading', label: 'Diagnostics', icon: TestTube},
 ];
 
 export function SidebarNav() {
