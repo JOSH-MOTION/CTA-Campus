@@ -1,5 +1,6 @@
 // src/lib/firebase-admin.ts
 import * as admin from 'firebase-admin';
+import { Agent } from 'http';
 
 // Check if the GOOGLE_APPLICATION_CREDENTIALS environment variable is set
 if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
@@ -15,6 +16,10 @@ if (!admin.apps.length) {
       // The SDK will automatically pick up the service account credentials
       // from the environment variables (GOOGLE_APPLICATION_CREDENTIALS)
       // or from the application default credentials in a deployed environment.
+      
+      // Add an HTTP Agent to mitigate potential clock drift issues in serverless environments
+      // which can cause token verification to fail.
+      httpAgent: new Agent({ keepAlive: true }),
     });
     console.log('Firebase Admin SDK initialized successfully.');
   } catch (error: any) {
