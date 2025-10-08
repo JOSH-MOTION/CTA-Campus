@@ -46,7 +46,7 @@ export default function AttendancePage() {
       )
     );
   }, [roadmapData]);
-  
+
   const form = useForm<AttendanceFormValues>({
     resolver: zodResolver(attendanceSchema),
     defaultValues: {
@@ -59,54 +59,66 @@ export default function AttendancePage() {
   const handleDownloadCsv = async () => {
     setIsDownloading(true);
     try {
-        const attendanceRef = collection(db, 'attendance');
-        const q = query(attendanceRef, orderBy('submittedAt', 'desc'));
-        const querySnapshot = await getDocs(q);
-        const attendanceRecords = querySnapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-                Student: data.studentName,
-                Gen: data.studentGen,
-                Class: data.className,
-                Date: data.submittedAt.toDate().toLocaleDateString(),
-                Learned: data.learned,
-                Challenged: data.challenged,
-                Questions: data.questions,
-            };
-        });
-        
-        const csv = Papa.unparse(attendanceRecords);
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        if (link.download !== undefined) {
-            const url = URL.createObjectURL(blob);
-            link.setAttribute('href', url);
-            link.setAttribute('download', 'attendance_feedback.csv');
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
-    } catch (error) {
-        console.error("Error downloading CSV: ", error);
-        toast({
-            variant: 'destructive',
-            title: 'Download Failed',
-            description: 'Could not download attendance data.'
-        });
+      const attendanceRef = collection(db, 'attendance');
+      const q = query(attendanceRef, orderBy('submittedAt', 'desc'));
+      const querySnapshot = await getDocs(q);
+      const attendanceRecords = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          Student: data.studentName,
+          Gen: data.studentGen,
+          Class: data.className,
+          Date: data.submittedAt.toDate().toLocaleDateString(),
+          Learned: data.learned,
+          Challenged: data.challenged,
+          Questions: data.questions || '',
+        };
+      });
+
+      const csv = Papa.unparse(attendanceRecords);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'attendance_feedback.csv');
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch (error: any) {
+      console.error('Error downloading CSV:', {
+        error: error.message,
+        stack: error.stack,
+      });
+      toast({
+        variant: 'destructive',
+        title: 'Download Failed',
+        description: 'Could not download attendance data.',
+      });
     } finally {
-        setIsDownloading(false);
+      setIsDownloading(false);
     }
-  }
+  };
 
   const onSubmit = async (data: AttendanceFormValues) => {
-    if (!user || !userData) return;
+    if (!user || !userData) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'You must be logged in to submit attendance. Redirecting to login.',
+      });
+      window.location.href = '/login';
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const idToken = await user.getIdToken(true);
       const result = await markAttendanceFlow({
         studentId: user.uid,
-        studentName: userData.displayName,
+        studentName: userData.displayName || 'Unknown Student',
         studentGen: userData.gen || 'N/A',
         classId: data.classId,
         className: classSessions.find(c => c.id === data.classId)?.name || 'Unknown Class',
@@ -125,7 +137,12 @@ export default function AttendancePage() {
         description: result.message,
       });
       form.reset();
-    } catch(error: any) {
+    } catch (error: any) {
+      console.error('Error submitting attendance:', {
+        error: error.message,
+        stack: error.stack,
+        classId: data.classId,
+      });
       toast({
         variant: 'destructive',
         title: 'Error',
@@ -135,28 +152,28 @@ export default function AttendancePage() {
       setIsSubmitting(false);
     }
   };
-  
+
   if (isTeacherOrAdmin) {
-      return (
-        <div className="space-y-6">
-            <div className="space-y-1">
-                <h1 className="text-3xl font-bold tracking-tight">Attendance Records</h1>
-                <p className="text-muted-foreground">Download all student attendance and feedback submissions.</p>
-            </div>
-            <Card>
-                <CardHeader>
-                    <CardTitle>Export Data</CardTitle>
-                    <CardDescription>Download a CSV file containing all attendance records.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Button onClick={handleDownloadCsv} disabled={isDownloading}>
-                        {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                        Download Attendance CSV
-                    </Button>
-                </CardContent>
-            </Card>
+    return (
+      <div className="space-y-6">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold tracking-tight">Attendance Records</h1>
+          <p className="text-muted-foreground">Download all student attendance and feedback submissions.</p>
         </div>
-      );
+        <Card>
+          <CardHeader>
+            <CardTitle>Export Data</CardTitle>
+            <CardDescription>Download a CSV file containing all attendance records.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={handleDownloadCsv} disabled={isDownloading}>
+              {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+              Download Attendance CSV
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
@@ -168,9 +185,7 @@ export default function AttendancePage() {
       <Card>
         <CardHeader>
           <CardTitle>Session Feedback</CardTitle>
-          <CardDescription>
-            Your feedback is valuable for improving the learning experience.
-          </CardDescription>
+          <CardDescription>Your feedback is valuable for improving the learning experience.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -199,7 +214,6 @@ export default function AttendancePage() {
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={form.control}
                 name="learned"
@@ -213,7 +227,6 @@ export default function AttendancePage() {
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={form.control}
                 name="challenged"
@@ -227,8 +240,7 @@ export default function AttendancePage() {
                   </FormItem>
                 )}
               />
-              
-               <FormField
+              <FormField
                 control={form.control}
                 name="questions"
                 render={({ field }) => (
@@ -241,7 +253,6 @@ export default function AttendancePage() {
                   </FormItem>
                 )}
               />
-
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 <CheckCircle className="mr-2 h-4 w-4" />
