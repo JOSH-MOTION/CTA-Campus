@@ -1,44 +1,42 @@
 // src/lib/firebase-admin.ts
-import * as admin from 'firebase-admin';
-import { Agent } from 'http';
-import { config } from 'dotenv';
+import { initializeApp, cert, getApps, ServiceAccount } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
 
-// IMPORTANT: This must be run before any other code to ensure environment variables are loaded.
-config();
+let adminDb: ReturnType<typeof getFirestore>;
+let adminAuth: ReturnType<typeof getAuth>;
 
-// Check if the GOOGLE_APPLICATION_CREDENTIALS environment variable is set
-if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    // In a deployed Firebase environment, these are set automatically.
-    // In local development, you need to set them in your .env file
-    // after downloading a service account key from the Firebase console.
-    console.warn("GOOGLE_APPLICATION_CREDENTIALS not set. Firebase Admin SDK may not initialize correctly in local development.");
-}
-
-if (!admin.apps.length) {
+if (!getApps().length) {
   try {
-    const serviceAccount = JSON.parse(
-        Buffer.from(process.env.GOOGLE_APPLICATION_CREDENTIALS_BASE64!, 'base64').toString('ascii')
-    );
+    let credential;
 
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-      // The SDK will automatically pick up the service account credentials
-      // from the environment variables (GOOGLE_APPLICATION_CREDENTIALS)
-      // or from the application default credentials in a deployed environment.
-      
-      // Add an HTTP Agent to mitigate potential clock drift issues in serverless environments
-      // which can cause token verification to fail.
-      httpAgent: new Agent({ keepAlive: true }),
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS_BASE64) {
+      // Decode the base64-encoded service account key
+      const serviceAccountJson = Buffer.from(process.env.GOOGLE_APPLICATION_CREDENTIALS_BASE64, 'base64').toString('utf-8');
+      const serviceAccount: ServiceAccount = JSON.parse(serviceAccountJson);
+      credential = cert(serviceAccount);
+    } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+      // Fallback to JSON string directly
+      const serviceAccount: ServiceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+      credential = cert(serviceAccount);
+    } else {
+      throw new Error('No Firebase Admin credentials provided. Set GOOGLE_APPLICATION_CREDENTIALS_BASE64 or GOOGLE_APPLICATION_CREDENTIALS.');
+    }
+
+    const app = initializeApp({
+      credential,
+      projectId: 'campus-compass-ug6bc',
     });
-    console.log('Firebase Admin SDK initialized successfully.');
+
+    adminDb = getFirestore(app);
+    adminAuth = getAuth(app);
   } catch (error: any) {
-    console.error('Firebase Admin SDK initialization error:', error.message);
+    console.error('Firebase Admin SDK initialization error:', {
+      error: error.message,
+      stack: error.stack,
+    });
+    throw new Error('Failed to initialize Firebase Admin SDK. Ensure GOOGLE_APPLICATION_CREDENTIALS_BASE64 or GOOGLE_APPLICATION_CREDENTIALS is set correctly.');
   }
 }
 
-export const adminDb = admin.apps.length ? admin.firestore() : null;
-export const adminAuth = admin.apps.length ? admin.auth() : null;
-
-if (!adminDb) {
-  console.error("Firestore Admin DB is not available. Ensure Firebase Admin SDK is initialized.");
-}
+export { adminDb, adminAuth };

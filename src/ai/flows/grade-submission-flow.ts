@@ -1,31 +1,30 @@
 // src/ai/flows/grade-submission-flow.ts
 'use server';
 
-/**
- * @fileOverview A secure flow for grading a student's submission.
- */
-
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { serverTimestamp } from 'firebase-admin/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb, adminAuth } from '@/lib/firebase-admin';
+import { awardPointsFlow } from './award-points-flow';
 
 const GradeSubmissionInputSchema = z.object({
-  submissionId: z.string().describe("The ID of the submission document to grade."),
-  studentId: z.string().describe("The UID of the student who made the submission."),
-  assignmentTitle: z.string().describe("The title of the assignment being graded."),
-  grade: z.string().optional().describe("The grade to award for the submission."),
-  feedback: z.string().optional().describe("Optional feedback for the student."),
-  gradedBy: z.string().describe("The UID of the user grading the submission."),
-  graderName: z.string().describe("The display name of the user grading the submission."),
-  idToken: z.string().describe("The Firebase ID token for authentication."), // Added this
+  submissionId: z.string().describe("The ID of the submission to grade"),
+  studentId: z.string().describe("The UID of the student"),
+  assignmentTitle: z.string().describe("The title of the assignment"),
+  grade: z.string().optional().describe("The assigned grade"),
+  feedback: z.string().optional().describe("Feedback for the submission"),
+  gradedBy: z.string().describe("The UID of the grader"),
+  graderName: z.string().describe("The name of the grader"),
+  idToken: z.string().describe("The Firebase ID token for authorization"),
 });
+
 export type GradeSubmissionInput = z.infer<typeof GradeSubmissionInputSchema>;
 
 const GradeSubmissionOutputSchema = z.object({
   success: z.boolean(),
   message: z.string(),
 });
+
 export type GradeSubmissionOutput = z.infer<typeof GradeSubmissionOutputSchema>;
 
 export const gradeSubmissionFlow = ai.defineFlow(
@@ -35,70 +34,88 @@ export const gradeSubmissionFlow = ai.defineFlow(
     outputSchema: GradeSubmissionOutputSchema,
   },
   async (input) => {
-    const { submissionId, studentId, grade, feedback, assignmentTitle, gradedBy, graderName, idToken } = input;
+    const { submissionId, studentId, assignmentTitle, grade, feedback, gradedBy, graderName, idToken } = input;
 
     try {
-      if (!adminDb || !adminAuth) {
-        throw new Error('Firebase Admin SDK not initialized.');
+      // Verify the ID token
+      await adminAuth.verifyIdToken(idToken);
+
+      // Check if student user document exists
+      const userDocRef = adminDb.collection('users').doc(studentId);
+      const userDoc = await userDocRef.get();
+      if (!userDoc.exists) {
+        console.error(`User document not found for studentId: ${studentId}`);
+        throw new Error('Student user document not found. Please ensure the student is registered.');
       }
 
-      // Verify the ID token first
-      const decodedToken = await adminAuth.verifyIdToken(idToken);
-      
-      // Check if the token user matches the grader
-      if (decodedToken.uid !== gradedBy) {
-        throw new Error('Token user does not match grader ID.');
-      }
-
-      // Check if user has permission to grade (teacher or admin role)
-      if (!decodedToken.role || !['teacher', 'admin'].includes(decodedToken.role)) {
-        throw new Error('Insufficient permissions to grade submissions.');
-      }
-      
-      const submissionRef = adminDb.collection('submissions').doc(submissionId);
-      
       // Check if submission exists
+      const submissionRef = adminDb.collection('submissions').doc(submissionId);
       const submissionDoc = await submissionRef.get();
+
       if (!submissionDoc.exists) {
+        console.error(`Submission document not found for submissionId: ${submissionId}`);
         throw new Error('Submission not found.');
       }
 
-      // Update the submission document with the grade and feedback
+      // Update the submission with grade and feedback
       await submissionRef.update({
-        grade: grade,
+        grade: grade || 'Complete',
         feedback: feedback || '',
-        gradedAt: serverTimestamp(),
-        gradedBy: gradedBy,
+        gradedBy,
+        graderName,
+        gradedAt: FieldValue.serverTimestamp(),
       });
 
-      // Create a notification for the student
-      const notification = {
-        userId: studentId,
-        title: `Graded: ${assignmentTitle}`,
-        description: `Your submission has been graded by ${graderName}.`,
-        href: `/submissions`,
-        read: false,
-        date: serverTimestamp(),
+      // Award points based on the submission's point category
+      const submissionData = submissionDoc.data();
+      const pointsToAward = getPointsForCategory(submissionData?.pointCategory);
+
+      if (pointsToAward > 0) {
+        const activityId = `graded-submission-${submissionId}`;
+        const pointsResult = await awardPointsFlow({
+          studentId,
+          points: pointsToAward,
+          reason: `Graded: ${assignmentTitle}`,
+          activityId,
+          action: 'award',
+          awardedBy: gradedBy,
+          assignmentTitle,
+        });
+
+        if (!pointsResult.success) {
+          console.error(`Failed to award points for submissionId: ${submissionId}`, pointsResult.message);
+          throw new Error(pointsResult.message);
+        }
+      }
+
+      return {
+        success: true,
+        message: 'Submission graded successfully.',
       };
-      await adminDb.collection('notifications').add(notification);
-
-      return { success: true, message: 'Submission graded successfully.' };
     } catch (error: any) {
-      console.error("Error grading submission in flow:", error);
-
-      // Handle specific authentication errors
-      if (error.code === 'auth/id-token-expired') {
-        return { success: false, message: 'Session expired. Please refresh the page and try again.' };
-      }
-      if (error.code === 'auth/id-token-revoked') {
-        return { success: false, message: 'Session invalid. Please login again.' };
-      }
-      if (error.code === 'auth/argument-error') {
-        return { success: false, message: 'Invalid authentication token. Please refresh and try again.' };
-      }
-
-      const errorMessage = error.message || "An unexpected error occurred.";
-      return { success: false, message: `Server error: Could not grade submission. Reason: ${errorMessage}` };
+      console.error('Error in gradeSubmissionFlow:', {
+        error: error.message,
+        submissionId,
+        studentId,
+        stack: error.stack,
+      });
+      return {
+        success: false,
+        message: error.message || 'Failed to grade submission.',
+      };
     }
   }
 );
+
+function getPointsForCategory(category: string | undefined): number {
+  switch (category) {
+    case 'Class Assignments':
+    case 'Class Exercises':
+    case 'Weekly Projects':
+      return 1;
+    case '100 Days of Code':
+      return 0.5;
+    default:
+      return 0;
+  }
+}

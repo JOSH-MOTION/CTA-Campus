@@ -1,12 +1,8 @@
 'use server';
 
-/**
- * @fileOverview A secure flow for marking student attendance and awarding points.
- */
-
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { serverTimestamp, increment } from 'firebase-admin/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb, adminAuth } from '@/lib/firebase-admin';
 
 const MarkAttendanceFlowInputSchema = z.object({
@@ -38,68 +34,71 @@ export const markAttendanceFlow = ai.defineFlow(
     const { studentId, studentName, studentGen, classId, className, learned, challenged, questions, idToken } = input;
     
     try {
-        if (!adminDb || !adminAuth) {
-            throw new Error('Firebase Admin SDK not initialized.');
-        }
+      await adminAuth.verifyIdToken(idToken);
+      
+      const attendanceDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      const activityId = `attendance-${classId}-${attendanceDate}`;
+      
+      const pointDocRef = adminDb.collection('users').doc(studentId).collection('points').doc(activityId);
+      const pointDocSnap = await pointDocRef.get();
 
-        // Verify the token to ensure the request is coming from an authenticated user.
-        await adminAuth.verifyIdToken(idToken);
-        
-        const attendanceDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-        const activityId = `attendance-${classId}-${attendanceDate}`;
-        
-        const pointDocRef = adminDb.collection('users').doc(studentId).collection('points').doc(activityId);
-        const pointDocSnap = await pointDocRef.get();
-
-        if (pointDocSnap.exists()) {
-            // If points exist, we can still save the feedback, but we don't award more points.
-            await adminDb.collection('attendance').add({
-            studentId,
-            studentName,
-            studentGen,
-            classId,
-            className,
-            learned,
-            challenged,
-            questions,
-            submittedAt: serverTimestamp(),
-            });
-            return { success: true, message: "Attendance already marked for this session today, but your feedback was saved." };
-        }
-
-        const userDocRef = adminDb.collection('users').doc(studentId);
-        
-        // Atomically increment points and save attendance records
-        await adminDb.runTransaction(async (transaction) => {
-            transaction.update(userDocRef, { totalPoints: increment(1) });
-            
-            transaction.set(pointDocRef, {
-            points: 1,
-            reason: 'Class Attendance',
-            assignmentTitle: `Attendance: ${className}`,
-            activityId: activityId,
-            awardedAt: serverTimestamp(),
-            });
-            
-            const attendanceRef = adminDb.collection('attendance').doc();
-            transaction.set(attendanceRef, {
-            studentId,
-            studentName,
-            studentGen,
-            classId,
-            className,
-            learned,
-            challenged,
-            questions,
-            submittedAt: serverTimestamp(),
-            });
+      if (pointDocSnap.exists) {
+        await adminDb.collection('attendance').add({
+          studentId,
+          studentName,
+          studentGen,
+          classId,
+          className,
+          learned,
+          challenged,
+          questions,
+          submittedAt: FieldValue.serverTimestamp(),
         });
+        return { success: true, message: "Attendance already marked for this session today, but your feedback was saved." };
+      }
 
-        return { success: true, message: 'Attendance marked and 1 point awarded!' };
+      const userDocRef = adminDb.collection('users').doc(studentId);
+      const userDoc = await userDocRef.get();
+
+      if (!userDoc.exists) {
+        console.error(`User document not found for studentId: ${studentId}`);
+        throw new Error('Student user document not found. Please ensure the student is registered.');
+      }
+      
+      await adminDb.runTransaction(async (transaction) => {
+        transaction.update(userDocRef, { totalPoints: FieldValue.increment(1) });
+        
+        transaction.set(pointDocRef, {
+          points: 1,
+          reason: 'Class Attendance',
+          assignmentTitle: `Attendance: ${className}`,
+          activityId: activityId,
+          awardedAt: FieldValue.serverTimestamp(),
+        });
+        
+        const attendanceRef = adminDb.collection('attendance').doc();
+        transaction.set(attendanceRef, {
+          studentId,
+          studentName,
+          studentGen,
+          classId,
+          className,
+          learned,
+          challenged,
+          questions,
+          submittedAt: FieldValue.serverTimestamp(),
+        });
+      });
+
+      return { success: true, message: 'Attendance marked and 1 point awarded!' };
     } catch (error: any) {
-        console.error("Error processing attendance in flow:", error);
-        const errorMessage = error.message || "An unexpected error occurred.";
-        return { success: false, message: `Server error: Could not process points. Reason: ${errorMessage}` };
+      console.error("Error processing attendance in flow:", {
+        error: error.message,
+        studentId,
+        classId
+      });
+      const errorMessage = error.message || "An unexpected error occurred.";
+      return { success: false, message: `Server error: Could not process points. Reason: ${errorMessage}` };
     }
   }
 );

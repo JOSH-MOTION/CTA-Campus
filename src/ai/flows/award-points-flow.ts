@@ -3,17 +3,17 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { serverTimestamp, increment } from 'firebase-admin/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase-admin';
 
 const AwardPointsFlowInputSchema = z.object({
-    studentId: z.string().describe("The UID of the student to award points to."),
-    points: z.number().describe("The number of points to award. Can be negative to revoke."),
-    reason: z.string().describe("A short description of why the points are being awarded."),
-    activityId: z.string().describe("A unique ID for the specific activity."),
-    action: z.enum(['award', 'revoke']).describe("Whether to award or revoke the points."),
-    awardedBy: z.string().describe("The UID of the user awarding the points."),
-    assignmentTitle: z.string().optional().describe("The title of the assignment or activity."),
+  studentId: z.string().describe("The UID of the student to award points to."),
+  points: z.number().describe("The number of points to award. Can be negative to revoke."),
+  reason: z.string().describe("A short description of why the points are being awarded."),
+  activityId: z.string().describe("A unique ID for the specific activity."),
+  action: z.enum(['award', 'revoke']).describe("Whether to award or revoke the points."),
+  awardedBy: z.string().describe("The UID of the user awarding the points."),
+  assignmentTitle: z.string().optional().describe("The title of the assignment or activity."),
 });
 
 export type AwardPointsFlowInput = z.infer<typeof AwardPointsFlowInputSchema>;
@@ -34,36 +34,32 @@ export const awardPointsFlow = ai.defineFlow(
   },
   async (input) => {
     const { studentId, points, reason, activityId, action, awardedBy, assignmentTitle } = input;
-    
-    try {
-      if (!adminDb) {
-        throw new Error('Firebase Admin SDK not initialized.');
-      }
 
+    try {
       const result = await adminDb.runTransaction(async (transaction) => {
         const userDocRef = adminDb.collection('users').doc(studentId);
         const userDoc = await transaction.get(userDocRef);
-        
+
         if (!userDoc.exists) {
-          throw new Error('Student user document not found.');
+          console.error(`User document not found for studentId: ${studentId}`);
+          throw new Error('Student user document not found. Please ensure the student is registered.');
         }
-        
+
         const currentTotalPoints = userDoc.data()?.totalPoints || 0;
-        
+
         if (action === 'award') {
           const pointDocRef = userDocRef.collection('points').doc(activityId);
-          
           const existingPointDoc = await transaction.get(pointDocRef);
           if (existingPointDoc.exists) {
-            return { 
+            return {
               success: true,
-              message: 'Points for this activity have already been awarded',
-              totalPoints: currentTotalPoints
+              message: 'Points for this activity have already been awarded.',
+              totalPoints: currentTotalPoints,
             };
           }
-          
+
           transaction.update(userDocRef, {
-            totalPoints: increment(points)
+            totalPoints: FieldValue.increment(points),
           });
 
           transaction.set(pointDocRef, {
@@ -71,53 +67,55 @@ export const awardPointsFlow = ai.defineFlow(
             reason,
             assignmentTitle: assignmentTitle || reason,
             activityId,
-            awardedAt: serverTimestamp(),
-            awardedBy: awardedBy,
+            awardedAt: FieldValue.serverTimestamp(),
+            awardedBy,
           });
-          
-          return { 
-            success: true, 
-            message: 'Points awarded successfully.',
-            totalPoints: currentTotalPoints + points
-          };
 
-        } else { // action === 'revoke'
+          return {
+            success: true,
+            message: 'Points awarded successfully.',
+            totalPoints: currentTotalPoints + points,
+          };
+        } else {
           const pointToRevokeRef = userDocRef.collection('points').doc(activityId);
           const pointDoc = await transaction.get(pointToRevokeRef);
-          
+
           if (!pointDoc.exists) {
-            return { 
-              success: true, 
-              message: "Points already revoked or never existed.",
-              totalPoints: currentTotalPoints
+            return {
+              success: true,
+              message: 'Points already revoked or never existed.',
+              totalPoints: currentTotalPoints,
             };
           }
-          
+
           const pointsToRevoke = pointDoc.data()?.points || 0;
-          
+
           transaction.update(userDocRef, {
-            totalPoints: increment(-pointsToRevoke)
+            totalPoints: FieldValue.increment(-pointsToRevoke),
           });
 
           transaction.delete(pointToRevokeRef);
-          
-          return { 
-            success: true, 
-            message: "Points revoked successfully.",
-            totalPoints: currentTotalPoints - pointsToRevoke
+
+          return {
+            success: true,
+            message: 'Points revoked successfully.',
+            totalPoints: currentTotalPoints - pointsToRevoke,
           };
         }
       });
-      
+
       return result;
-      
     } catch (error: any) {
-      console.error("Error processing points in flow:", error);
-      
-      const errorMessage = error.message || "An unexpected error occurred.";
-      return { 
-        success: false, 
-        message: `Server error: Could not process points. Reason: ${errorMessage}` 
+      console.error('Error processing points in flow:', {
+        error: error.message,
+        studentId,
+        activityId,
+        action,
+        stack: error.stack,
+      });
+      return {
+        success: false,
+        message: error.message || 'Failed to process points. Please try again.',
       };
     }
   }

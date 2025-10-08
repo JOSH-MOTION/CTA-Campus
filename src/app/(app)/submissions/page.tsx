@@ -17,30 +17,15 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { clearAllSubmissionsFlow } from '@/ai/flows/clear-all-submissions-flow';
-import { cn } from '@/lib/utils';
 import Papa from 'papaparse';
 import { GradeSubmissionDialog } from '@/components/submissions/GradeSubmissionDialog';
 import { awardPointsAction } from '@/app/actions/grading-actions';
 import Image from 'next/image';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { getAuth } from 'firebase/auth';
+import { getActivityIdForSubmission } from '@/lib/utils'; // Import shared utility
 
 const submissionCategories = ['All', 'Class Assignments', 'Class Exercises', 'Weekly Projects', '100 Days of Code'];
-
-// Helper to generate the correct activity ID based on submission type
-const getActivityIdForSubmission = (submission: Submission): string => {
-    switch (submission.pointCategory) {
-        case 'Class Assignments':
-            return `graded-submission-${submission.id}`;
-        case 'Class Exercises':
-            return `graded-exercise-${submission.id}`;
-        case 'Weekly Projects':
-            return `graded-project-${submission.id}`;
-        case '100 Days of Code':
-            return `100-days-of-code-${submission.assignmentTitle.replace('100 Days of Code - ', '')}`;
-        default:
-            return `graded-submission-${submission.id}`;
-    }
-};
 
 export default function AllSubmissionsPage() {
   const router = useRouter();
@@ -60,12 +45,15 @@ export default function AllSubmissionsPage() {
     try {
       const [fetchedSubmissions, fetchedUsers] = await Promise.all([
         getAllSubmissions(),
-        fetchAllUsers()
+        fetchAllUsers(),
       ]);
       setSubmissions(fetchedSubmissions);
       setAllStudents(fetchedUsers.filter(u => u.role === 'student'));
-    } catch (error) {
-      console.error("Failed to fetch data:", error);
+    } catch (error: any) {
+      console.error('Error fetching submissions or users:', {
+        error: error.message,
+        stack: error.stack,
+      });
       toast({
         variant: 'destructive',
         title: 'Error',
@@ -81,7 +69,7 @@ export default function AllSubmissionsPage() {
   }, [fetchData]);
 
   const availableGens = useMemo(() => {
-    const gens = new Set(allStudents.map(student => student.gen).filter(Boolean));
+    const gens = new Set(allStudents.map(student => student.gen).filter((gen): gen is string => Boolean(gen)));
     return ['all', ...Array.from(gens).sort()];
   }, [allStudents]);
 
@@ -103,30 +91,60 @@ export default function AllSubmissionsPage() {
   }, [submissions, allStudents, searchTerm, selectedGen, selectedCategory]);
 
   const handleRevoke = async (submission: Submission) => {
-    if (!user) return;
-    const activityId = getActivityIdForSubmission(submission);
-    
+    if (!user) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'You must be logged in to perform this action. Redirecting to login.',
+      });
+      router.push('/login');
+      return;
+    }
+
+    const auth = getAuth();
+    const currentUser = auth.currentUser;
+
+    if (!currentUser) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Authentication error. Please log in again.',
+      });
+      router.push('/login');
+      return;
+    }
+
     try {
+      const idToken = await currentUser.getIdToken(true);
+      const activityId = getActivityIdForSubmission(submission);
+
       const result = await awardPointsAction({
-          studentId: submission.studentId,
-          points: 0, // points are retrieved from the doc, so 0 is fine here.
-          reason: submission.pointCategory,
-          activityId: activityId,
-          action: 'revoke',
-          assignmentTitle: submission.assignmentTitle,
+        studentId: submission.studentId,
+        points: 0,
+        reason: submission.pointCategory,
+        activityId,
+        action: 'revoke',
+        assignmentTitle: submission.assignmentTitle,
+        idToken,
       });
 
-       if (!result.success) throw new Error(result.message);
-       
-      // No need to call gradeSubmissionFlow here to revoke, the points flow handles it.
-      // We just need to update the local state.
+      if (!result.success) {
+        throw new Error(result.message);
+      }
+
       await fetchData();
-      
+
       toast({
         title: 'Points Revoked',
         description: `Points for ${submission.studentName} have been revoked.`,
       });
     } catch (error: any) {
+      console.error('Error revoking points:', {
+        error: error.message,
+        submissionId: submission.id,
+        studentId: submission.studentId,
+        stack: error.stack,
+      });
       toast({
         variant: 'destructive',
         title: 'Error',
@@ -134,31 +152,35 @@ export default function AllSubmissionsPage() {
       });
     }
   };
-  
+
   const handleDelete = async () => {
-      if (!submissionToDelete) return;
+    if (!submissionToDelete) return;
 
-      try {
-          if(submissionToDelete.grade) {
-              await handleRevoke(submissionToDelete);
-          }
-          await deleteSubmission(submissionToDelete.id);
-          toast({
-              title: 'Submission Deleted',
-              description: 'The submission has been permanently removed.'
-          });
-          fetchData();
-      } catch (error) {
-           toast({
-              variant: 'destructive',
-              title: 'Error',
-              description: 'Could not delete submission.'
-          });
-      } finally {
-          setSubmissionToDelete(null);
+    try {
+      if (submissionToDelete.grade) {
+        await handleRevoke(submissionToDelete);
       }
-  }
-
+      await deleteSubmission(submissionToDelete.id);
+      toast({
+        title: 'Submission Deleted',
+        description: 'The submission has been permanently removed.',
+      });
+      await fetchData();
+    } catch (error: any) {
+      console.error('Error deleting submission:', {
+        error: error.message,
+        submissionId: submissionToDelete.id,
+        stack: error.stack,
+      });
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.message || 'Could not delete submission.',
+      });
+    } finally {
+      setSubmissionToDelete(null);
+    }
+  };
 
   if (role === 'student') {
     router.push('/');
@@ -174,11 +196,15 @@ export default function AllSubmissionsPage() {
           title: 'Submissions Cleared',
           description: `${result.deletedCount} submissions have been deleted.`,
         });
-        fetchData();
+        await fetchData();
       } else {
         throw new Error(result.message);
       }
     } catch (error: any) {
+      console.error('Error clearing submissions:', {
+        error: error.message,
+        stack: error.stack,
+      });
       toast({
         variant: 'destructive',
         title: 'Error',
@@ -191,13 +217,13 @@ export default function AllSubmissionsPage() {
 
   const handleDownloadCsv = () => {
     const dataToExport = filteredSubmissions.map(s => ({
-        Student: s.studentName,
-        Generation: s.studentGen,
-        Assignment: s.assignmentTitle,
-        Category: s.pointCategory,
-        Submitted: s.submittedAt.toDate().toLocaleString(),
-        Link: s.submissionLink,
-        Graded: s.grade ? 'Yes' : 'No'
+      Student: s.studentName,
+      Generation: s.studentGen,
+      Assignment: s.assignmentTitle,
+      Category: s.pointCategory,
+      Submitted: s.submittedAt.toDate().toLocaleString(),
+      Link: s.submissionLink || 'N/A',
+      Graded: s.grade ? 'Yes' : 'No',
     }));
 
     const csv = Papa.unparse(dataToExport);
@@ -212,9 +238,7 @@ export default function AllSubmissionsPage() {
     document.body.removeChild(link);
   };
 
-
   return (
-    <>
     <div className="space-y-6">
       <div className="space-y-1">
         <h1 className="text-3xl font-bold tracking-tight">All Submissions</h1>
@@ -242,16 +266,16 @@ export default function AllSubmissionsPage() {
                   onChange={e => setSearchTerm(e.target.value)}
                 />
               </div>
-               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                  <SelectTrigger className="w-full md:w-[180px]">
-                    <SelectValue placeholder="Filter by Category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {submissionCategories.map(cat => (
-                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger className="w-full md:w-[180px]">
+                  <SelectValue placeholder="Filter by Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {submissionCategories.map(cat => (
+                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Select value={selectedGen} onValueChange={setSelectedGen}>
                 <SelectTrigger className="w-full md:w-[180px]">
                   <SelectValue placeholder="Filter by Gen" />
@@ -268,8 +292,12 @@ export default function AllSubmissionsPage() {
               </Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="destructive" disabled={submissions.length === 0}>
-                    <Trash2 className="mr-2 h-4 w-4" />
+                  <Button variant="destructive" disabled={submissions.length === 0 || isClearing}>
+                    {isClearing ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="mr-2 h-4 w-4" />
+                    )}
                     Clear All
                   </Button>
                 </AlertDialogTrigger>
@@ -296,127 +324,138 @@ export default function AllSubmissionsPage() {
           {loading ? (
             <div className="flex h-96 flex-col items-center justify-center">
               <Loader2 className="h-12 w-12 animate-spin text-muted-foreground" />
+              <p className="mt-4 text-muted-foreground">Loading submissions...</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Student</TableHead>
-                  <TableHead>Gen</TableHead>
-                  <TableHead>Assignment</TableHead>
-                  <TableHead>Submitted</TableHead>
-                  <TableHead>Link</TableHead>
-                  <TableHead>Image</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredSubmissions.length > 0 ? (
-                  filteredSubmissions.map(submission => {
-                    return (
-                        <TableRow key={submission.id}>
-                            <TableCell className="font-medium">{submission.studentName}</TableCell>
-                            <TableCell><Badge variant="secondary">{submission.studentGen}</Badge></TableCell>
-                            <TableCell>
-                                <p className="font-medium">{submission.assignmentTitle}</p>
-                                <Badge variant="outline" className="mt-1">{submission.pointCategory}</Badge>
-                            </TableCell>
-                            <TableCell>{formatDistanceToNow(submission.submittedAt.toDate(), { addSuffix: true })}</TableCell>
-                            <TableCell>
-                                {submission.submissionLink ? (
-                                    <Button variant="ghost" asChild size="icon">
-                                        <Link href={submission.submissionLink} target="_blank" rel="noopener noreferrer">
-                                            <ExternalLink className="h-4 w-4" />
-                                        </Link>
-                                    </Button>
-                                ) : (
-                                    <span className="text-muted-foreground text-xs">N/A</span>
-                                )}
-                            </TableCell>
-                             <TableCell>
-                                {submission.imageUrl && (
-                                     <Dialog>
-                                        <DialogTrigger asChild>
-                                            <Button variant="ghost" size="icon">
-                                                <ImageIcon className="h-4 w-4" />
-                                            </Button>
-                                        </DialogTrigger>
-                                        <DialogContent className="max-w-3xl">
-                                            <DialogHeader>
-                                                <DialogTitle>Submitted Image</DialogTitle>
-                                                <DialogDescription>
-                                                    Image submitted by {submission.studentName} for {submission.assignmentTitle}.
-                                                </DialogDescription>
-                                            </DialogHeader>
-                                            <div className="flex justify-center p-4">
-                                               <Image src={submission.imageUrl} alt="Submission image" width={800} height={600} className="rounded-md object-contain max-h-[70vh]" />
-                                            </div>
-                                        </DialogContent>
-                                    </Dialog>
-                                )}
-                            </TableCell>
-                            <TableCell className="text-right space-x-2">
-                                {submission.grade ? (
-                                     <Button
-                                        size="sm"
-                                        variant="destructive"
-                                        onClick={() => handleRevoke(submission)}
-                                    >
-                                        <XCircle className="mr-2 h-4 w-4" />
-                                        Revoke
-                                    </Button>
-                                ) : (
-                                    <GradeSubmissionDialog
-                                        submission={submission}
-                                        onGraded={fetchData}
-                                    >
-                                        <Button size="sm" variant="outline">
-                                          <CheckCircle className="mr-2 h-4 w-4" />
-                                          Grade
-                                        </Button>
-                                    </GradeSubmissionDialog>
-                                )}
-                                 <Button 
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => setSubmissionToDelete(submission)}
-                                >
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                            </TableCell>
-                        </TableRow>
-                    )
-                  })
-                ) : (
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center">
-                      No submissions match your filters.
-                    </TableCell>
+                    <TableHead>Student</TableHead>
+                    <TableHead>Gen</TableHead>
+                    <TableHead>Assignment</TableHead>
+                    <TableHead>Submitted</TableHead>
+                    <TableHead>Link</TableHead>
+                    <TableHead>Image</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredSubmissions.length > 0 ? (
+                    filteredSubmissions.map(submission => (
+                      <TableRow key={submission.id}>
+                        <TableCell className="font-medium">{submission.studentName}</TableCell>
+                        <TableCell><Badge variant="secondary">{submission.studentGen}</Badge></TableCell>
+                        <TableCell>
+                          <p className="font-medium">{submission.assignmentTitle}</p>
+                          <Badge variant="outline" className="mt-1">{submission.pointCategory}</Badge>
+                        </TableCell>
+                        <TableCell>{formatDistanceToNow(submission.submittedAt.toDate(), { addSuffix: true })}</TableCell>
+                        <TableCell>
+                          {submission.submissionLink ? (
+                            <Button variant="ghost" asChild size="icon">
+                              <Link href={submission.submissionLink} target="_blank" rel="noopener noreferrer">
+                                <ExternalLink className="h-4 w-4" />
+                              </Link>
+                            </Button>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">N/A</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {submission.imageUrl && (
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                  <ImageIcon className="h-4 w-4" />
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-3xl">
+                                <DialogHeader>
+                                  <DialogTitle>Submitted Image</DialogTitle>
+                                  <DialogDescription>
+                                    Image submitted by {submission.studentName} for {submission.assignmentTitle}.
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <div className="flex justify-center p-4">
+                                  <Image
+                                    src={submission.imageUrl}
+                                    alt="Submission image"
+                                    width={800}
+                                    height={600}
+                                    className="rounded-md object-contain max-h-[70vh]"
+                                  />
+                                </div>
+                              </DialogContent>
+                            </Dialog>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right space-x-2">
+                          {submission.grade ? (
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleRevoke(submission)}
+                            >
+                              <XCircle className="mr-2 h-4 w-4" />
+                              Revoke
+                            </Button>
+                          ) : (
+                            <GradeSubmissionDialog
+                              submission={submission}
+                              onGraded={fetchData}
+                            >
+                              <Button size="sm" variant="outline">
+                                <CheckCircle className="mr-2 h-4 w-4" />
+                                Grade
+                              </Button>
+                            </GradeSubmissionDialog>
+                          )}
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setSubmissionToDelete(submission)}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This action cannot be undone. This will permanently delete the submission from{' '}
+                                  <span className="font-semibold">{submissionToDelete?.studentName}</span>. Any points awarded will be revoked.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={handleDelete}
+                                  className="bg-destructive hover:bg-destructive/90"
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={7} className="h-24 text-center">
+                        No submissions match your filters.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
             </div>
           )}
         </CardContent>
       </Card>
     </div>
-    <AlertDialog open={!!submissionToDelete} onOpenChange={(open) => !open && setSubmissionToDelete(null)}>
-        <AlertDialogContent>
-        <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete the submission from{' '}
-                <span className="font-semibold">{submissionToDelete?.studentName}</span>. Any points awarded will be revoked.
-            </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
-        </AlertDialogFooter>
-        </AlertDialogContent>
-    </AlertDialog>
-    </>
   );
 }

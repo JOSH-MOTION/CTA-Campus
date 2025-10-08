@@ -25,6 +25,8 @@ import Link from 'next/link';
 import { awardPointsAction, gradeSubmissionAction } from '@/app/actions/grading-actions';
 import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
+import { getActivityIdForSubmission } from '@/lib/utils';
 
 const gradingSchema = z.object({
   feedback: z.string().optional(),
@@ -38,26 +40,12 @@ interface GradeSubmissionDialogProps {
   onGraded: () => void;
 }
 
-const getActivityIdForSubmission = (submission: Submission): string => {
-    switch (submission.pointCategory) {
-        case 'Class Assignments':
-            return `graded-submission-${submission.id}`;
-        case 'Class Exercises':
-            return `graded-exercise-${submission.id}`;
-        case 'Weekly Projects':
-            return `graded-project-${submission.id}`;
-        case '100 Days of Code':
-            return `100-days-of-code-${submission.assignmentTitle.replace('100 Days of Code - ', '')}`;
-        default:
-            return `graded-submission-${submission.id}`;
-    }
-};
-
 export function GradeSubmissionDialog({ children, submission, onGraded }: GradeSubmissionDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
+  const router = useRouter();
 
   const form = useForm<GradingFormValues>({
     resolver: zodResolver(gradingSchema),
@@ -71,60 +59,72 @@ export function GradeSubmissionDialog({ children, submission, onGraded }: GradeS
     if (!open) {
       form.reset();
     }
-  }
+  };
 
   const pointsToAward = submission.pointCategory === '100 Days of Code' ? 0.5 : 1;
 
   const onSubmit = async (data: GradingFormValues) => {
     if (!user) {
-        toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to perform this action.' });
-        return;
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'You must be logged in to perform this action. Redirecting to login.',
+      });
+      router.push('/login');
+      return;
     }
+
     setIsSubmitting(true);
     try {
-        const idToken = await user.getIdToken(true);
-        const activityId = getActivityIdForSubmission(submission);
-        
-        // Award points first
-        const awardResult = await awardPointsAction({
-            studentId: submission.studentId,
-            points: pointsToAward,
-            reason: submission.pointCategory,
-            activityId,
-            action: 'award',
-            assignmentTitle: submission.assignmentTitle,
-            idToken,
-        });
+      const idToken = await user.getIdToken(true);
+      const activityId = getActivityIdForSubmission(submission);
 
-        if (!awardResult.success) {
-            // Allow duplicates to proceed to grading without showing an error
-            if (awardResult.message !== 'Points already revoked or never existed.' && !awardResult.message.includes('already awarded')) {
-                throw new Error(awardResult.message);
-            }
+      // Award points first
+      const awardResult = await awardPointsAction({
+        studentId: submission.studentId,
+        points: pointsToAward,
+        reason: submission.pointCategory,
+        activityId,
+        action: 'award',
+        assignmentTitle: submission.assignmentTitle,
+        idToken,
+      });
+
+      if (!awardResult.success) {
+        if (awardResult.message.includes('already awarded')) {
+          console.warn(`Points already awarded for submissionId: ${submission.id}, proceeding to grade.`);
+        } else if (awardResult.message !== 'Points already revoked or never existed.') {
+          throw new Error(awardResult.message);
         }
+      }
 
-        // Then, update the submission document with grade and feedback
-        const gradeResult = await gradeSubmissionAction({
-            submissionId: submission.id,
-            studentId: submission.studentId,
-            assignmentTitle: submission.assignmentTitle,
-            grade: 'Complete',
-            feedback: data.feedback,
-            idToken,
-        });
+      // Then, update the submission document with grade and feedback
+      const gradeResult = await gradeSubmissionAction({
+        submissionId: submission.id,
+        studentId: submission.studentId,
+        assignmentTitle: submission.assignmentTitle,
+        grade: 'Complete',
+        feedback: data.feedback,
+        idToken,
+      });
 
-        if (!gradeResult.success) {
-            throw new Error(gradeResult.message);
-        }
+      if (!gradeResult.success) {
+        throw new Error(gradeResult.message);
+      }
 
-        toast({
-            title: 'Submission Graded!',
-            description: `Awarded ${pointsToAward} points and saved feedback.`,
-        });
-        onGraded();
-        setIsOpen(false);
-
+      toast({
+        title: 'Submission Graded!',
+        description: `Awarded ${pointsToAward} point(s) and saved feedback.`,
+      });
+      onGraded();
+      setIsOpen(false);
     } catch (error: any) {
+      console.error('Error grading submission:', {
+        error: error.message,
+        submissionId: submission.id,
+        studentId: submission.studentId,
+        stack: error.stack,
+      });
       toast({
         variant: 'destructive',
         title: 'Error',
@@ -145,44 +145,50 @@ export function GradeSubmissionDialog({ children, submission, onGraded }: GradeS
             Submitted by {submission.studentName} from {submission.studentGen}.
           </DialogDescription>
         </DialogHeader>
-        
+
         <div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto pr-2">
-            {submission.submissionLink && (
-                <p className="text-sm font-medium">
-                    Submission Link:{' '}
-                    <Button variant="link" asChild className="p-0 h-auto">
-                        <Link href={submission.submissionLink} target="_blank" rel="noopener noreferrer">
-                        View Submission <ExternalLink className="ml-2 h-3 w-3" />
-                        </Link>
-                    </Button>
-                </p>
-            )}
-             {submission.imageUrl && (
-                <div className="space-y-2">
-                    <p className="text-sm font-medium">Submitted Image:</p>
-                    <div className="flex justify-center p-2 border rounded-md">
-                        <Image src={submission.imageUrl} alt="Submission image" width={400} height={300} className="rounded-md object-contain max-h-[40vh]" />
-                    </div>
-                </div>
-            )}
-            {submission.submissionNotes && (
-                <div className="space-y-1">
-                    <p className="text-sm font-medium">Student Notes:</p>
-                    <blockquote className="border-l-2 pl-6 italic text-muted-foreground">
-                       {submission.submissionNotes}
-                    </blockquote>
-                </div>
-            )}
+          {submission.submissionLink && (
+            <p className="text-sm font-medium">
+              Submission Link:{' '}
+              <Button variant="link" asChild className="p-0 h-auto">
+                <Link href={submission.submissionLink} target="_blank" rel="noopener noreferrer">
+                  View Submission <ExternalLink className="ml-2 h-3 w-3" />
+                </Link>
+              </Button>
+            </p>
+          )}
+          {submission.imageUrl && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Submitted Image:</p>
+              <div className="flex justify-center p-2 border rounded-md">
+                <Image
+                  src={submission.imageUrl}
+                  alt="Submission image"
+                  width={400}
+                  height={300}
+                  className="rounded-md object-contain max-h-[40vh]"
+                />
+              </div>
+            </div>
+          )}
+          {submission.submissionNotes && (
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Student Notes:</p>
+              <blockquote className="border-l-2 pl-6 italic text-muted-foreground">
+                {submission.submissionNotes}
+              </blockquote>
+            </div>
+          )}
         </div>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <Alert>
-                <Award className="h-4 w-4" />
-                <AlertTitle>Points to Award</AlertTitle>
-                <AlertDescription>
-                    This will award <span className="font-bold">{pointsToAward} point(s)</span> to the student.
-                </AlertDescription>
+              <Award className="h-4 w-4" />
+              <AlertTitle>Points to Award</AlertTitle>
+              <AlertDescription>
+                This will award <span className="font-bold">{pointsToAward} point(s)</span> to the student.
+              </AlertDescription>
             </Alert>
             <FormField
               control={form.control}

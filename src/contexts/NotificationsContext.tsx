@@ -1,13 +1,10 @@
-
-// src/contexts/NotificationsContext.tsx
 'use client';
 
-import {createContext, useContext, useState, ReactNode, FC, useCallback, useEffect} from 'react';
+import { createContext, useContext, useState, ReactNode, FC, useCallback, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useAuth, UserData } from './AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, query, where, onSnapshot, orderBy, doc, updateDoc, getDocs, writeBatch, getDoc } from 'firebase/firestore';
-import { sendEmail } from '@/services/email';
+import { collection, addDoc, serverTimestamp, query, where, onSnapshot, orderBy, doc, updateDoc, writeBatch } from 'firebase/firestore';
 
 export interface Notification {
   id: string;
@@ -32,7 +29,7 @@ interface NotificationsContextType {
 
 const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined);
 
-export const NotificationsProvider: FC<{children: ReactNode}> = ({children}) => {
+export const NotificationsProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const { user, userData: authorData, allUsers } = useAuth();
 
@@ -40,167 +37,133 @@ export const NotificationsProvider: FC<{children: ReactNode}> = ({children}) => 
     let unsubscribe: (() => void) | undefined = undefined;
 
     if (user) {
-        const notificationsCol = collection(db, 'notifications');
-        const q = query(
-            notificationsCol,
-            where('userId', '==', user.uid),
-            orderBy('date', 'desc')
-        );
+      const notificationsCol = collection(db, 'notifications');
+      const q = query(
+        notificationsCol,
+        where('userId', '==', user.uid),
+        orderBy('date', 'desc')
+      );
 
-        unsubscribe = onSnapshot(q, (querySnapshot) => {
-            const fetchedNotifications = querySnapshot.docs.map(doc => {
-                const data = doc.data();
-                return {
-                    id: doc.id,
-                    ...data,
-                    date: data.date?.toDate().toISOString() || new Date().toISOString(),
-                } as Notification;
-            });
-            setNotifications(fetchedNotifications);
-        }, (error) => {
-            console.error(error);
+      unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const fetchedNotifications = querySnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data,
+            date: data.date?.toDate().toISOString() || new Date().toISOString(),
+          } as Notification;
         });
+        setNotifications(fetchedNotifications);
+      }, (error) => {
+        console.error('Error fetching notifications:', {
+          error: error.message,
+          stack: error.stack,
+        });
+      });
     } else {
-        setNotifications([]);
+      setNotifications([]);
     }
 
     return () => {
-        if (unsubscribe) {
-            unsubscribe();
-        }
+      if (unsubscribe) {
+        unsubscribe();
+      }
     };
   }, [user]);
-  
+
   const addNotificationForUser = useCallback(async (userId: string, notificationData: Omit<Notification, 'id' | 'date' | 'read' | 'userId'>) => {
+    try {
       const newNotification = {
-          ...notificationData,
-          userId,
-          read: false,
-          date: serverTimestamp(),
+        ...notificationData,
+        userId,
+        read: false,
+        date: serverTimestamp(),
       };
       await addDoc(collection(db, 'notifications'), newNotification);
-
-      // Send email but don't let it block the main thread if it fails
-      try {
-        const userDoc = await getDoc(doc(db, 'users', userId));
-        if (userDoc.exists()) {
-            const userData = userDoc.data() as UserData;
-            if(userData.email) {
-                await sendEmail({
-                    to: userData.email,
-                    subject: notificationData.title,
-                    html: `
-                        <h1>Hi ${userData.displayName},</h1>
-                        <p>You have a new notification on Codetrain Campus:</p>
-                        <p><b>${notificationData.title}</b></p>
-                        <p>${notificationData.description}</p>
-                        <p><a href="https://campus-compass-ug6bc.web.app${notificationData.href}">Click here to view it</a></p>
-                        <br/>
-                        <p>Best,</p>
-                        <p>The Codetrain Team</p>
-                    `
-                });
-            }
-        }
-      } catch (emailError) {
-          console.error("Non-critical error: Failed to send notification email.", emailError);
-      }
+    } catch (error: any) {
+      console.error('Error adding notification for user:', {
+        error: error.message,
+        userId,
+        stack: error.stack,
+      });
+      throw new Error('Failed to add notification.');
+    }
   }, []);
 
   const addNotificationForGen = useCallback(async (targetGen: string, notificationData: Omit<Notification, 'id' | 'date' | 'read' | 'userId'>, authorId?: string) => {
-    const batch = writeBatch(db);
-    const notificationsCol = collection(db, 'notifications');
-    const notifiedUsers: { name: string, email: string }[] = [];
+    try {
+      const batch = writeBatch(db);
+      const notificationsCol = collection(db, 'notifications');
 
-    const usersToNotify = allUsers.filter(u => {
+      const usersToNotify = allUsers.filter(u => {
         if (u.uid === authorId) return false;
         if (targetGen === 'Everyone') return true;
         if (targetGen === 'All Students' && u.role === 'student') return true;
         if (targetGen === 'All Staff' && (u.role === 'teacher' || u.role === 'admin')) return true;
         if (u.role === 'student' && u.gen === targetGen) return true;
         return false;
-    });
+      });
 
-    for (const userData of usersToNotify) {
+      for (const userData of usersToNotify) {
         const newNotification = {
-            ...notificationData,
-            userId: userData.uid,
-            read: false,
-            date: serverTimestamp(),
+          ...notificationData,
+          userId: userData.uid,
+          read: false,
+          date: serverTimestamp(),
         };
         const notificationRef = doc(notificationsCol);
         batch.set(notificationRef, newNotification);
+      }
 
-        if (userData.email) {
-            notifiedUsers.push({ name: userData.displayName, email: userData.email });
-             try {
-                await sendEmail({
-                    to: userData.email,
-                    subject: notificationData.title,
-                    html: `
-                        <h1>Hi ${userData.displayName},</h1>
-                        <p>You have a new notification on Codetrain Campus:</p>
-                        <p><b>${notificationData.title}</b></p>
-                        <p>${notificationData.description}</p>
-                        <p><a href="https://campus-compass-ug6bc.web.app${notificationData.href}">Click here to view it</a></p>
-                        <br/>
-                        <p>Best,</p>
-                        <p>The Codetrain Team</p>
-                    `
-                });
-             } catch (emailError) {
-                 console.error(`Non-critical error: Failed to send notification email to ${userData.email}.`, emailError);
-             }
-        }
+      await batch.commit();
+    } catch (error: any) {
+      console.error('Error adding notifications for gen:', {
+        error: error.message,
+        targetGen,
+        stack: error.stack,
+      });
+      throw new Error('Failed to add notifications for group.');
     }
-
-    await batch.commit();
-
-    // Send confirmation email to the author, but don't let it block the flow.
-    if (authorId && authorData && authorData.email) {
-       try {
-            const userListHtml = notifiedUsers.map(u => `<li>${u.name} (${u.email})</li>`).join('');
-            await sendEmail({
-                to: authorData.email,
-                subject: `Confirmation: "${notificationData.title}" Sent`,
-                html: `
-                    <h1>Confirmation</h1>
-                    <p>Your announcement titled "<b>${notificationData.title}</b>" has been sent to the following ${notifiedUsers.length} user(s):</p>
-                    <ul>
-                        ${userListHtml}
-                    </ul>
-                    <p>Best,</p>
-                    <p>The Codetrain Team</p>
-                `
-            });
-       } catch(authorEmailError) {
-           console.error(`Non-critical error: Failed to send confirmation email to author ${authorData.email}.`, authorEmailError);
-       }
-    }
-
-  }, [authorData, allUsers]);
+  }, [allUsers]);
 
   const markAsRead = useCallback(async (notificationId: string) => {
+    try {
       const notifDoc = doc(db, 'notifications', notificationId);
       await updateDoc(notifDoc, { read: true });
+    } catch (error: any) {
+      console.error('Error marking notification as read:', {
+        error: error.message,
+        notificationId,
+        stack: error.stack,
+      });
+      throw new Error('Failed to mark notification as read.');
+    }
   }, []);
 
   const markAllAsRead = useCallback(async () => {
-    const unreadNotifications = notifications.filter(n => !n.read);
-    if (unreadNotifications.length === 0) return;
+    try {
+      const unreadNotifications = notifications.filter(n => !n.read);
+      if (unreadNotifications.length === 0) return;
 
-    const batch = writeBatch(db);
-    unreadNotifications.forEach(notif => {
+      const batch = writeBatch(db);
+      unreadNotifications.forEach(notif => {
         const notifDoc = doc(db, 'notifications', notif.id);
         batch.update(notifDoc, { read: true });
-    });
-    await batch.commit();
+      });
+      await batch.commit();
+    } catch (error: any) {
+      console.error('Error marking all notifications as read:', {
+        error: error.message,
+        stack: error.stack,
+      });
+      throw new Error('Failed to mark all notifications as read.');
+    }
   }, [notifications]);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
-    <NotificationsContext.Provider value={{notifications, unreadCount, addNotificationForUser, addNotificationForGen, markAsRead, markAllAsRead}}>
+    <NotificationsContext.Provider value={{ notifications, unreadCount, addNotificationForUser, addNotificationForGen, markAsRead, markAllAsRead }}>
       {children}
     </NotificationsContext.Provider>
   );

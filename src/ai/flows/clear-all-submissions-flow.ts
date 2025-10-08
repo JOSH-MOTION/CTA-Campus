@@ -3,8 +3,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { collection, getDocs, writeBatch, query, limit, startAfter, orderBy } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { adminDb } from '@/lib/firebase-admin';
 
 const ClearAllSubmissionsOutputSchema = z.object({
   success: z.boolean(),
@@ -20,51 +19,45 @@ export const clearAllSubmissionsFlow = ai.defineFlow(
   },
   async () => {
     try {
-      const submissionsRef = collection(db, 'submissions');
+      const submissionsRef = adminDb.collection('submissions');
       const BATCH_SIZE = 500; // Firestore batch limit
       let totalDeleted = 0;
-      let lastDoc = null;
 
-      do {
-        // Build query with pagination
-        let q = query(submissionsRef, orderBy('__name__'), limit(BATCH_SIZE));
-        if (lastDoc) {
-          q = query(submissionsRef, orderBy('__name__'), startAfter(lastDoc), limit(BATCH_SIZE));
-        }
+      while (true) {
+        const snapshot = await submissionsRef.limit(BATCH_SIZE).get();
 
-        const querySnapshot = await getDocs(q);
-        
-        if (querySnapshot.empty) {
+        if (snapshot.empty) {
           break;
         }
 
-        const batch = writeBatch(db);
-        querySnapshot.forEach(doc => {
+        const batch = adminDb.batch();
+        snapshot.forEach(doc => {
           batch.delete(doc.ref);
         });
 
         await batch.commit();
-        totalDeleted += querySnapshot.size;
-        
-        // Update lastDoc for pagination
-        lastDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
-        
-      } while (lastDoc);
+        totalDeleted += snapshot.size;
+      }
 
       if (totalDeleted === 0) {
         return { success: true, deletedCount: 0, message: 'No submissions to delete.' };
       }
 
-      return { 
-        success: true, 
+      return {
+        success: true,
         deletedCount: totalDeleted,
-        message: `Successfully deleted ${totalDeleted} submission(s).` 
+        message: `Successfully deleted ${totalDeleted} submission(s).`,
       };
-
     } catch (error: any) {
-      console.error("Error clearing submissions:", error);
-      const errorMessage = error.message || "An unexpected error occurred.";
-      return { success: false, deletedCount: 0, message: `Server error: Could not clear submissions. Reason: ${errorMessage}` };
+      console.error('Error clearing submissions:', {
+        error: error.message,
+        stack: error.stack,
+      });
+      return {
+        success: false,
+        deletedCount: 0,
+        message: `Server error: Could not clear submissions. Reason: ${error.message || 'An unexpected error occurred.'}`,
+      };
     }
   }
 );
