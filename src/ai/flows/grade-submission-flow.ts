@@ -6,6 +6,9 @@ import { z } from 'genkit';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb, adminAuth } from '@/lib/firebase-admin';
 import { awardPointsFlow } from './award-points-flow';
+import { db } from '@/lib/firebase';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { getBaseUrl } from '@/lib/utils';
 
 const GradeSubmissionInputSchema = z.object({
   submissionId: z.string().describe("The ID of the submission to grade"),
@@ -86,6 +89,26 @@ export const gradeSubmissionFlow = ai.defineFlow(
           console.error(`Failed to award points for submissionId: ${submissionId}`, pointsResult.message);
           throw new Error(pointsResult.message);
         }
+      }
+
+      // Add in-app notification for the student
+      try {
+        await addDoc(collection(db, 'notifications'), {
+          title: `Submission Graded: ${assignmentTitle}`,
+          description: `Your submission has been graded by ${graderName}. ${feedback ? `Feedback: ${feedback}` : ''} ${pointsToAward > 0 ? `Points awarded: ${pointsToAward}` : ''}`,
+          userId: studentId,
+          read: false,
+          date: serverTimestamp(),
+          href: `${getBaseUrl()}/submissions/${submissionId}`,
+        });
+      } catch (notificationError: any) {
+        console.error('Non-critical error adding notification:', {
+          error: notificationError.message,
+          submissionId,
+          studentId,
+          stack: notificationError.stack,
+        });
+        // Don't throw, as notification failure shouldn't block grading
       }
 
       return {

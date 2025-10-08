@@ -87,27 +87,36 @@ export async function GET(request: NextRequest) {
 }
 
 async function fetchSubmissions(filters: { status?: string | null; studentId?: string | null }) {
-  let query: Query<DocumentData> = adminDb.collection('submissions');
+  try {
+    let query: Query<DocumentData> = adminDb.collection('submissions');
 
-  if (filters.status) {
-    if (filters.status === 'graded') {
-      query = query.where('grade', '!=', null);
-    } else if (filters.status === 'pending') {
-      query = query.where('grade', '==', null);
+    if (filters.status) {
+      if (filters.status === 'graded') {
+        query = query.where('grade', '!=', null);
+      } else if (filters.status === 'pending') {
+        query = query.where('grade', '==', null);
+      }
     }
+
+    if (filters.studentId) {
+      query = query.where('studentId', '==', filters.studentId);
+    }
+
+    query = query.orderBy('submittedAt', 'desc');
+
+    const snapshot = await query.get();
+
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      submittedAt: doc.data().submittedAt?.toDate?.()?.toISOString() || doc.data().submittedAt,
+    }));
+  } catch (error: any) {
+    console.error('Error in fetchSubmissions:', {
+      error: error.message,
+      stack: error.stack,
+      filters,
+    });
+    throw new Error('Failed to fetch submissions');
   }
-
-  if (filters.studentId) {
-    query = query.where('studentId', '==', filters.studentId);
-  }
-
-  query = query.orderBy('submittedAt', 'desc');
-
-  const snapshot = await query.get();
-
-  return snapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data(),
-    submittedAt: doc.data().submittedAt?.toDate?.()?.toISOString() || doc.data().submittedAt,
-  }));
 }

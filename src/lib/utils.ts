@@ -21,3 +21,17 @@ export function getActivityIdForSubmission(submission: Submission): string {
       return `graded-submission-${submission.id}`;
   }
 }
+
+export function getBaseUrl(): string {
+  if (typeof window !== 'undefined') {
+    return `${window.location.protocol}//${window.location.host}`;
+  }
+  if (process.env.NEXT_PUBLIC_BASE_URL) {
+    return process.env.NEXT_PUBLIC_BASE_URL;
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  console.warn('NEXT_PUBLIC_BASE_URL not set, falling back to localhost');
+  return 'http://localhost:3000';
+}

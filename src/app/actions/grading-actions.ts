@@ -1,85 +1,100 @@
+// src/app/actions/grading-actions.ts
 'use server';
 
-import { awardPointsFlow, AwardPointsFlowInput } from '@/ai/flows/award-points-flow';
-import { gradeSubmissionFlow, GradeSubmissionInput } from '@/ai/flows/grade-submission-flow';
+import { z } from 'zod';
 import { adminAuth, adminDb } from '@/lib/firebase-admin';
+import { gradeSubmissionFlow, GradeSubmissionInput } from '@/ai/flows/grade-submission-flow';
+import { awardPointsFlow, AwardPointsFlowInput } from '@/ai/flows/award-points-flow';
 
-type AwardPointsServerInput = Omit<AwardPointsFlowInput, 'awardedBy'> & { idToken: string };
-type GradeSubmissionServerInput = Omit<GradeSubmissionInput, 'gradedBy' | 'graderName' | 'idToken'> & { idToken: string };
+const ActionResponseSchema = z.object({
+  success: z.boolean(),
+  message: z.string(),
+});
 
 async function getVerifiedUser(idToken: string) {
-  if (!idToken) {
-    throw new Error('Authentication token is missing.');
-  }
-
   try {
     const decodedToken = await adminAuth.verifyIdToken(idToken);
     const uid = decodedToken.uid;
-    
-    const userDoc = await adminDb.collection('users').doc(uid).get();
 
+    const userDoc = await adminDb.collection('users').doc(uid).get();
     if (!userDoc.exists) {
-      console.error(`User document not found for UID: ${uid}`);
-      throw new Error('User document not found in database.');
+      throw new Error('User document not found');
     }
 
     const userData = userDoc.data();
-    const role = userData?.role;
+    if (!userData || !['teacher', 'admin'].includes(userData.role)) {
+      throw new Error('User does not have sufficient permissions');
+    }
 
-    if (role !== 'teacher' && role !== 'admin') {
-      throw new Error('You do not have permission to perform this action.');
-    }
-    
-    return {
-      uid: uid,
-      name: userData?.displayName || decodedToken.email || 'Unnamed User',
-      role: role
-    };
+    return { uid, role: userData.role };
   } catch (error: any) {
-    console.error("Error verifying ID token or fetching user role:", error);
-    
-    if (error.code === 'auth/id-token-expired') {
-      throw new Error('Session expired. Please refresh the page and try again.');
-    }
-    if (error.code === 'auth/argument-error') {
-      throw new Error('Invalid authentication token. Please refresh and try again.');
-    }
-    
+    console.error('Error verifying ID token or fetching user role:', {
+      error: error.message,
+      stack: error.stack,
+    });
     throw new Error(error.message || 'Session invalid. Please log in again.');
   }
 }
 
-export async function awardPointsAction(input: AwardPointsServerInput) {
+export async function awardPointsAction(input: Omit<AwardPointsFlowInput, 'awardedBy'> & { idToken: string }) {
   try {
-    const { idToken, ...flowInput } = input;
-    const user = await getVerifiedUser(idToken);
+    const { idToken, ...flowInput } = input; // Destructure idToken to exclude it from flowInput
+    const { uid, role } = await getVerifiedUser(idToken);
 
-    return await awardPointsFlow({
+    if (!['teacher', 'admin'].includes(role)) {
+      return {
+        success: false,
+        message: 'Unauthorized: Only teachers or admins can award points',
+      };
+    }
+
+    const result = await awardPointsFlow({
       ...flowInput,
-      awardedBy: user.uid,
+      awardedBy: uid,
     });
+
+    return ActionResponseSchema.parse(result);
   } catch (error: any) {
-    console.error('Error in awardPointsAction:', error);
+    console.error('Error in awardPointsAction:', {
+      error: error.message,
+      stack: error.stack,
+      studentId: input.studentId,
+      activityId: input.activityId,
+    });
     return {
       success: false,
-      message: error.message || 'Failed to process points',
+      message: error.message || 'Failed to award points',
     };
   }
 }
 
-export async function gradeSubmissionAction(input: GradeSubmissionServerInput) {
+export async function gradeSubmissionAction(input: Omit<GradeSubmissionInput, 'gradedBy' | 'graderName'> & { idToken: string }) {
   try {
-    const { idToken, ...flowInput } = input;
-    const user = await getVerifiedUser(idToken);
-    
-    return await gradeSubmissionFlow({
+    const { idToken, ...flowInput } = input; // Destructure idToken to exclude it from flowInput
+    const { uid, role } = await getVerifiedUser(idToken);
+
+    if (!['teacher', 'admin'].includes(role)) {
+      return {
+        success: false,
+        message: 'Unauthorized: Only teachers or admins can grade submissions',
+      };
+    }
+
+    const result = await gradeSubmissionFlow({
       ...flowInput,
-      gradedBy: user.uid,
-      graderName: user.name,
-      idToken,
+      gradedBy: uid,
+      graderName: 'Teacher', // Or fetch from userData if needed
+      idToken, // Pass idToken to flow if it needs it for verification
     });
+
+    return ActionResponseSchema.parse(result);
   } catch (error: any) {
-    console.error('Error in gradeSubmissionAction:', error);
+    console.error('Error in gradeSubmissionAction:', {
+      error: error.message,
+      stack: error.stack,
+      submissionId: input.submissionId,
+      studentId: input.studentId,
+    });
     return {
       success: false,
       message: error.message || 'Failed to grade submission',
