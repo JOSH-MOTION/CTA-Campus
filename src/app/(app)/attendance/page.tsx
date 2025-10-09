@@ -12,12 +12,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { CheckCircle, Download, Loader2 } from 'lucide-react';
 import { useRoadmap } from '@/contexts/RoadmapContext';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getDocs, collection, query, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import Papa from 'papaparse';
 import { markAttendanceFlow } from '@/ai/flows/mark-attendance-flow';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const attendanceSchema = z.object({
   classId: z.string().nonempty('Please select a class.'),
@@ -28,12 +30,25 @@ const attendanceSchema = z.object({
 
 type AttendanceFormValues = z.infer<typeof attendanceSchema>;
 
+interface AttendanceRecord {
+  id: string;
+  studentName: string;
+  studentGen: string;
+  className: string;
+  date: string;
+  learned: string;
+  challenged: string;
+  questions: string;
+}
+
 export default function AttendancePage() {
   const { toast } = useToast();
   const { roadmapData } = useRoadmap();
   const { user, userData, role } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+  const [isLoadingRecords, setIsLoadingRecords] = useState(false);
   const isTeacherOrAdmin = role === 'teacher' || role === 'admin';
 
   const classSessions = useMemo(() => {
@@ -56,25 +71,50 @@ export default function AttendancePage() {
     },
   });
 
+  // Fetch attendance records for teachers/admins
+  useEffect(() => {
+    if (isTeacherOrAdmin) {
+      const fetchAttendanceRecords = async () => {
+        setIsLoadingRecords(true);
+        try {
+          const attendanceRef = collection(db, 'attendance');
+          const q = query(attendanceRef, orderBy('submittedAt', 'desc'));
+          const querySnapshot = await getDocs(q);
+          const records = querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              studentName: data.studentName,
+              studentGen: data.studentGen,
+              className: data.className,
+              date: data.submittedAt.toDate().toLocaleDateString(),
+              learned: data.learned,
+              challenged: data.challenged,
+              questions: data.questions || '',
+            };
+          });
+          setAttendanceRecords(records);
+        } catch (error: any) {
+          console.error('Error fetching attendance records:', {
+            error: error.message,
+            stack: error.stack,
+          });
+          toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: 'Could not fetch attendance records.',
+          });
+        } finally {
+          setIsLoadingRecords(false);
+        }
+      };
+      fetchAttendanceRecords();
+    }
+  }, [isTeacherOrAdmin, toast]);
+
   const handleDownloadCsv = async () => {
     setIsDownloading(true);
     try {
-      const attendanceRef = collection(db, 'attendance');
-      const q = query(attendanceRef, orderBy('submittedAt', 'desc'));
-      const querySnapshot = await getDocs(q);
-      const attendanceRecords = querySnapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          Student: data.studentName,
-          Gen: data.studentGen,
-          Class: data.className,
-          Date: data.submittedAt.toDate().toLocaleDateString(),
-          Learned: data.learned,
-          Challenged: data.challenged,
-          Questions: data.questions || '',
-        };
-      });
-
       const csv = Papa.unparse(attendanceRecords);
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
@@ -104,6 +144,7 @@ export default function AttendancePage() {
 
   const onSubmit = async (data: AttendanceFormValues) => {
     if (!user || !userData) {
+      console.error('No user or userData available for attendance submission');
       toast({
         variant: 'destructive',
         title: 'Error',
@@ -142,11 +183,12 @@ export default function AttendancePage() {
         error: error.message,
         stack: error.stack,
         classId: data.classId,
+        studentId: user.uid,
       });
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: error.message || 'Could not submit attendance.',
+        description: error.message || 'Could not submit attendance. Please try again.',
       });
     } finally {
       setIsSubmitting(false);
@@ -158,18 +200,56 @@ export default function AttendancePage() {
       <div className="space-y-6">
         <div className="space-y-1">
           <h1 className="text-3xl font-bold tracking-tight">Attendance Records</h1>
-          <p className="text-muted-foreground">Download all student attendance and feedback submissions.</p>
+          <p className="text-muted-foreground">View and download all student attendance and feedback submissions.</p>
         </div>
         <Card>
           <CardHeader>
-            <CardTitle>Export Data</CardTitle>
-            <CardDescription>Download a CSV file containing all attendance records.</CardDescription>
+            <CardTitle>Attendance Records</CardTitle>
+            <CardDescription>Review student attendance and feedback.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={handleDownloadCsv} disabled={isDownloading}>
-              {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-              Download Attendance CSV
-            </Button>
+            {isLoadingRecords ? (
+              <div className="flex justify-center">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
+            ) : attendanceRecords.length === 0 ? (
+              <p className="text-muted-foreground">No attendance records found.</p>
+            ) : (
+              <ScrollArea className="h-[400px]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Student</TableHead>
+                      <TableHead>Generation</TableHead>
+                      <TableHead>Class</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Learned</TableHead>
+                      <TableHead>Challenged</TableHead>
+                      <TableHead>Questions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {attendanceRecords.map(record => (
+                      <TableRow key={record.id}>
+                        <TableCell>{record.studentName}</TableCell>
+                        <TableCell>{record.studentGen}</TableCell>
+                        <TableCell>{record.className}</TableCell>
+                        <TableCell>{record.date}</TableCell>
+                        <TableCell className="max-w-[200px] truncate">{record.learned}</TableCell>
+                        <TableCell className="max-w-[200px] truncate">{record.challenged}</TableCell>
+                        <TableCell className="max-w-[200px] truncate">{record.questions}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
+            )}
+            <div className="mt-4">
+              <Button onClick={handleDownloadCsv} disabled={isDownloading || isLoadingRecords || attendanceRecords.length === 0}>
+                {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                Download Attendance CSV
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
