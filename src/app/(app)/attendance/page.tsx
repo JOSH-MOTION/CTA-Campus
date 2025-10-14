@@ -52,15 +52,13 @@ export default function AttendancePage() {
   const isTeacherOrAdmin = role === 'teacher' || role === 'admin';
 
   const classSessions = useMemo(() => {
-    return roadmapData.flatMap(subject =>
-      subject.weeks.flatMap(week =>
-        week.topics.map(topic => ({
-          id: topic.id,
-          name: `${subject.title} - ${topic.title}`,
-        }))
-      )
-    );
-  }, [roadmapData]);
+  return roadmapData.flatMap(subject =>
+    subject.weeks.map(week => ({
+      id: `${subject.title}-${week.title}`, // Create unique ID for each week
+      name: `${subject.title} ${week.title}`, // e.g., "Git Week 1", "HTML Week 2"
+    }))
+  );
+}, [roadmapData]);
 
   const form = useForm<AttendanceFormValues>({
     resolver: zodResolver(attendanceSchema),
