@@ -1,35 +1,82 @@
 // src/app/(app)/attendance/page.tsx
 'use client';
 
-import { useForm } from 'react-hook-form';
+import { useForm, type FieldValues } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { CheckCircle, Download, Loader2 } from 'lucide-react';
 import { useRoadmap } from '@/contexts/RoadmapContext';
 import { useMemo, useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { getDocs, collection, query, orderBy } from 'firebase/firestore';
+import {
+  getDocs,
+  collection,
+  query,
+  orderBy,
+} from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import Papa from 'papaparse';
 import { markAttendanceFlow } from '@/ai/flows/mark-attendance-flow';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 
+/* ----------  SCHEMA ---------- */
 const attendanceSchema = z.object({
   classId: z.string().nonempty('Please select a class.'),
   learned: z.string().min(10, 'Please share at least 10 characters about what you learned.'),
   challenged: z.string().min(10, 'Please share at least 10 characters about what you found challenging.'),
   questions: z.string().optional(),
+  rating: z.coerce.number().int().min(1).max(10, 'Rating must be 1–10'),
+  attendanceType: z.enum(['virtual', 'in-person'], { required_error: 'Please select attendance type.' }),
+  understanding: z.coerce.number().int().min(1).max(10, 'Understanding must be 1–10'),
+  actionPlan: z.string().min(10, 'Please describe your action plan to improve.'),
+  preClassReview: z.enum(['yes', 'no'], { required_error: 'Please answer.' }),
 });
 
 type AttendanceFormValues = z.infer<typeof attendanceSchema>;
 
+/* ----------  RECORD TYPE ---------- */
 interface AttendanceRecord {
   id: string;
   studentName: string;
@@ -39,203 +86,265 @@ interface AttendanceRecord {
   learned: string;
   challenged: string;
   questions: string;
+  rating: number;
+  attendanceType: 'virtual' | 'in-person';
+  understanding: number;
+  actionPlan: string;
+  preClassReview: 'yes' | 'no';
 }
 
+/* ----------  MAIN COMPONENT ---------- */
 export default function AttendancePage() {
   const { toast } = useToast();
   const { roadmapData } = useRoadmap();
   const { user, userData, role } = useAuth();
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+  const [filteredRecords, setFilteredRecords] = useState<AttendanceRecord[]>([]);
   const [isLoadingRecords, setIsLoadingRecords] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null);
+  const [genFilter, setGenFilter] = useState<string>('all');
+  const [classFilter, setClassFilter] = useState<string>('all');
+
   const isTeacherOrAdmin = role === 'teacher' || role === 'admin';
 
+  /* ----------  CLASS / SESSION LIST ---------- */
   const classSessions = useMemo(() => {
-  return roadmapData.flatMap(subject =>
-    subject.weeks.map(week => ({
-      id: `${subject.title}-${week.title}`, // Create unique ID for each week
-      name: `${subject.title} ${week.title}`, // e.g., "Git Week 1", "HTML Week 2"
-    }))
-  );
-}, [roadmapData]);
+    return roadmapData.flatMap(subject =>
+      subject.weeks.map(week => ({
+        id: `${subject.title}-${week.title}`,
+        name: `${subject.title} ${week.title}`,
+      }))
+    );
+  }, [roadmapData]);
 
+  /* ----------  UNIQUE GEN LIST ---------- */
+  const genOptions = useMemo(() => {
+    const gens = Array.from(new Set(attendanceRecords.map(r => r.studentGen)));
+    return gens.sort();
+  }, [attendanceRecords]);
+
+  /* ----------  FILTER LOGIC ---------- */
+  useEffect(() => {
+    let result = attendanceRecords;
+
+    if (genFilter !== 'all') {
+      result = result.filter(r => r.studentGen === genFilter);
+    }
+    if (classFilter !== 'all') {
+      const targetName = classSessions.find(c => c.id === classFilter)?.name;
+      if (targetName) result = result.filter(r => r.className === targetName);
+    }
+
+    setFilteredRecords(result); // Fixed: was setFilteredRecords.allAttendanceRecords
+  }, [attendanceRecords, genFilter, classFilter, classSessions]);
+
+  /* ----------  FORM ---------- */
   const form = useForm<AttendanceFormValues>({
     resolver: zodResolver(attendanceSchema),
     defaultValues: {
       learned: '',
       challenged: '',
       questions: '',
+      rating: 5,
+      attendanceType: 'virtual',
+      understanding: 5,
+      actionPlan: '',
+      preClassReview: 'no',
     },
   });
 
-  // Fetch attendance records for teachers/admins
+  /* ----------  FETCH RECORDS (teacher/admin) ---------- */
   useEffect(() => {
-    if (isTeacherOrAdmin) {
-      const fetchAttendanceRecords = async () => {
-        setIsLoadingRecords(true);
-        try {
-          const attendanceRef = collection(db, 'attendance');
-          const q = query(attendanceRef, orderBy('submittedAt', 'desc'));
-          const querySnapshot = await getDocs(q);
-          const records = querySnapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-              id: doc.id,
-              studentName: data.studentName,
-              studentGen: data.studentGen,
-              className: data.className,
-              date: data.submittedAt.toDate().toLocaleDateString(),
-              learned: data.learned,
-              challenged: data.challenged,
-              questions: data.questions || '',
-            };
-          });
-          setAttendanceRecords(records);
-        } catch (error: any) {
-          console.error('Error fetching attendance records:', {
-            error: error.message,
-            stack: error.stack,
-          });
-          toast({
-            variant: 'destructive',
-            title: 'Error',
-            description: 'Could not fetch attendance records.',
-          });
-        } finally {
-          setIsLoadingRecords(false);
-        }
-      };
-      fetchAttendanceRecords();
-    }
+    if (!isTeacherOrAdmin) return;
+
+    const fetchAttendanceRecords = async () => {
+      setIsLoadingRecords(true);
+      try {
+        const q = query(collection(db, 'attendance'), orderBy('submittedAt', 'desc'));
+        const snapshot = await getDocs(q);
+        const records: AttendanceRecord[] = snapshot.docs.map(doc => {
+          const d = doc.data();
+          return {
+            id: doc.id,
+            studentName: d.studentName || 'Unknown',
+            studentGen: d.studentGen || 'N/A',
+            className: d.className || 'Unknown',
+            date: d.submittedAt?.toDate?.()?.toLocaleDateString() || 'N/A',
+            learned: d.learned || '',
+            challenged: d.challenged || '',
+            questions: d.questions || '',
+            rating: d.rating ?? 0,
+            attendanceType: d.attendanceType || 'virtual',
+            understanding: d.understanding ?? 0,
+            actionPlan: d.actionPlan || '',
+            preClassReview: d.preClassReview || 'no',
+          };
+        });
+        setAttendanceRecords(records);
+      } catch (error: any) {
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to load records.',
+        });
+      } finally {
+        setIsLoadingRecords(false);
+      }
+    };
+
+    fetchAttendanceRecords();
   }, [isTeacherOrAdmin, toast]);
 
+  /* ----------  CSV DOWNLOAD ---------- */
   const handleDownloadCsv = async () => {
     setIsDownloading(true);
     try {
-      const csv = Papa.unparse(attendanceRecords);
+      const csv = Papa.unparse(filteredRecords);
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      if (link.download !== undefined) {
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', 'attendance_feedback.csv');
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }
-    } catch (error: any) {
-      console.error('Error downloading CSV:', {
-        error: error.message,
-        stack: error.stack,
-      });
-      toast({
-        variant: 'destructive',
-        title: 'Download Failed',
-        description: 'Could not download attendance data.',
-      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'attendance_feedback.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast({ variant: 'destructive', title: 'Download failed' });
     } finally {
       setIsDownloading(false);
     }
   };
 
+  /* ----------  SUBMIT ---------- */
   const onSubmit = async (data: AttendanceFormValues) => {
     if (!user || !userData) {
-      console.error('No user or userData available for attendance submission');
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'You must be logged in to submit attendance. Redirecting to login.',
-      });
-      window.location.href = '/login';
+      toast({ variant: 'destructive', title: 'Login required' });
       return;
     }
 
     setIsSubmitting(true);
     try {
       const idToken = await user.getIdToken(true);
+      const classInfo = classSessions.find(c => c.id === data.classId)!;
+
       const result = await markAttendanceFlow({
         studentId: user.uid,
-        studentName: userData.displayName || 'Unknown Student',
+        studentName: userData.displayName || 'Unknown',
         studentGen: userData.gen || 'N/A',
         classId: data.classId,
-        className: classSessions.find(c => c.id === data.classId)?.name || 'Unknown Class',
+        className: classInfo.name,
         learned: data.learned,
         challenged: data.challenged,
         questions: data.questions,
+        rating: data.rating,
+        attendanceType: data.attendanceType,
+        understanding: data.understanding,
+        actionPlan: data.actionPlan,
+        preClassReview: data.preClassReview,
         idToken,
       });
 
-      if (!result.success) {
-        throw new Error(result.message);
-      }
+      if (!result.success) throw new Error(result.message);
 
-      toast({
-        title: 'Attendance Marked!',
-        description: result.message,
-      });
+      toast({ title: 'Success!', description: result.message });
       form.reset();
     } catch (error: any) {
-      console.error('Error submitting attendance:', {
-        error: error.message,
-        stack: error.stack,
-        classId: data.classId,
-        studentId: user.uid,
-      });
       toast({
         variant: 'destructive',
-        title: 'Error',
-        description: error.message || 'Could not submit attendance. Please try again.',
+        title: 'Submission failed',
+        description: error.message || 'Please try again.',
       });
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  /* ========== TEACHER / ADMIN VIEW ========== */
   if (isTeacherOrAdmin) {
     return (
       <div className="space-y-6">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-bold tracking-tight">Attendance Records</h1>
-          <p className="text-muted-foreground">View and download all student attendance and feedback submissions.</p>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Attendance & Feedback</h1>
+          <p className="text-muted-foreground">Filter and review all student submissions.</p>
         </div>
+
+        {/* FILTERS */}
+        <Card>
+          <CardHeader><CardTitle>Filters</CardTitle></CardHeader>
+          <CardContent className="flex gap-4 flex-wrap">
+            <div className="flex-1 min-w-[180px]">
+              <Label>Generation</Label>
+              <Select value={genFilter} onValueChange={setGenFilter}>
+                <SelectTrigger><SelectValue placeholder="All" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Generations</SelectItem>
+                  {genOptions.map(g => (
+                    <SelectItem key={g} value={g}>{g}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex-1 min-w-[180px]">
+              <Label>Class</Label>
+              <Select value={classFilter} onValueChange={setClassFilter}>
+                <SelectTrigger><SelectValue placeholder="All" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Classes</SelectItem>
+                  {classSessions.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* TABLE */}
         <Card>
           <CardHeader>
-            <CardTitle>Attendance Records</CardTitle>
-            <CardDescription>Review student attendance and feedback.</CardDescription>
+            <CardTitle>Records ({filteredRecords.length})</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoadingRecords ? (
-              <div className="flex justify-center">
-                <Loader2 className="h-6 w-6 animate-spin" />
-              </div>
-            ) : attendanceRecords.length === 0 ? (
-              <p className="text-muted-foreground">No attendance records found.</p>
+              <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
+            ) : filteredRecords.length === 0 ? (
+              <p className="text-center py-8 text-muted-foreground">No records found.</p>
             ) : (
-              <ScrollArea className="h-[400px]">
+              <ScrollArea className="h-[600px]">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Student</TableHead>
-                      <TableHead>Generation</TableHead>
+                      <TableHead>Gen</TableHead>
                       <TableHead>Class</TableHead>
                       <TableHead>Date</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Rating</TableHead>
+                      <TableHead>Understand</TableHead>
+                      <TableHead>Pre-Review</TableHead>
                       <TableHead>Learned</TableHead>
                       <TableHead>Challenged</TableHead>
-                      <TableHead>Questions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {attendanceRecords.map(record => (
-                      <TableRow key={record.id}>
-                        <TableCell>{record.studentName}</TableCell>
-                        <TableCell>{record.studentGen}</TableCell>
-                        <TableCell>{record.className}</TableCell>
-                        <TableCell>{record.date}</TableCell>
-                        <TableCell className="max-w-[200px] truncate">{record.learned}</TableCell>
-                        <TableCell className="max-w-[200px] truncate">{record.challenged}</TableCell>
-                        <TableCell className="max-w-[200px] truncate">{record.questions}</TableCell>
+                    {filteredRecords.map((r: AttendanceRecord) => (
+                      <TableRow
+                        key={r.id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => setSelectedRecord(r)}
+                      >
+                        <TableCell>{r.studentName}</TableCell>
+                        <TableCell>{r.studentGen}</TableCell>
+                        <TableCell>{r.className}</TableCell>
+                        <TableCell>{r.date}</TableCell>
+                        <TableCell className="capitalize">{r.attendanceType}</TableCell>
+                        <TableCell className="text-center font-medium">{r.rating}/10</TableCell>
+                        <TableCell className="text-center font-medium">{r.understanding}/10</TableCell>
+                        <TableCell className="capitalize">{r.preClassReview}</TableCell>
+                        <TableCell className="max-w-[150px] truncate">{r.learned}</TableCell>
+                        <TableCell className="max-w-[150px] truncate">{r.challenged}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -243,98 +352,181 @@ export default function AttendancePage() {
               </ScrollArea>
             )}
             <div className="mt-4">
-              <Button onClick={handleDownloadCsv} disabled={isDownloading || isLoadingRecords || attendanceRecords.length === 0}>
+              <Button onClick={handleDownloadCsv} disabled={isDownloading || filteredRecords.length === 0}>
                 {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                Download Attendance CSV
+                Download CSV
               </Button>
             </div>
           </CardContent>
         </Card>
+
+        {/* DETAILED DIALOG */}
+        <Dialog open={!!selectedRecord} onOpenChange={open => !open && setSelectedRecord(null)}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{selectedRecord?.studentName} – {selectedRecord?.className}</DialogTitle>
+              <DialogDescription>
+                {selectedRecord?.date} • {selectedRecord?.attendanceType} • Rating: {selectedRecord?.rating}/10
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-5 mt-4 text-sm">
+              <div>
+                <Label className="font-semibold">Learned</Label>
+                <p className="mt-1 whitespace-pre-wrap">{selectedRecord?.learned}</p>
+              </div>
+              <div>
+                <Label className="font-semibold">Challenged</Label>
+                <p className="mt-1 whitespace-pre-wrap">{selectedRecord?.challenged}</p>
+              </div>
+              <div>
+                <Label className="font-semibold">Questions</Label>
+                <p className="mt-1 whitespace-pre-wrap">{selectedRecord?.questions || '(none)'}</p>
+              </div>
+              <div>
+                <Label className="font-semibold">Understanding (1–10)</Label>
+                <p className="mt-1">{selectedRecord?.understanding}/10</p>
+              </div>
+              <div>
+                <Label className="font-semibold">Action Plan to Reach 8–9</Label>
+                <p className="mt-1 whitespace-pre-wrap">{selectedRecord?.actionPlan}</p>
+              </div>
+              <div>
+                <Label className="font-semibold">Reviewed Content Before Class?</Label>
+                <p className="mt-1 capitalize">{selectedRecord?.preClassReview}</p>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
 
+  /* ========== STUDENT FORM ========== */
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
+      <div>
         <h1 className="text-3xl font-bold tracking-tight">Daily Attendance & Feedback</h1>
-        <p className="text-muted-foreground">Submit this form to mark your attendance and get 1 point.</p>
+        <p className="text-muted-foreground">Earn 1 point by submitting honest feedback.</p>
       </div>
+
       <Card>
         <CardHeader>
           <CardTitle>Session Feedback</CardTitle>
-          <CardDescription>Your feedback is valuable for improving the learning experience.</CardDescription>
+          <CardDescription>Help us improve the learning experience.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <FormField
-                control={form.control}
-                name="classId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Class/Session</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select the session you attended" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {classSessions.map(c => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="learned"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>What is one key thing you learned today?</FormLabel>
-                    <FormControl>
-                      <Textarea placeholder="e.g., I learned how to implement the flexbox model in CSS..." {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="challenged"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>What did you find most challenging?</FormLabel>
-                    <FormControl>
-                      <Textarea placeholder="e.g., Understanding the difference between position relative and absolute was tricky..." {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="questions"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Do you have any questions for the instructor? (Optional)</FormLabel>
-                    <FormControl>
-                      <Textarea placeholder="e.g., Could we go over an example of..." {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+
+              {/* Class */}
+              <FormField control={form.control} name="classId" render={({ field }: { field: FieldValues }) => (
+                <FormItem>
+                  <FormLabel>Session</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl><SelectTrigger><SelectValue placeholder="Select session" /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      {classSessions.map(c => (
+                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              {/* Attendance Type */}
+              <FormField control={form.control} name="attendanceType" render={({ field }: { field: FieldValues }) => (
+                <FormItem>
+                  <FormLabel>Attendance Type</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      <SelectItem value="virtual">Virtual</SelectItem>
+                      <SelectItem value="in-person">In-person</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              {/* Learned */}
+              <FormField control={form.control} name="learned" render={({ field }: { field: FieldValues }) => (
+                <FormItem>
+                  <FormLabel>One key thing you learned</FormLabel>
+                  <FormControl><Textarea placeholder="e.g., I learned flexbox layout..." {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              {/* Challenged */}
+              <FormField control={form.control} name="challenged" render={({ field }: { field: FieldValues }) => (
+                <FormItem>
+                  <FormLabel>Most challenging part</FormLabel>
+                  <FormControl><Textarea placeholder="e.g., Understanding position absolute..." {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              {/* Rating */}
+              <FormField control={form.control} name="rating" render={({ field }: { field: FieldValues }) => (
+                <FormItem>
+                  <FormLabel>Rate the session (1–10)</FormLabel>
+                  <FormControl>
+                    <Input type="number" min={1} max={10} {...field} onChange={e => field.onChange(+e.target.value)} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              {/* Understanding */}
+              <FormField control={form.control} name="understanding" render={({ field }: { field: FieldValues }) => (
+                <FormItem>
+                  <FormLabel>How well do you understand the topic? (1–10)</FormLabel>
+                  <FormControl>
+                    <Input type="number" min={1} max={10} {...field} onChange={e => field.onChange(+e.target.value)} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              {/* Action Plan */}
+              <FormField control={form.control} name="actionPlan" render={({ field }: { field: FieldValues }) => (
+                <FormItem>
+                  <FormLabel>Action plan to reach 8–9 understanding</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="e.g., I will watch 2 YouTube videos..." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              {/* Pre-class review */}
+              <FormField control={form.control} name="preClassReview" render={({ field }: { field: FieldValues }) => (
+                <FormItem>
+                  <FormLabel>Did you review course content before class?</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      <SelectItem value="yes">Yes</SelectItem>
+                      <SelectItem value="no">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              {/* Questions */}
+              <FormField control={form.control} name="questions" render={({ field }: { field: FieldValues }) => (
+                <FormItem>
+                  <FormLabel>Questions for instructor (optional)</FormLabel>
+                  <FormControl><Textarea placeholder="e.g., Can we review..." {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                <CheckCircle className="mr-2 h-4 w-4" />
-                Submit Attendance
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+                Submit Feedback
               </Button>
             </form>
           </Form>

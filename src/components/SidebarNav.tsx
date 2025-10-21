@@ -78,6 +78,7 @@ export const teacherNavItems = [
   {href: '/availability', label: 'Manage Availability', icon: CalendarClock},
   {href: '/profile', label: 'Profile', icon: User},
   {href: '/diag/grading', label: 'Auth Diag Tool', icon: Bug},
+  {href: '/export', label: 'EXport', icon: Bug},
 ];
 
 export const adminNavItems = [
