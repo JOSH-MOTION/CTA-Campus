@@ -33,6 +33,7 @@ import {
   Star,
   School,
   Bug,
+  FileSpreadsheet,
 } from 'lucide-react';
 import {SidebarMenu, SidebarMenuItem, SidebarMenuButton} from '@/components/ui/sidebar';
 import Link from 'next/link';
@@ -78,7 +79,7 @@ export const teacherNavItems = [
   {href: '/availability', label: 'Manage Availability', icon: CalendarClock},
   {href: '/profile', label: 'Profile', icon: User},
   {href: '/diag/grading', label: 'Auth Diag Tool', icon: Bug},
-  {href: '/export', label: 'EXport', icon: Bug},
+  {href: '/export', label: 'Gradebook', icon: FileSpreadsheet},
 ];
 
 export const adminNavItems = [
