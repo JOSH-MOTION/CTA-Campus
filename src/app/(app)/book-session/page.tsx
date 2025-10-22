@@ -17,12 +17,15 @@ import { cn } from '@/lib/utils';
 import { CalendarIcon, Clock, Loader2 } from 'lucide-react';
 import { format, parse } from 'date-fns';
 import { useAuth, UserData } from '@/contexts/AuthContext';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { useBookings } from '@/contexts/BookingsContext';
 
 const bookingSchema = z.object({
   staffId: z.string().nonempty('Please select a staff member.'),
   date: z.date({ required_error: 'Please select a date.' }),
   time: z.string().nonempty('Please select a time slot.'),
   reason: z.string().min(10, 'Please provide a brief reason (min. 10 characters).'),
+  meetingType: z.enum(['online', 'in-person'], { required_error: 'Please select a meeting type.' }),
 });
 
 type BookingFormValues = z.infer<typeof bookingSchema>;
@@ -32,6 +35,7 @@ export default function BookSessionPage() {
   const { fetchAllUsers } = useAuth();
   const [staff, setStaff] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
+  const { addBooking } = useBookings();
   
   const form = useForm<BookingFormValues>({
     resolver: zodResolver(bookingSchema),
@@ -78,14 +82,32 @@ export default function BookSessionPage() {
     return !selectedStaff.availableDays.includes(dayOfWeek) || date < new Date();
   };
 
-  const onSubmit = (data: BookingFormValues) => {
-    console.log(data);
-    const selectedStaffMember = staff.find(s => s.uid === data.staffId);
-    toast({
-      title: 'Booking Confirmed!',
-      description: `Your session with ${selectedStaffMember?.displayName} on ${format(data.date, 'PPP')} at ${data.time} is booked.`,
-    });
-    form.reset();
+  const onSubmit = async (data: BookingFormValues) => {
+    try {
+      const [hours, minutes] = data.time.split(':').map(Number);
+      const dateTime = new Date(data.date);
+      dateTime.setHours(hours, minutes, 0, 0);
+
+      await addBooking({
+        staffId: data.staffId,
+        dateTime,
+        reason: data.reason,
+        meetingType: data.meetingType,
+      });
+
+      const selectedStaffMember = staff.find((s) => s.uid === data.staffId);
+      toast({
+        title: 'Booking request sent',
+        description: `Requested ${data.meetingType} session with ${selectedStaffMember?.displayName} on ${format(dateTime, 'PPp')}.`,
+      });
+      form.reset();
+    } catch (e: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Could not send booking',
+        description: e?.message || 'Please try again.',
+      });
+    }
   };
 
   return (
@@ -202,6 +224,33 @@ export default function BookSessionPage() {
                     <FormLabel>Reason for Booking</FormLabel>
                     <FormControl>
                       <Textarea placeholder="e.g., Discuss project proposal, review assignment feedback..." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="meetingType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Meeting Type</FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                        className="grid grid-cols-2 gap-4"
+                      >
+                        <label className="flex items-center gap-2 rounded-md border p-3">
+                          <RadioGroupItem value="online" />
+                          <span>Online</span>
+                        </label>
+                        <label className="flex items-center gap-2 rounded-md border p-3">
+                          <RadioGroupItem value="in-person" />
+                          <span>In person</span>
+                        </label>
+                      </RadioGroup>
                     </FormControl>
                     <FormMessage />
                   </FormItem>

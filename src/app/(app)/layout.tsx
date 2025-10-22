@@ -22,6 +22,7 @@ import {NotificationsProvider} from '@/contexts/NotificationsContext';
 import {ExercisesProvider} from '@/contexts/ExercisesContext';
 import {ProjectsProvider} from '@/contexts/ProjectsContext';
 import {ResourcesProvider} from '@/contexts/ResourcesContext';
+import { BookingsProvider } from '@/contexts/BookingsContext';
 import {useRouter, usePathname} from 'next/navigation';
 import {useEffect} from 'react';
 import {auth} from '@/lib/firebase';
@@ -122,12 +123,13 @@ const MemoizedProtectedLayout = memo(function ProtectedLayout({children}: {child
 
   return (
     <NotificationsProvider>
-      <RoadmapProvider>
-        <AnnouncementsProvider>
-          <AssignmentsProvider>
-            <ExercisesProvider>
-              <ProjectsProvider>
-                <ResourcesProvider>
+      <BookingsProvider>
+        <RoadmapProvider>
+          <AnnouncementsProvider>
+            <AssignmentsProvider>
+              <ExercisesProvider>
+                <ProjectsProvider>
+                  <ResourcesProvider>
                   <SidebarProvider>
                     <Sidebar>
                       <SidebarContent className="p-4">
@@ -183,6 +185,7 @@ const MemoizedProtectedLayout = memo(function ProtectedLayout({children}: {child
           </AssignmentsProvider>
         </AnnouncementsProvider>
       </RoadmapProvider>
+      </BookingsProvider>
     </NotificationsProvider>
   );
 });
