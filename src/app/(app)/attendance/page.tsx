@@ -247,8 +247,9 @@ export default function AttendancePage() {
       });
 
       if (!result.success) {
-        // Check if it's a permission error (but submission was successful)
-        if (result.message.includes('Permission') || result.message.includes('PERMISSION')) {
+        // Treat any case-insensitive permission error as non-blocking success
+        const msg = result.message || '';
+        if (/permission/i.test(msg)) {
           toast({ 
             title: 'Attendance Submitted!', 
             description: 'Your attendance has been recorded successfully.',

@@ -5,8 +5,6 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb, adminAuth } from '@/lib/firebase-admin';
-import { db } from '@/lib/firebase';
-import { addDoc, collection, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { getBaseUrl } from '@/lib/utils';
 
 /* ---------- INPUT SCHEMA ---------- */
@@ -43,20 +41,20 @@ async function sendNotificationToUsers(
 ) {
   if (userIds.length === 0) return;
 
-  const batch = [];
+  const batch: Promise<any>[] = [];
   for (const uid of userIds) {
     batch.push(
-      addDoc(collection(db, 'notifications'), {
+      adminDb.collection('notifications').add({
         title,
         description,
         userId: uid,
         read: false,
-        date: serverTimestamp(),
+        date: FieldValue.serverTimestamp(),
         href,
       })
     );
   }
-  
+
   try {
     await Promise.all(batch);
   } catch (error) {
@@ -123,25 +121,34 @@ export const markAttendanceFlow = ai.defineFlow(
       });
 
       // 3. Get users to notify BEFORE checking duplicate
-      const [genMatesSnap, staffSnap] = await Promise.all([
-        // All students in same gen (exclude self)
-        getDocs(query(
-          collection(db, 'users'), 
-          where('gen', '==', studentGen), 
-          where('role', '==', 'student')
-        )),
-        // All teachers + admins
-        getDocs(query(
-          collection(db, 'users'), 
-          where('role', 'in', ['teacher', 'admin'])
-        )),
-      ]);
+      let genMateIds: string[] = [];
+      let staffIds: string[] = [];
+      try {
+        const [genMatesSnap, staffSnap] = await Promise.all([
+          // All students in same gen (exclude self)
+          adminDb
+            .collection('users')
+            .where('gen', '==', studentGen)
+            .where('role', '==', 'student')
+            .get(),
+          // All teachers + admins
+          adminDb
+            .collection('users')
+            .where('role', 'in', ['teacher', 'admin'])
+            .get(),
+        ]);
 
-      const genMateIds = genMatesSnap.docs
-        .map(d => d.id)
-        .filter(id => id !== studentId);
+        genMateIds = genMatesSnap.docs
+          .map(d => d.id)
+          .filter(id => id !== studentId);
 
-      const staffIds = staffSnap.docs.map(d => d.id);
+        staffIds = staffSnap.docs.map(d => d.id);
+      } catch (notifyQueryError) {
+        console.error('Error querying users for notifications:', notifyQueryError);
+        // Continue without notifications
+        genMateIds = [];
+        staffIds = [];
+      }
 
       // 4. Handle duplicate attendance
       if (pointDocSnap.exists) {
