@@ -40,6 +40,8 @@ import Link from 'next/link';
 import {usePathname} from 'next/navigation';
 import {useAuth} from '@/contexts/AuthContext';
 import {useSidebar} from '@/components/ui/sidebar';
+import { SidebarMenuBadge } from '@/components/ui/sidebar';
+import { useNotifications } from '@/contexts/NotificationsContext';
 
 export const studentNavItems = [
   {href: '/', label: 'Dashboard', icon: LayoutDashboard},
@@ -76,6 +78,7 @@ export const teacherNavItems = [
   {href: '/materials', label: 'Class Materials', icon: BookCopy},
   {href: '/roadmap', label: 'Roadmap', icon: Map},
   {href: '/directory', label: 'Directory', icon: Contact},
+  {href: '/bookings', label: 'Manage Bookings', icon: CalendarClock},
   {href: '/availability', label: 'Manage Availability', icon: CalendarClock},
   {href: '/profile', label: 'Profile', icon: User},
   {href: '/diag/grading', label: 'Auth Diag Tool', icon: Bug},
@@ -106,6 +109,15 @@ export function SidebarNav() {
   const pathname = usePathname();
   const {role} = useAuth();
   const {setOpenMobile} = useSidebar();
+  const { notifications } = useNotifications();
+
+  const getUnreadCountForHref = (href: string): number => {
+    try {
+      return notifications.filter(n => !n.read && typeof n.href === 'string' && n.href.startsWith(href)).length;
+    } catch {
+      return 0;
+    }
+  };
 
   let navItems;
   switch (role) {
@@ -128,6 +140,7 @@ export function SidebarNav() {
         const isActive =
           (pathname === '/' && item.href === '/') ||
           (item.href !== '/' && pathname.startsWith(item.href));
+        const unread = getUnreadCountForHref(item.href);
         return (
           <SidebarMenuItem key={item.label}>
             <SidebarMenuButton asChild isActive={isActive} tooltip={item.label}>
@@ -136,6 +149,11 @@ export function SidebarNav() {
                 <span>{item.label}</span>
               </Link>
             </SidebarMenuButton>
+            {unread > 0 && (
+              <SidebarMenuBadge className="bg-primary/10 text-primary">
+                {unread > 9 ? '9+' : unread}
+              </SidebarMenuBadge>
+            )}
           </SidebarMenuItem>
         );
       })}
