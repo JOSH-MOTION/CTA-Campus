@@ -17,7 +17,7 @@ import {cn} from '@/lib/utils';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 export default function RoadmapPage() {
-  const {roadmapData, completedWeeks, completionMap, toggleWeekCompletion, loading} = useRoadmap();
+  const {roadmapData, completedWeeks, completionMap, toggleWeekCompletion, loading, setTeacherViewingGen} = useRoadmap();
   const {role, userData, allUsers} = useAuth();
   const isTeacherOrAdmin = role === 'teacher' || role === 'admin';
   
@@ -46,6 +46,13 @@ export default function RoadmapPage() {
       setSelectedGen(manageableGens[0]);
     }
   }, [isTeacherOrAdmin, manageableGens, selectedGen]);
+
+  // Keep context's teacher viewing gen in sync (helps other components relying on completedWeeks)
+  useEffect(() => {
+    if (isTeacherOrAdmin && selectedGen) {
+      setTeacherViewingGen(selectedGen);
+    }
+  }, [isTeacherOrAdmin, selectedGen, setTeacherViewingGen]);
 
   if (loading) {
     return (

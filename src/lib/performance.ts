@@ -28,10 +28,9 @@ export interface StudentPerformance {
    CONFIG
    ------------------------------------------------------------------ */
 const TOTAL_WEEKS = 30;
-const PROGRAM_START = new Date('2024-09-01'); // CHANGE TO YOUR COHORT
 
-function getWeek(date: Date): number {
-  const ms = date.getTime() - PROGRAM_START.getTime();
+function getWeekFromStart(date: Date, start: Date): number {
+  const ms = date.getTime() - start.getTime();
   const week = Math.floor(ms / (7 * 24 * 60 * 60 * 1000)) + 1;
   return Math.max(1, Math.min(week, TOTAL_WEEKS));
 }
@@ -54,36 +53,65 @@ export async function fetchAllPerformance(): Promise<StudentPerformance[]> {
 
   if (students.length === 0) return [];
 
-  // Attendance
+  // Attendance and Submissions: build per-student event lists first
   const attSnap = await getDocs(collection(db, 'attendance'));
-  const attMap = new Map<string, Set<number>>();
+  const attendanceEvents: Array<{ uid: string; date: Date }> = [];
   attSnap.forEach((doc) => {
     const d = doc.data() as any;
-    const uid = d.studentId;
-    const ts = d.submittedAt;
-    if (uid && ts?.toDate) {
-      const w = getWeek(ts.toDate());
-      if (!attMap.has(uid)) attMap.set(uid, new Set());
-      attMap.get(uid)!.add(w);
-    }
+    const uid = d.studentId as string | undefined;
+    const ts: Timestamp | undefined = d.submittedAt;
+    if (uid && ts?.toDate) attendanceEvents.push({ uid, date: ts.toDate() });
   });
 
-  // Submissions
   const subSnap = await getDocs(collection(db, 'submissions'));
+  const submissionEvents: Array<{ uid: string; date: Date; cat: string }> = [];
+  subSnap.forEach((doc) => {
+    const d = doc.data() as any;
+    const uid = d.studentId as string | undefined;
+    const ts: Timestamp | undefined = d.submittedAt;
+    const cat: string | undefined = d.pointCategory;
+    if (uid && ts?.toDate && cat) submissionEvents.push({ uid, date: ts.toDate(), cat });
+  });
+
+  // Build uid->gen map for students
+  const uidToGen = new Map<string, string>();
+  students.forEach((s) => {
+    uidToGen.set(s.uid, s.gen);
+  });
+
+  // Derive a per-student and per-generation cohort start date from earliest activity
+  const earliestByStudent = new Map<string, Date>();
+  const earliestByGen = new Map<string, Date>();
+  const updateEarliest = (uid: string, date: Date) => {
+    const curr = earliestByStudent.get(uid);
+    if (!curr || date < curr) earliestByStudent.set(uid, date);
+    const gen = uidToGen.get(uid);
+    if (gen) {
+      const currGen = earliestByGen.get(gen);
+      if (!currGen || date < currGen) earliestByGen.set(gen, date);
+    }
+  };
+  attendanceEvents.forEach((e) => updateEarliest(e.uid, e.date));
+  submissionEvents.forEach((e) => updateEarliest(e.uid, e.date));
+
+  // Build week-indexed maps using per-student start
+  const attMap = new Map<string, Set<number>>();
+  attendanceEvents.forEach(({ uid, date }) => {
+    const gen = uidToGen.get(uid);
+    const start = (gen && earliestByGen.get(gen)) || earliestByStudent.get(uid) || date; // prefer gen start
+    const w = getWeekFromStart(date, start);
+    if (!attMap.has(uid)) attMap.set(uid, new Set());
+    attMap.get(uid)!.add(w);
+  });
+
   const subMap = new Map<
     string,
     Map<number, { exercise: boolean; assignment: boolean; project: boolean; hundredDays: boolean }>
   >();
-
-  subSnap.forEach((doc) => {
-    const d = doc.data() as any;
-    const uid = d.studentId;
-    const ts = d.submittedAt;
-    const cat = d.pointCategory;
-
-    if (!uid || !ts?.toDate || !cat) return;
-
-    const w = getWeek(ts.toDate());
+  submissionEvents.forEach(({ uid, date, cat }) => {
+    const gen = uidToGen.get(uid);
+    const start = (gen && earliestByGen.get(gen)) || earliestByStudent.get(uid) || date;
+    const w = getWeekFromStart(date, start);
     if (!subMap.has(uid)) subMap.set(uid, new Map());
     const weekMap = subMap.get(uid)!;
     if (!weekMap.has(w)) weekMap.set(w, { exercise: false, assignment: false, project: false, hundredDays: false });
