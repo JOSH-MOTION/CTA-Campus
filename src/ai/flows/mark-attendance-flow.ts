@@ -9,7 +9,7 @@ import { db } from '@/lib/firebase';
 import { addDoc, collection, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { getBaseUrl } from '@/lib/utils';
 
-/* ---------- INPUT SCHEMA (with new fields) ---------- */
+/* ---------- INPUT SCHEMA ---------- */
 const MarkAttendanceFlowInputSchema = z.object({
   studentId: z.string(),
   studentName: z.string(),
@@ -34,7 +34,7 @@ const MarkAttendanceFlowOutputSchema = z.object({
   message: z.string(),
 });
 
-/* ---------- HELPER: Send notification to many users ---------- */
+/* ---------- HELPER: Send notification ---------- */
 async function sendNotificationToUsers(
   userIds: string[],
   title: string,
@@ -56,7 +56,13 @@ async function sendNotificationToUsers(
       })
     );
   }
-  await Promise.all(batch);
+  
+  try {
+    await Promise.all(batch);
+  } catch (error) {
+    console.error('Error sending notifications:', error);
+    // Don't throw - notifications are non-critical
+  }
 }
 
 /* ---------- MAIN FLOW ---------- */
@@ -107,7 +113,7 @@ export const markAttendanceFlow = ai.defineFlow(
         className,
         learned,
         challenged,
-        questions,
+        questions: questions || '',
         rating,
         attendanceType,
         understanding,
@@ -116,12 +122,19 @@ export const markAttendanceFlow = ai.defineFlow(
         submittedAt: FieldValue.serverTimestamp(),
       });
 
-      // 3. Get users to notify
+      // 3. Get users to notify BEFORE checking duplicate
       const [genMatesSnap, staffSnap] = await Promise.all([
         // All students in same gen (exclude self)
-        getDocs(query(collection(db, 'users'), where('gen', '==', studentGen), where('role', '==', 'student'))),
+        getDocs(query(
+          collection(db, 'users'), 
+          where('gen', '==', studentGen), 
+          where('role', '==', 'student')
+        )),
         // All teachers + admins
-        getDocs(query(collection(db, 'users'), where('role', 'in', ['teacher', 'admin']))),
+        getDocs(query(
+          collection(db, 'users'), 
+          where('role', 'in', ['teacher', 'admin'])
+        )),
       ]);
 
       const genMateIds = genMatesSnap.docs
@@ -139,14 +152,14 @@ export const markAttendanceFlow = ai.defineFlow(
           `Your feedback was recorded. Attendance already marked today.`
         );
 
-        // Notify gen-mates
+        // Notify gen-mates (they only get notification, can't see details)
         await sendNotificationToUsers(
           genMateIds,
           `${studentName} attended ${className}`,
           `Your gen-mate just submitted feedback.`
         );
 
-        // Notify staff
+        // Notify staff (they can see full details)
         await sendNotificationToUsers(
           staffIds,
           `Feedback: ${studentName} (${studentGen})`,
@@ -177,32 +190,38 @@ export const markAttendanceFlow = ai.defineFlow(
 
       // 6. SUCCESS NOTIFICATIONS
       await Promise.all([
-        // Student
+        // Student confirmation
         sendNotificationToUsers(
           [studentId],
           `Attendance Marked: ${className}`,
           `You earned 1 point!`
         ),
 
-        // Gen-mates
+        // Gen-mates notification (simple, no details)
         sendNotificationToUsers(
           genMateIds,
           `${studentName} just attended!`,
-          `${studentName} from Gen ${studentGen} marked attendance for ${className}.`
+          `${studentName} from ${studentGen} marked attendance for ${className}.`
         ),
 
-        // Teachers/Admins
+        // Teachers/Admins (with details)
         sendNotificationToUsers(
           staffIds,
           `New Attendance: ${studentName}`,
-          `${studentName} (Gen ${studentGen}) attended ${className}. Rating: ${rating}/10`
+          `${studentName} (${studentGen}) attended ${className}. Rating: ${rating}/10`
         ),
       ]);
 
-      return { success: true, message: 'Attendance marked and 1 point awarded!' };
+      return { 
+        success: true, 
+        message: 'Attendance marked and 1 point awarded!' 
+      };
     } catch (error: any) {
       console.error('markAttendanceFlow error:', error);
-      return { success: false, message: error.message || 'Server error' };
+      return { 
+        success: false, 
+        message: error.message || 'Server error' 
+      };
     }
   }
 );

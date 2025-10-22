@@ -9,19 +9,20 @@ import { Input } from '@/components/ui/input';
 import { Search, Users, Loader2 } from 'lucide-react';
 import { Chat } from '@/components/chat/Chat';
 import { useAuth, UserData } from '@/contexts/AuthContext';
-import { Message, getChatId, sendMessage, onMessages } from '@/services/chat';
+import { 
+  Message, 
+  getChatId, 
+  sendMessage, 
+  onMessages, 
+  markChatAsRead, 
+  onChatMetadata, 
+  ChatMetadata 
+} from '@/services/chat';
 import { Unsubscribe } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { useNotifications } from '@/contexts/NotificationsContext';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 
 type ChatEntityType = 'dm' | 'group';
 
@@ -41,7 +42,6 @@ export default function ChatPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { toast } = useToast();
-  const { addNotificationForUser } = useNotifications();
 
   const [loading, setLoading] = useState(true);
   const [allUsers, setAllUsers] = useState<UserData[]>([]);
@@ -49,6 +49,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const messageUnsubscribeRef = useRef<Unsubscribe | null>(null);
   const [isContactListOpen, setIsContactListOpen] = useState(false);
+  const [chatMetadata, setChatMetadata] = useState<Map<string, ChatMetadata>>(new Map());
 
   useEffect(() => {
     const loadUsers = async () => {
@@ -59,6 +60,17 @@ export default function ChatPage() {
     };
     loadUsers();
   }, [fetchAllUsers]);
+
+  // Listen to chat metadata for unread counts
+  useEffect(() => {
+    if (!currentUser) return;
+    
+    const unsubscribe = onChatMetadata((metadata) => {
+      setChatMetadata(metadata);
+    });
+    
+    return () => unsubscribe();
+  }, [currentUser]);
 
   const otherUsers = useMemo(() => {
     if (!currentUser || !role) return [];
@@ -95,10 +107,6 @@ export default function ChatPage() {
     }
     return groups.sort((a, b) => a.name.localeCompare(b.name));
   }, [role, userData, allUsers]);
-
-  const markChatAsRead = useCallback((chatId: string) => {
-    localStorage.setItem(`lastSeen_${chatId}`, Date.now().toString());
-  }, []);
 
   const handleSelectChat = useCallback(
     (entity: ChatEntity) => {
@@ -150,7 +158,9 @@ export default function ChatPage() {
       chatId = selectedChat.id;
     }
     setMessages([]);
-    markChatAsRead(chatId);
+    
+    // Mark as read
+    markChatAsRead(chatId, currentUser.uid);
 
     const unsubscribe = onMessages(chatId, (newMessages) => {
       setMessages(newMessages);
@@ -162,7 +172,7 @@ export default function ChatPage() {
         messageUnsubscribeRef.current();
       }
     };
-  }, [selectedChat, currentUser, markChatAsRead]);
+  }, [selectedChat, currentUser]);
 
   const handleSendMessage = async (text: string, replyTo?: Message) => {
     if (!selectedChat || !text.trim() || !currentUser) return;
@@ -192,15 +202,17 @@ export default function ChatPage() {
     await sendMessage(chatId, messagePayload);
   };
 
-  const formatTimestamp = (date?: Date) => {
-    if (!date) return '';
-    return format(date, 'HH:mm');
+  const getUnreadCountForChat = (chatId: string): number => {
+    if (!currentUser) return 0;
+    const metadata = chatMetadata.get(chatId);
+    if (!metadata) return 0;
+    return metadata.unreadCount?.[currentUser.uid] || 0;
   };
 
   const ContactList = () => (
     <div className="flex flex-col h-full bg-background border-r">
       <div className="p-4 border-b shrink-0">
-         <h2 className="text-xl font-semibold">Campus Connect</h2>
+        <h2 className="text-xl font-semibold">Campus Connect</h2>
       </div>
 
       <div className="p-3 shrink-0">
@@ -226,78 +238,111 @@ export default function ChatPage() {
                   <h3 className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Group Channels</h3>
                 </div>
               )}
-              {groupChats.map((chatItem) => (
-                <button
-                  key={chatItem.id}
-                  className={cn(
-                    'w-full text-left p-3 hover:bg-muted transition-colors flex items-center gap-3',
-                    selectedChat?.id === chatItem.id && 'bg-primary/10'
-                  )}
-                  onClick={() =>
-                    handleSelectChat({
-                      ...chatItem,
-                      type: 'group',
-                      avatar: `https://placehold.co/100x100.png?text=${chatItem.name.charAt(0)}`,
-                    })
-                  }
-                >
-                  <Avatar className="h-12 w-12">
-                    <AvatarImage
-                      src={`https://placehold.co/100x100.png?text=${chatItem.name.charAt(0)}`}
-                      alt={chatItem.name}
-                      data-ai-hint={chatItem.dataAiHint}
-                    />
-                    <AvatarFallback>{chatItem.name.charAt(0)}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <div className="flex justify-between">
-                      <p className="font-semibold text-sm">{chatItem.name}</p>
+              {groupChats.map((chatItem) => {
+                const unreadCount = getUnreadCountForChat(chatItem.id);
+                return (
+                  <button
+                    key={chatItem.id}
+                    className={cn(
+                      'w-full text-left p-3 hover:bg-muted transition-colors flex items-center gap-3',
+                      selectedChat?.id === chatItem.id && 'bg-primary/10'
+                    )}
+                    onClick={() =>
+                      handleSelectChat({
+                        ...chatItem,
+                        type: 'group',
+                        avatar: `https://placehold.co/100x100.png?text=${chatItem.name.charAt(0)}`,
+                      })
+                    }
+                  >
+                    <div className="relative">
+                      <Avatar className="h-12 w-12">
+                        <AvatarImage
+                          src={`https://placehold.co/100x100.png?text=${chatItem.name.charAt(0)}`}
+                          alt={chatItem.name}
+                          data-ai-hint={chatItem.dataAiHint}
+                        />
+                        <AvatarFallback>{chatItem.name.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      {unreadCount > 0 && (
+                        <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white font-semibold">
+                          {unreadCount > 9 ? '9+' : unreadCount}
+                        </span>
+                      )}
                     </div>
-                    <p className="text-sm text-muted-foreground truncate">
-                      Group Chat
-                    </p>
-                  </div>
-                </button>
-              ))}
+                    <div className="flex-1">
+                      <div className="flex justify-between items-center">
+                        <p className="font-semibold text-sm">{chatItem.name}</p>
+                        {unreadCount > 0 && (
+                          <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full font-bold">
+                            {unreadCount}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground truncate">
+                        Group Chat
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
 
               {otherUsers.length > 0 && (
                 <div className="p-3 mt-4">
                   <h3 className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Direct Messages</h3>
                 </div>
               )}
-              {otherUsers.map((chatItem) => (
-                <button
-                  key={chatItem.uid}
-                  className={cn(
-                    'w-full text-left p-3 hover:bg-muted transition-colors flex items-center gap-3',
-                    selectedChat?.id === chatItem.uid && 'bg-primary/10'
-                  )}
-                  onClick={() =>
-                    handleSelectChat({
-                      id: chatItem.uid,
-                      name: chatItem.displayName,
-                      type: 'dm',
-                      avatar: chatItem.photoURL,
-                      dataAiHint: 'student portrait',
-                    })
-                  }
-                >
-                  <Avatar className="h-12 w-12">
-                    <AvatarImage
-                      src={chatItem.photoURL}
-                      alt={chatItem.displayName}
-                      data-ai-hint={'student portrait'}
-                    />
-                    <AvatarFallback>{chatItem.displayName.charAt(0)}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <p className="font-semibold text-sm">{chatItem.displayName}</p>
-                    <p className="text-sm text-muted-foreground truncate">
-                      Direct Message
-                    </p>
-                  </div>
-                </button>
-              ))}
+              {otherUsers.map((chatItem) => {
+                const dmChatId = getChatId(currentUser?.uid || '', chatItem.uid);
+                const unreadCount = getUnreadCountForChat(dmChatId);
+                return (
+                  <button
+                    key={chatItem.uid}
+                    className={cn(
+                      'w-full text-left p-3 hover:bg-muted transition-colors flex items-center gap-3',
+                      selectedChat?.id === chatItem.uid && 'bg-primary/10'
+                    )}
+                    onClick={() =>
+                      handleSelectChat({
+                        id: chatItem.uid,
+                        name: chatItem.displayName,
+                        type: 'dm',
+                        avatar: chatItem.photoURL,
+                        dataAiHint: 'student portrait',
+                      })
+                    }
+                  >
+                    <div className="relative">
+                      <Avatar className="h-12 w-12">
+                        <AvatarImage
+                          src={chatItem.photoURL}
+                          alt={chatItem.displayName}
+                          data-ai-hint={'student portrait'}
+                        />
+                        <AvatarFallback>{chatItem.displayName.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      {unreadCount > 0 && (
+                        <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white font-semibold">
+                          {unreadCount > 9 ? '9+' : unreadCount}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex justify-between items-center">
+                        <p className="font-semibold text-sm">{chatItem.displayName}</p>
+                        {unreadCount > 0 && (
+                          <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full font-bold">
+                            {unreadCount}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground truncate">
+                        Direct Message
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
             </>
           )}
         </div>
