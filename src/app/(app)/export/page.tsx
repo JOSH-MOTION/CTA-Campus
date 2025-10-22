@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Download,
   RefreshCw,
@@ -10,6 +10,9 @@ import {
   Users,
 } from 'lucide-react';
 import { fetchAllPerformance, StudentPerformance, WeekRecord } from '@/lib/performance';
+import ExcelJS from 'exceljs';
+import { useRoadmap } from '@/contexts/RoadmapContext';
+import { getAllWeeksInOrder } from '@/services/materials-tracking';
 
 const TOTAL_WEEKS = 30;
 
@@ -25,6 +28,11 @@ const PerformanceExportSystem = () => {
   const [exporting, setExporting] = useState(false);
   const [autoSync, setAutoSync] = useState(false);
   const [lastSync, setLastSync] = useState<Date | null>(null);
+  const [selectedGen, setSelectedGen] = useState<string>('all');
+  const [availableGens, setAvailableGens] = useState<string[]>([]);
+
+  const { roadmapData } = useRoadmap();
+  const weeksFromRoadmap = useMemo(() => getAllWeeksInOrder(roadmapData), [roadmapData]);
 
   useEffect(() => {
     const load = async () => {
@@ -48,6 +56,7 @@ const PerformanceExportSystem = () => {
           }));
 
         setGroupedData(sortedGroups);
+        setAvailableGens(['all', ...sortedGroups.map(g => g.gen)]);
       } catch (e) {
         console.error(e);
       } finally {
@@ -60,9 +69,8 @@ const PerformanceExportSystem = () => {
   const exportToExcel = async () => {
     setExporting(true);
     try {
-      const { headers, rows } = convertToExcelFormat(data);
-      const csv = generateCSV({ headers, rows });
-      downloadCSV(csv, `Performance_${new Date().toISOString().split('T')[0]}.csv`);
+      const filtered = selectedGen === 'all' ? data : data.filter(s => s.gen === selectedGen);
+      await exportExcelWorkbook(filtered);
       setLastSync(new Date());
     } catch (e) {
       console.error(e);
@@ -78,14 +86,30 @@ const PerformanceExportSystem = () => {
   }, [autoSync, data]);
 
   const formatCell = (record: { completed: boolean; points: number }) =>
-    record.completed ? `Check (${record.points})` : '';
+    record.completed ? `✓ (${record.points})` : '';
+
+  const subjectColors: Record<string, string> = {
+    Git: 'FF0EA5E9',
+    HTML: 'FFEF4444',
+    CSS: 'FF3B82F6',
+    Tailwind: 'FF8B5CF6',
+    JS: 'FFF59E0B',
+    'System Design': 'FF475569',
+    'Data Structures and Algorithms': 'FFF43F5E',
+    React: 'FF10B981',
+    Firebase: 'FFF97316',
+    'Backend - NodeJS': 'FFA3E635',
+    'React Native': 'FFA855F7',
+    'Final Project': 'FFD946EF',
+  };
 
   const generateWeekHeaders = () => {
-    const h: string[] = [];
-    for (let i = 1; i <= TOTAL_WEEKS; i++) {
-      h.push(`Week ${i} (Att)`, `Week ${i} (Ex)`, `Week ${i} (As)`, `Week ${i} (Pr)`, `Week ${i} (100D)`);
-    }
-    return h;
+    const weeks = weeksFromRoadmap.slice(0, TOTAL_WEEKS);
+    const headers: { subject: string; weekLabel: string }[] = weeks.map((w, idx) => ({
+      subject: w.subject,
+      weekLabel: `Week ${idx + 1} (${w.subject})`,
+    }));
+    return headers;
   };
 
   const flattenWeeklyData = (weeks: WeekRecord[]) =>
@@ -97,27 +121,147 @@ const PerformanceExportSystem = () => {
       formatCell(w.hundredDays),
     ]);
 
-  const convertToExcelFormat = (perf: StudentPerformance[]) => {
-    const headers = ['Student ID', 'Student Name', 'Gen', 'Active', ...generateWeekHeaders()];
-    const rows = perf.map((s) => [
-      s.studentId,
-      s.studentName,
-      s.gen,
-      'Yes',
-      ...flattenWeeklyData(s.weeks),
-    ]);
-    return { headers, rows };
-  };
+  const exportExcelWorkbook = async (perf: StudentPerformance[]) => {
+    const workbook = new ExcelJS.Workbook();
+    const ws = workbook.addWorksheet('Gradebook');
 
-  const generateCSV = ({ headers, rows }: any) =>
-    [headers.join(','), ...rows.map((r: any) => r.map((c: any) => `"${c}"`).join(','))].join('\n');
+    // Freeze ID/Name/Gen/Active and top header rows
+    ws.views = [{ state: 'frozen', xSplit: 4, ySplit: 3 }];
 
-  const downloadCSV = (csv: string, filename: string) => {
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    // Column widths for first columns
+    ws.getColumn(1).width = 14; // Student ID
+    ws.getColumn(2).width = 24; // Name
+    ws.getColumn(3).width = 10; // Gen
+    ws.getColumn(4).width = 6;  // Yes
+
+    // Build dynamic header groups from roadmap
+    const weekHeaders = generateWeekHeaders();
+    const categories = ['Att', 'Ex', 'As', 'Pr', '100D'];
+
+    const startCol = 5; // weekly data starts after first 4 columns
+
+    // Row 1: Subject groups
+    let colCursor = startCol;
+    let weekIndex = 0;
+    while (weekIndex < Math.min(TOTAL_WEEKS, weekHeaders.length)) {
+      const currentSubject = weekHeaders[weekIndex].subject;
+      let weeksInSubject = 0;
+      while (
+        weekIndex + weeksInSubject < weekHeaders.length &&
+        weekHeaders[weekIndex + weeksInSubject].subject === currentSubject &&
+        weekIndex + weeksInSubject < TOTAL_WEEKS
+      ) {
+        weeksInSubject++;
+      }
+
+      const subjectStart = colCursor;
+      const subjectEnd = colCursor + weeksInSubject * categories.length - 1;
+      if (subjectStart <= subjectEnd) {
+        ws.mergeCells(1, subjectStart, 1, subjectEnd);
+        const cell = ws.getCell(1, subjectStart);
+        cell.value = currentSubject;
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        const fillColor = subjectColors[currentSubject] || 'FF374151';
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fillColor } };
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+
+        // Color the whole merged range background
+        for (let c = subjectStart; c <= subjectEnd; c++) {
+          ws.getCell(1, c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fillColor } };
+        }
+      }
+
+      colCursor = subjectEnd + 1;
+      weekIndex += weeksInSubject;
+    }
+
+    // Row 2: Week labels (merged across 5 categories)
+    colCursor = startCol;
+    for (let i = 0; i < Math.min(TOTAL_WEEKS, weekHeaders.length); i++) {
+      const weekStart = colCursor;
+      const weekEnd = colCursor + categories.length - 1;
+      ws.mergeCells(2, weekStart, 2, weekEnd);
+      const fillColor = subjectColors[weekHeaders[i].subject] || 'FF6B7280';
+      const cell = ws.getCell(2, weekStart);
+      cell.value = weekHeaders[i].weekLabel;
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fillColor } };
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      for (let c = weekStart; c <= weekEnd; c++) {
+        ws.getCell(2, c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fillColor } };
+      }
+      colCursor += categories.length;
+    }
+
+    // Row 3: Category headers
+    ws.getCell(3, 1).value = 'Student ID';
+    ws.getCell(3, 2).value = 'Student Name';
+    ws.getCell(3, 3).value = 'Gen';
+    ws.getCell(3, 4).value = 'Yes';
+    ws.getRow(3).font = { bold: true };
+    colCursor = startCol;
+    for (let i = 0; i < Math.min(TOTAL_WEEKS, weekHeaders.length); i++) {
+      for (const cat of categories) {
+        const cell = ws.getCell(3, colCursor);
+        cell.value = cat;
+        cell.alignment = { horizontal: 'center' };
+        cell.font = { bold: true, color: { argb: 'FF111827' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E7EB' } };
+        colCursor++;
+      }
+    }
+
+    // Data rows
+    const rowsStart = 4;
+    const weekCellFormatter = (w: WeekRecord) => [
+      formatCell(w.attendance),
+      formatCell(w.classExercise),
+      formatCell(w.assignment),
+      formatCell(w.project),
+      formatCell(w.hundredDays),
+    ];
+
+    perf.forEach((s, idx) => {
+      const rowIdx = rowsStart + idx;
+      ws.getCell(rowIdx, 1).value = s.studentId;
+      ws.getCell(rowIdx, 2).value = s.studentName;
+      ws.getCell(rowIdx, 3).value = s.gen;
+      ws.getCell(rowIdx, 4).value = 'Yes';
+
+      let c = startCol;
+      const weeksToWrite = Math.min(TOTAL_WEEKS, s.weeks.length, weekHeaders.length);
+      for (let w = 0; w < weeksToWrite; w++) {
+        const values = weekCellFormatter(s.weeks[w]);
+        for (const val of values) {
+          const cell = ws.getCell(rowIdx, c++);
+          cell.value = val;
+          cell.alignment = { horizontal: 'center' };
+        }
+      }
+      // Total points at end
+      const totalCol = startCol + Math.min(TOTAL_WEEKS, weekHeaders.length) * categories.length;
+      ws.getCell(3, totalCol).value = 'Points';
+      ws.getCell(3, totalCol).font = { bold: true };
+      ws.getCell(rowIdx, totalCol).value = s.totalPoints;
+      ws.getColumn(totalCol).width = 10;
+    });
+
+    // Alternate row shading for readability
+    for (let r = rowsStart; r < rowsStart + perf.length; r++) {
+      if ((r - rowsStart) % 2 === 1) {
+        for (let c = 1; c <= ws.columnCount; c++) {
+          const cell = ws.getCell(r, c);
+          cell.fill = cell.fill || { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
+        }
+      }
+    }
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = filename;
+    a.download = `Gradebook_${selectedGen === 'all' ? 'All' : selectedGen}_${new Date().toISOString().split('T')[0]}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -141,7 +285,7 @@ const PerformanceExportSystem = () => {
           className="flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50"
         >
           {exporting ? <Loader2 className="animate-spin h-5 w-5" /> : <Download className="h-5 w-5" />}
-          {exporting ? 'Exporting...' : 'Export CSV'}
+          {exporting ? 'Exporting...' : 'Export Excel'}
         </button>
 
         <button
@@ -153,6 +297,18 @@ const PerformanceExportSystem = () => {
           {autoSync ? <CheckCircle className="h-5 w-5" /> : <RefreshCw className="h-5 w-5" />}
           {autoSync ? 'Auto-Sync ON' : 'Enable Auto-Sync'}
         </button>
+
+        <div className="flex items-stretch">
+          <select
+            className="w-full rounded-lg border px-3 py-2 text-sm"
+            value={selectedGen}
+            onChange={(e) => setSelectedGen(e.target.value)}
+          >
+            {availableGens.map((g) => (
+              <option key={g} value={g}>{g === 'all' ? 'All Generations' : g}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {lastSync && (
