@@ -105,42 +105,11 @@ export default function MaterialsPage() {
     return () => unsubscribe();
   }, [selectedGen, isTeacherOrAdmin]);
 
-  // Determine unlocked materials for students
-  const unlockedWeekIds = useMemo(() => {
-    if (isTeacherOrAdmin) return null; // Teachers/admins see everything
-
-    // Students start with all their completed weeks unlocked
-    const unlocked = new Set<string>(completedWeeks);
-
-    roadmapData.forEach(subject => {
-        let lastCompletedWeekIndex = -1;
-        subject.weeks.forEach((week, index) => {
-            const weekId = `${subject.title}-${week.title}`;
-            if (completedWeeks.has(weekId)) {
-                lastCompletedWeekIndex = index;
-            }
-        });
-        
-        // Unlock the next week if there is one
-        if (lastCompletedWeekIndex !== -1 && lastCompletedWeekIndex + 1 < subject.weeks.length) {
-            const nextWeek = subject.weeks[lastCompletedWeekIndex + 1];
-            unlocked.add(`${subject.title}-${nextWeek.title}`);
-        } else if (lastCompletedWeekIndex === -1 && subject.weeks.length > 0) {
-            const firstWeek = subject.weeks[0];
-            unlocked.add(`${subject.title}-${firstWeek.title}`);
-        }
-    });
-
-    return unlocked;
-  }, [isTeacherOrAdmin, completedWeeks, roadmapData]);
-  
+  // Determine unlocked materials for students (curriculum-wide gating)
   const filteredMaterials = useMemo(() => {
     if (isTeacherOrAdmin) return materials;
-    return materials.filter(material => {
-      const materialWeekId = `${material.subject}-${material.week}`;
-      return unlockedWeekIds?.has(materialWeekId);
-    });
-  }, [materials, isTeacherOrAdmin, unlockedWeekIds]);
+    return getUnlockedMaterials(completedWeeks, roadmapData, materials);
+  }, [isTeacherOrAdmin, materials, completedWeeks, roadmapData]);
 
   const form = useForm<MaterialFormValues>({
     resolver: zodResolver(materialSchema),
