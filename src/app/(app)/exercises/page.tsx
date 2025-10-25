@@ -91,6 +91,12 @@ export default function ExercisesPage() {
                   <div className="flex justify-between items-start">
                     <div className="flex-1 pr-2">
                       <CardTitle>{exercise.title}</CardTitle>
+                      {(exercise.subject && exercise.week) && (
+                        <div className="mt-1 flex flex-wrap gap-2">
+                          <Badge variant="outline">{exercise.subject}</Badge>
+                          <Badge variant="secondary">{exercise.week}</Badge>
+                        </div>
+                      )}
                       {isTeacherOrAdmin && <Badge variant={exercise.targetGen === 'Everyone' ? 'destructive' : exercise.targetGen === 'All Students' ? 'default' : 'secondary'} className="mt-1">{exercise.targetGen}</Badge>}
                     </div>
                     {isTeacherOrAdmin && <ExerciseActions exercise={exercise} />}

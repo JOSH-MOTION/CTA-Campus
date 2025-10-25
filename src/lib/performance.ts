@@ -27,7 +27,8 @@ export interface StudentPerformance {
 /* ------------------------------------------------------------------
    CONFIG
    ------------------------------------------------------------------ */
-const TOTAL_WEEKS = 30;
+// Extend to cover full curriculum span (incl. Node)
+const TOTAL_WEEKS = 52;
 
 function getWeekFromStart(date: Date, start: Date): number {
   const ms = date.getTime() - start.getTime();

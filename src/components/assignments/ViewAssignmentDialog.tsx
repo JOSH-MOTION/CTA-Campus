@@ -36,6 +36,12 @@ export function ViewAssignmentDialog({ children, assignment }: ViewAssignmentDia
             {assignment.description}
           </DialogDescription>
         </DialogHeader>
+        {(assignment.subject && assignment.week) && (
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="outline">{assignment.subject}</Badge>
+            <Badge variant="secondary">{assignment.week}</Badge>
+          </div>
+        )}
         <div className="space-y-2 py-4">
             <p className="text-sm font-semibold">Due Date:</p>
             <div className="flex flex-wrap gap-2">
