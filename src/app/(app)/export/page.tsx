@@ -38,7 +38,7 @@ const PerformanceExportSystem = () => {
     const load = async () => {
       setLoading(true);
       try {
-        const perf = await fetchAllPerformance();
+        const perf = await fetchAllPerformance(weeksFromRoadmap);
         setData(perf);
 
         // Group by gen
