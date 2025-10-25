@@ -14,8 +14,6 @@ import ExcelJS from 'exceljs';
 import { useRoadmap } from '@/contexts/RoadmapContext';
 import { getAllWeeksInOrder } from '@/services/materials-tracking';
 
-const TOTAL_WEEKS = 30;
-
 interface GenGroup {
   gen: string;
   students: StudentPerformance[];
@@ -33,6 +31,8 @@ const PerformanceExportSystem = () => {
 
   const { roadmapData } = useRoadmap();
   const weeksFromRoadmap = useMemo(() => getAllWeeksInOrder(roadmapData), [roadmapData]);
+  // Include all weeks from the roadmap (up to Node and beyond)
+  const TOTAL_WEEKS = weeksFromRoadmap.length;
 
   useEffect(() => {
     const load = async () => {

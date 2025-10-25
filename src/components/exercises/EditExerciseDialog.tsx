@@ -22,11 +22,14 @@ import {useAuth, UserData} from '@/contexts/AuthContext';
 import {useToast} from '@/hooks/use-toast';
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup} from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
+import { useRoadmap } from '@/contexts/RoadmapContext';
 
 const exerciseSchema = z.object({
   title: z.string().min(5, 'Title must be at least 5 characters long.'),
   description: z.string().min(10, 'Description must be at least 10 characters long.'),
   targetGen: z.string().nonempty('Please select a target audience.'),
+  subject: z.string().nonempty('Please select a subject.'),
+  week: z.string().nonempty('Please select a week.'),
 });
 
 type ExerciseFormValues = z.infer<typeof exerciseSchema>;
@@ -44,6 +47,9 @@ export function EditExerciseDialog({ exercise, isOpen, onOpenChange }: EditExerc
   const {fetchAllUsers} = useAuth();
   const [allUsers, setAllUsers] = useState<UserData[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
+  const { roadmapData } = useRoadmap();
+
+  const subjectsWithWeeks = useMemo(() => roadmapData.filter(s => (s.weeks?.length || 0) > 0), [roadmapData]);
 
   useEffect(() => {
     if (isOpen) {
@@ -70,6 +76,8 @@ export function EditExerciseDialog({ exercise, isOpen, onOpenChange }: EditExerc
       title: exercise.title,
       description: exercise.description,
       targetGen: exercise.targetGen,
+      subject: exercise.subject || subjectsWithWeeks[0]?.title || '',
+      week: exercise.week || subjectsWithWeeks[0]?.weeks?.[0]?.title || '',
     },
   });
 
@@ -121,6 +129,64 @@ export function EditExerciseDialog({ exercise, isOpen, onOpenChange }: EditExerc
                 </FormItem>
               )}
             />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="subject"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Subject</FormLabel>
+                    <Select
+                      onValueChange={(val) => {
+                        field.onChange(val);
+                        const found = subjectsWithWeeks.find(s => s.title === val);
+                        const firstWeek = found?.weeks?.[0]?.title || '';
+                        form.setValue('week', firstWeek);
+                      }}
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select subject" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectGroup>
+                          {subjectsWithWeeks.map(s => (
+                            <SelectItem key={s.title} value={s.title}>{s.title}</SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="week"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Week</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select week" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectGroup>
+                          {(subjectsWithWeeks.find(s => s.title === form.watch('subject'))?.weeks || []).map((w) => (
+                            <SelectItem key={w.title} value={w.title}>{w.title}</SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
              <FormField
                 control={form.control}
                 name="targetGen"

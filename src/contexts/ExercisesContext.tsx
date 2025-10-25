@@ -13,6 +13,9 @@ export interface Exercise {
   description: string;
   targetGen: string; // e.g., "Gen 30", "All Students", "Everyone"
   authorId: string;
+  // Optional categorization by curriculum week
+  subject?: string; // e.g., "HTML", "CSS", "Backend - NodeJS"
+  week?: string; // e.g., "Week 1"
   createdAt: Timestamp;
 }
 

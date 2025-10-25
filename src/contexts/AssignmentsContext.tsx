@@ -20,6 +20,9 @@ export interface Assignment {
   dueDates: AssignmentDueDate[];
   targetGen: string; // e.g., "Gen 30" or "All"
   authorId: string;
+  // Optional categorization by curriculum week
+  subject?: string; // e.g., "HTML", "CSS", "Backend - NodeJS"
+  week?: string; // e.g., "Week 1"
   createdAt: Timestamp;
 }
 

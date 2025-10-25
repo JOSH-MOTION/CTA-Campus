@@ -90,6 +90,12 @@ export default function AssignmentsPage() {
                             <div className="flex justify-between items-start">
                             <div className="flex-1 pr-2">
                                 <CardTitle>{assignment.title}</CardTitle>
+                                {(assignment.subject && assignment.week) && (
+                                  <div className="mt-1 flex flex-wrap gap-2">
+                                    <Badge variant="outline">{assignment.subject}</Badge>
+                                    <Badge variant="secondary">{assignment.week}</Badge>
+                                  </div>
+                                )}
                                 {isTeacherOrAdmin && <Badge variant={assignment.targetGen === 'Everyone' ? 'destructive' : assignment.targetGen === 'All Students' ? 'default' : 'secondary'} className="mt-1">{assignment.targetGen}</Badge>}
                             </div>
                             <AssignmentActions assignment={assignment} />
