@@ -31,9 +31,6 @@ import Image from 'next/image';
 const submissionSchema = z.object({
   submissionLink: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
   submissionNotes: z.string().optional(),
-}).refine(data => data.submissionLink || 'image_uploaded', {
-    message: "A submission link or an image is required.",
-    path: ["submissionLink"],
 });
 
 type SubmissionFormValues = z.infer<typeof submissionSchema>;
@@ -71,8 +68,7 @@ export function SubmitProjectDialog({ children, project, onSubmissionSuccess }: 
         setImagePreview(reader.result as string);
       };
       reader.readAsDataURL(file);
-      // Let zod know that an image has been uploaded
-      form.setValue('submissionLink', form.getValues('submissionLink') || 'image_uploaded');
+      // No-op for schema; validation happens at submit time
     }
   };
 
@@ -90,7 +86,7 @@ export function SubmitProjectDialog({ children, project, onSubmissionSuccess }: 
   const onSubmit = async (data: SubmissionFormValues) => {
     if (!user || !userData) return;
     
-    if (!data.submissionLink && !imageFile) {
+    if ((!data.submissionLink || data.submissionLink.trim() === '') && !imageFile) {
         form.setError("submissionLink", { type: "manual", message: "A submission link or an image is required." });
         return;
     }
@@ -109,7 +105,7 @@ export function SubmitProjectDialog({ children, project, onSubmissionSuccess }: 
         studentGen: userData.gen || 'N/A',
         assignmentId: project.id,
         assignmentTitle: project.title,
-        submissionLink: data.submissionLink === 'image_uploaded' ? '' : data.submissionLink,
+        submissionLink: data.submissionLink || '',
         submissionNotes: data.submissionNotes || '',
         pointCategory: 'Weekly Projects',
         imageUrl: imageUrl,
@@ -162,7 +158,7 @@ export function SubmitProjectDialog({ children, project, onSubmissionSuccess }: 
                     </AlertDescription>
                 </Alert>
                 <div className="space-y-3 rounded-md border p-4">
-                    {submittedData.submissionLink && submittedData.submissionLink !== 'image_uploaded' && (
+                    {submittedData.submissionLink && (
                         <p className="text-sm font-medium">
                             Submission Link:{' '}
                             <Link href={submittedData.submissionLink} target="_blank" rel="noopener noreferrer" className="text-primary underline">
