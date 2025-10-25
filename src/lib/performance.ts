@@ -31,10 +31,10 @@ export interface StudentPerformance {
    ------------------------------------------------------------------ */
 // NOTE: Total weeks will be derived from the provided roadmap ordering
 
-function getWeekFromStart(date: Date, start: Date): number {
-  const ms = date.getTime() - start.getTime();
-  const week = Math.floor(ms / (7 * 24 * 60 * 60 * 1000)) + 1;
-  return Math.max(1, Math.min(week, TOTAL_WEEKS));
+function getWeekFromStart(date: Date, start: Date, totalWeeks: number): number {
+  const millisecondsSinceStart = date.getTime() - start.getTime();
+  const weekIndex = Math.floor(millisecondsSinceStart / (7 * 24 * 60 * 60 * 1000)) + 1;
+  return Math.max(1, Math.min(weekIndex, totalWeeks));
 }
 
 /**
@@ -129,7 +129,7 @@ export async function fetchAllPerformance(
     const gen = uidToGen.get(uid);
     // If we have precise mapping via classId, use it; otherwise fall back to cohort-relative week
     const start = (gen && earliestByGen.get(gen)) || earliestByStudent.get(uid) || date;
-    const w = weekIdx ?? getWeekFromStart(date, start);
+    const w = weekIdx ?? getWeekFromStart(date, start, TOTAL_WEEKS);
     const bounded = Math.max(1, Math.min(w, TOTAL_WEEKS));
     if (!attMap.has(uid)) attMap.set(uid, new Set());
     attMap.get(uid)!.add(bounded);
@@ -168,7 +168,7 @@ export async function fetchAllPerformance(
     if (cat.includes('100 Days of Code')) {
       const gen = uidToGen.get(uid);
       const start = (gen && earliestByGen.get(gen)) || earliestByStudent.get(uid) || date;
-      w = getWeekFromStart(date, start);
+      w = getWeekFromStart(date, start, TOTAL_WEEKS);
     } else if (cat.includes('Assignment')) {
       const meta = idToSubjectWeek.get(`assignments:${assignmentId}`);
       if (meta?.subject && meta.week) w = weekIndexByKey.get(`${meta.subject}-${meta.week}`);
@@ -184,7 +184,7 @@ export async function fetchAllPerformance(
     if (!w) {
       const gen = uidToGen.get(uid);
       const start = (gen && earliestByGen.get(gen)) || earliestByStudent.get(uid) || date;
-      w = getWeekFromStart(date, start);
+      w = getWeekFromStart(date, start, TOTAL_WEEKS);
     }
 
     const bounded = Math.max(1, Math.min(w!, TOTAL_WEEKS));
