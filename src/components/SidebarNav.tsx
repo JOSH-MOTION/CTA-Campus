@@ -87,22 +87,11 @@ export const teacherNavItems = [
 
 export const adminNavItems = [
   {href: '/', label: 'Dashboard', icon: LayoutDashboard},
-  {href: '/users', label: 'User Management', icon: UserCog},
-  {href: '/submissions', label: 'All Submissions', icon: Inbox},
-  {href: '/rankings', label: 'Rankings', icon: TrendingUp},
-  {href: '/grading', label: 'Grading System', icon: Award},
-  {href: '/announcements', label: 'Manage Announcements', icon: Megaphone},
-  {href: '/assignments', label: 'Assignments', icon: ListOrdered},
-  {href: '/exercises', label: 'Exercises', icon: PencilRuler},
-  {href: '/projects', label: 'Projects', icon: BookMarked},
-  {href: '/100-days-of-code/submissions', label: '100 Days of Code', icon: Code},
-  {href: '/bookings', label: 'Manage Bookings', icon: CalendarCheck},
-  {href: '/availability', label: 'Manage Availability', icon: CalendarClock},
-  {href: '/roadmap', label: 'Roadmap', icon: Map},
-  {href: '/directory', label: 'Directory', icon: Contact},
-  {href: '/career', label: 'Career Module', icon: GraduationCap},
-  {href: '/profile', label: 'Profile', icon: User},
-  {href: '/diag/grading', label: 'Auth Diag Tool', icon: Bug},
+  {href: '/students', label: 'Student Management', icon: Users},
+  {href: '/users', label: 'Teachers Management', icon: UserCog},
+  {href: '/announcements', label: 'Announcements', icon: Megaphone},
+  {href: '/attendance', label: 'Attendance', icon: UserCheck},
+  {href: '/export', label: 'Gradebook', icon: FileSpreadsheet},
 ];
 
 export function SidebarNav() {
