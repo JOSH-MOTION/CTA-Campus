@@ -58,17 +58,17 @@ function initializeFirebaseAdmin() {
       base64Provided: !!process.env.GOOGLE_APPLICATION_CREDENTIALS_BASE64,
       jsonProvided: !!process.env.GOOGLE_APPLICATION_CREDENTIALS,
     });
-    throw new Error('Failed to initialize Firebase Admin SDK. Ensure GOOGLE_APPLICATION_CREDENTIALS_BASE64 or GOOGLE_APPLICATION_CREDENTIALS is set correctly.');
+    // Do not throw during module import to avoid failing builds where
+    // credentials are not present (e.g., Vercel build step). Consumers
+    // that rely on admin SDK should ensure credentials are configured
+    // in the runtime environment.
+    console.warn(
+      'Firebase Admin not initialized. Set GOOGLE_APPLICATION_CREDENTIALS_BASE64 or GOOGLE_APPLICATION_CREDENTIALS in the environment.'
+    );
   }
 }
 
-// Initialize Firebase Admin SDK
+// Initialize Firebase Admin SDK (safe: will warn but not throw if creds missing)
 initializeFirebaseAdmin();
-
-// Ensure adminDb and adminAuth are defined
-if (!adminDb || !adminAuth) {
-  console.error('Firebase Admin SDK failed to initialize adminDb or adminAuth');
-  throw new Error('Firebase Admin SDK failed to initialize adminDb or adminAuth');
-}
 
 export { adminDb, adminAuth };
