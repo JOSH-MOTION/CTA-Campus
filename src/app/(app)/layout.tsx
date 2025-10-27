@@ -75,11 +75,13 @@ const MemoizedProtectedLayout = memo(function ProtectedLayout({children}: {child
         break;
     }
     
-    // Allow access to grading page for teachers and admins
-    if (role === 'teacher' || role === 'admin') {
+    // Allow access to grading page for teachers only; attendance for teachers and admins
+    if (role === 'teacher') {
         if (!allowedPaths.includes('/grading')) {
             allowedPaths.push('/grading');
         }
+    }
+    if (role === 'teacher' || role === 'admin')) {
         if (!allowedPaths.includes('/attendance')) {
             allowedPaths.push('/attendance');
         }

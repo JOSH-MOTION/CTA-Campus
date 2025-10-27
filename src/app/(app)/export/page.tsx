@@ -105,9 +105,9 @@ const PerformanceExportSystem = () => {
 
   const generateWeekHeaders = () => {
     const weeks = weeksFromRoadmap.slice(0, TOTAL_WEEKS);
-    const headers: { subject: string; weekLabel: string }[] = weeks.map((w, idx) => ({
+    const headers: { subject: string; weekLabel: string }[] = weeks.map((w) => ({
       subject: w.subject,
-      weekLabel: `Week ${idx + 1} (${w.subject})`,
+      weekLabel: `${w.week} (${w.subject})`,
     }));
     return headers;
   };
@@ -317,7 +317,7 @@ const PerformanceExportSystem = () => {
         </div>
       )}
 
-      {/* Live Preview: Grouped by Gen */}
+      {/* Live Preview: Grouped by Gen with all weeks/topics */}
       {loading ? (
         <div className="flex justify-center items-center h-64">
           <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
@@ -342,23 +342,23 @@ const PerformanceExportSystem = () => {
                     <tr>
                       <th className="px-3 py-2 text-left sticky left-0 bg-gray-50 text-gray-900 font-medium">ID</th>
                       <th className="px-3 py-2 text-left sticky left-16 bg-gray-50 text-gray-900 font-medium">Name</th>
-                      {Array.from({ length: 5 }, (_, i) => (
+                      {generateWeekHeaders().map((wh, i) => (
                         <th key={i} colSpan={5} className="px-3 py-2 text-center border-l text-gray-900 font-medium">
-                          Week {i + 1}
+                          {wh.weekLabel}
                         </th>
                       ))}
                       <th className="px-3 py-2 text-left text-gray-900 font-medium">Points</th>
                     </tr>
                     <tr className="bg-gray-50 text-gray-700">
                       <th colSpan={2}></th>
-                      {Array.from({ length: 5 }, () => (
-                        <>
+                      {generateWeekHeaders().map((_, idx) => (
+                        <React.Fragment key={`cats-${idx}`}>
                           <th className="px-2 py-1 text-xs font-medium">Att</th>
                           <th className="px-2 py-1 text-xs font-medium">Ex</th>
                           <th className="px-2 py-1 text-xs font-medium">As</th>
                           <th className="px-2 py-1 text-xs font-medium">Pr</th>
                           <th className="px-2 py-1 text-xs font-medium">100D</th>
-                        </>
+                        </React.Fragment>
                       ))}
                       <th></th>
                     </tr>
@@ -368,15 +368,13 @@ const PerformanceExportSystem = () => {
                       <tr key={s.studentId} className="hover:bg-gray-50">
                         <td className="px-3 py-2 sticky left-0 bg-white font-medium text-gray-900">{s.studentId}</td>
                         <td className="px-3 py-2 sticky left-16 bg-white font-medium text-gray-900">{s.studentName}</td>
-                        {s.weeks.slice(0, 5).map((w, i) => (
+                        {s.weeks.slice(0, generateWeekHeaders().length).map((w, i) => (
                           <React.Fragment key={i}>
                             <td className="px-2 py-2 text-center text-gray-800">{formatCell(w.attendance)}</td>
                             <td className="px-2 py-2 text-center text-gray-800">{formatCell(w.classExercise)}</td>
                             <td className="px-2 py-2 text-center text-gray-800">{formatCell(w.assignment)}</td>
                             <td className="px-2 py-2 text-center text-gray-800">{formatCell(w.project)}</td>
-                            <td className="px-2 py-2 text-center text-gray-800 font-bold text-emerald-600">
-                              {formatCell(w.hundredDays)}
-                            </td>
+                            <td className="px-2 py-2 text-center text-gray-800 font-bold text-emerald-600">{formatCell(w.hundredDays)}</td>
                           </React.Fragment>
                         ))}
                         <td className="px-3 py-2 font-bold text-gray-900">{s.totalPoints}</td>
