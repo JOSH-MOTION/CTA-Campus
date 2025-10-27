@@ -81,7 +81,7 @@ const MemoizedProtectedLayout = memo(function ProtectedLayout({children}: {child
             allowedPaths.push('/grading');
         }
     }
-    if (role === 'teacher' || role === 'admin')) {
+    if (role === 'teacher' || role === 'admin') {
         if (!allowedPaths.includes('/attendance')) {
             allowedPaths.push('/attendance');
         }
