@@ -8,6 +8,8 @@ import {
   Loader2,
   CheckCircle,
   Users,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { fetchAllPerformance, StudentPerformance, WeekRecord } from '@/lib/performance';
 import ExcelJS from 'exceljs';
@@ -28,10 +30,10 @@ const PerformanceExportSystem = () => {
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [selectedGen, setSelectedGen] = useState<string>('all');
   const [availableGens, setAvailableGens] = useState<string[]>([]);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   const { roadmapData } = useRoadmap();
   const weeksFromRoadmap = useMemo(() => getAllWeeksInOrder(roadmapData), [roadmapData]);
-  // Include all weeks from the roadmap (up to Node and beyond)
   const TOTAL_WEEKS = weeksFromRoadmap.length;
 
   useEffect(() => {
@@ -41,7 +43,6 @@ const PerformanceExportSystem = () => {
         const perf = await fetchAllPerformance(weeksFromRoadmap);
         setData(perf);
 
-        // Group by gen
         const grouped = perf.reduce((acc: any, s) => {
           if (!acc[s.gen]) acc[s.gen] = [];
           acc[s.gen].push(s);
@@ -52,11 +53,16 @@ const PerformanceExportSystem = () => {
           .sort()
           .map((gen) => ({
             gen,
-            students: grouped[gen],
+            students: grouped[gen].sort((a: StudentPerformance, b: StudentPerformance) => 
+              b.totalPoints - a.totalPoints
+            ),
           }));
 
         setGroupedData(sortedGroups);
         setAvailableGens(['all', ...sortedGroups.map(g => g.gen)]);
+        
+        // Expand all groups by default
+        setExpandedGroups(new Set(sortedGroups.map(g => g.gen)));
       } catch (e) {
         console.error(e);
       } finally {
@@ -64,7 +70,24 @@ const PerformanceExportSystem = () => {
       }
     };
     load();
-  }, []);
+  }, [weeksFromRoadmap]);
+
+  const filteredData = useMemo(() => {
+    if (selectedGen === 'all') return groupedData;
+    return groupedData.filter(g => g.gen === selectedGen);
+  }, [groupedData, selectedGen]);
+
+  const toggleGroup = (gen: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(gen)) {
+        next.delete(gen);
+      } else {
+        next.add(gen);
+      }
+      return next;
+    });
+  };
 
   const exportToExcel = async () => {
     setExporting(true);
@@ -83,7 +106,7 @@ const PerformanceExportSystem = () => {
     if (!autoSync) return;
     const id = setInterval(exportToExcel, 3_600_000);
     return () => clearInterval(id);
-  }, [autoSync, data]);
+  }, [autoSync, data, selectedGen]);
 
   const formatCell = (record: { completed: boolean; points: number }) =>
     record.completed ? `✓ (${record.points})` : '';
@@ -105,40 +128,27 @@ const PerformanceExportSystem = () => {
 
   const generateWeekHeaders = () => {
     const weeks = weeksFromRoadmap.slice(0, TOTAL_WEEKS);
-    const headers: { subject: string; weekLabel: string }[] = weeks.map((w, idx) => ({
+    return weeks.map((w, idx) => ({
       subject: w.subject,
       weekLabel: `Week ${idx + 1} (${w.subject})`,
     }));
-    return headers;
   };
-
-  const flattenWeeklyData = (weeks: WeekRecord[]) =>
-    weeks.flatMap((w) => [
-      formatCell(w.attendance),
-      formatCell(w.classExercise),
-      formatCell(w.assignment),
-      formatCell(w.project),
-      formatCell(w.hundredDays),
-    ]);
 
   const exportExcelWorkbook = async (perf: StudentPerformance[]) => {
     const workbook = new ExcelJS.Workbook();
     const ws = workbook.addWorksheet('Gradebook');
 
-    // Freeze ID/Name/Gen/Active and top header rows
     ws.views = [{ state: 'frozen', xSplit: 4, ySplit: 3 }];
 
-    // Column widths for first columns
-    ws.getColumn(1).width = 14; // Student ID
-    ws.getColumn(2).width = 24; // Name
-    ws.getColumn(3).width = 10; // Gen
-    ws.getColumn(4).width = 6;  // Yes
+    ws.getColumn(1).width = 14;
+    ws.getColumn(2).width = 24;
+    ws.getColumn(3).width = 10;
+    ws.getColumn(4).width = 6;
 
-    // Build dynamic header groups from roadmap
     const weekHeaders = generateWeekHeaders();
     const categories = ['Att', 'Ex', 'As', 'Pr', '100D'];
 
-    const startCol = 5; // weekly data starts after first 4 columns
+    const startCol = 5;
 
     // Row 1: Subject groups
     let colCursor = startCol;
@@ -165,7 +175,6 @@ const PerformanceExportSystem = () => {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fillColor } };
         cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
 
-        // Color the whole merged range background
         for (let c = subjectStart; c <= subjectEnd; c++) {
           ws.getCell(1, c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fillColor } };
         }
@@ -175,7 +184,7 @@ const PerformanceExportSystem = () => {
       weekIndex += weeksInSubject;
     }
 
-    // Row 2: Week labels (merged across 5 categories)
+    // Row 2: Week labels
     colCursor = startCol;
     for (let i = 0; i < Math.min(TOTAL_WEEKS, weekHeaders.length); i++) {
       const weekStart = colCursor;
@@ -238,7 +247,7 @@ const PerformanceExportSystem = () => {
           cell.alignment = { horizontal: 'center' };
         }
       }
-      // Total points at end
+      
       const totalCol = startCol + Math.min(TOTAL_WEEKS, weekHeaders.length) * categories.length;
       ws.getCell(3, totalCol).value = 'Points';
       ws.getCell(3, totalCol).font = { bold: true };
@@ -246,12 +255,13 @@ const PerformanceExportSystem = () => {
       ws.getColumn(totalCol).width = 10;
     });
 
-    // Alternate row shading for readability
     for (let r = rowsStart; r < rowsStart + perf.length; r++) {
       if ((r - rowsStart) % 2 === 1) {
         for (let c = 1; c <= ws.columnCount; c++) {
           const cell = ws.getCell(r, c);
-          cell.fill = cell.fill || { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
+          if (!cell.fill || (cell.fill as any).fgColor?.argb?.startsWith('FF')) {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
+          }
         }
       }
     }
@@ -272,7 +282,7 @@ const PerformanceExportSystem = () => {
       <div className="bg-white rounded-lg shadow-sm border p-6 flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Performance Export</h1>
-          <p className="text-gray-600 mt-1">Grouped by Generation • 100 Days = 0.5 pts</p>
+          <p className="text-gray-600 mt-1">Grouped by Generation • Real-time data from submissions & attendance</p>
         </div>
         <FileSpreadsheet className="h-12 w-12 text-blue-600" />
       </div>
@@ -322,71 +332,81 @@ const PerformanceExportSystem = () => {
         <div className="flex justify-center items-center h-64">
           <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
         </div>
-      ) : groupedData.length === 0 ? (
+      ) : filteredData.length === 0 ? (
         <div className="text-center text-gray-500 py-12">No students found.</div>
       ) : (
-        <div className="space-y-8">
-          {groupedData.map((group) => (
-            <div key={group.gen} className="bg-white rounded-lg shadow-sm border overflow-hidden">
-              <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-4 flex items-center gap-3">
-                <Users className="h-6 w-6 text-white" />
-                <h2 className="text-xl font-bold text-white">{group.gen}</h2>
-                <span className="ml-auto bg-white/20 text-white px-3 py-1 rounded-full text-sm">
-                  {group.students.length} student{group.students.length !== 1 ? 's' : ''}
-                </span>
-              </div>
+        <div className="space-y-6">
+          {filteredData.map((group) => {
+            const isExpanded = expandedGroups.has(group.gen);
+            
+            return (
+              <div key={group.gen} className="bg-white rounded-lg shadow-sm border overflow-hidden">
+                <button
+                  onClick={() => toggleGroup(group.gen)}
+                  className="w-full bg-gradient-to-r from-blue-600 to-blue-700 p-4 flex items-center gap-3 hover:from-blue-700 hover:to-blue-800 transition-colors"
+                >
+                  {isExpanded ? <ChevronUp className="h-6 w-6 text-white" /> : <ChevronDown className="h-6 w-6 text-white" />}
+                  <Users className="h-6 w-6 text-white" />
+                  <h2 className="text-xl font-bold text-white">{group.gen}</h2>
+                  <span className="ml-auto bg-white/20 text-white px-3 py-1 rounded-full text-sm">
+                    {group.students.length} student{group.students.length !== 1 ? 's' : ''}
+                  </span>
+                </button>
 
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 text-xs">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-3 py-2 text-left sticky left-0 bg-gray-50 text-gray-900 font-medium">ID</th>
-                      <th className="px-3 py-2 text-left sticky left-16 bg-gray-50 text-gray-900 font-medium">Name</th>
-                      {Array.from({ length: 5 }, (_, i) => (
-                        <th key={i} colSpan={5} className="px-3 py-2 text-center border-l text-gray-900 font-medium">
-                          Week {i + 1}
-                        </th>
-                      ))}
-                      <th className="px-3 py-2 text-left text-gray-900 font-medium">Points</th>
-                    </tr>
-                    <tr className="bg-gray-50 text-gray-700">
-                      <th colSpan={2}></th>
-                      {Array.from({ length: 5 }, () => (
-                        <>
-                          <th className="px-2 py-1 text-xs font-medium">Att</th>
-                          <th className="px-2 py-1 text-xs font-medium">Ex</th>
-                          <th className="px-2 py-1 text-xs font-medium">As</th>
-                          <th className="px-2 py-1 text-xs font-medium">Pr</th>
-                          <th className="px-2 py-1 text-xs font-medium">100D</th>
-                        </>
-                      ))}
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {group.students.map((s) => (
-                      <tr key={s.studentId} className="hover:bg-gray-50">
-                        <td className="px-3 py-2 sticky left-0 bg-white font-medium text-gray-900">{s.studentId}</td>
-                        <td className="px-3 py-2 sticky left-16 bg-white font-medium text-gray-900">{s.studentName}</td>
-                        {s.weeks.slice(0, 5).map((w, i) => (
-                          <React.Fragment key={i}>
-                            <td className="px-2 py-2 text-center text-gray-800">{formatCell(w.attendance)}</td>
-                            <td className="px-2 py-2 text-center text-gray-800">{formatCell(w.classExercise)}</td>
-                            <td className="px-2 py-2 text-center text-gray-800">{formatCell(w.assignment)}</td>
-                            <td className="px-2 py-2 text-center text-gray-800">{formatCell(w.project)}</td>
-                            <td className="px-2 py-2 text-center text-gray-800 font-bold text-emerald-600">
-                              {formatCell(w.hundredDays)}
-                            </td>
-                          </React.Fragment>
+                {isExpanded && (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200 text-xs">
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                          <th className="px-3 py-2 text-left sticky left-0 bg-gray-50 text-gray-900 font-medium z-10">ID</th>
+                          <th className="px-3 py-2 text-left sticky left-16 bg-gray-50 text-gray-900 font-medium z-10">Name</th>
+                          {weeksFromRoadmap.slice(0, Math.min(10, TOTAL_WEEKS)).map((week, i) => (
+                            <th key={i} colSpan={5} className="px-3 py-2 text-center border-l text-gray-900 font-medium">
+                              Week {i + 1}<br/><span className="text-xs font-normal text-gray-600">({week.subject})</span>
+                            </th>
+                          ))}
+                          <th className="px-3 py-2 text-center text-gray-900 font-medium sticky right-0 bg-gray-50">Points</th>
+                        </tr>
+                        <tr className="bg-gray-50 text-gray-700">
+                          <th colSpan={2} className="sticky left-0 bg-gray-50 z-10"></th>
+                          {Array.from({ length: Math.min(10, TOTAL_WEEKS) }, () => (
+                            <>
+                              <th className="px-2 py-1 text-xs font-medium">Att</th>
+                              <th className="px-2 py-1 text-xs font-medium">Ex</th>
+                              <th className="px-2 py-1 text-xs font-medium">As</th>
+                              <th className="px-2 py-1 text-xs font-medium">Pr</th>
+                              <th className="px-2 py-1 text-xs font-medium">100D</th>
+                            </>
+                          ))}
+                          <th className="sticky right-0 bg-gray-50"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 bg-white">
+                        {group.students.map((s, idx) => (
+                          <tr key={s.studentId} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                            <td className="px-3 py-2 sticky left-0 bg-inherit font-medium text-gray-900 z-10">{s.studentId}</td>
+                            <td className="px-3 py-2 sticky left-16 bg-inherit font-medium text-gray-900 z-10">{s.studentName}</td>
+                            {s.weeks.slice(0, Math.min(10, TOTAL_WEEKS)).map((w, i) => (
+                              <React.Fragment key={i}>
+                                <td className="px-2 py-2 text-center text-gray-800">{formatCell(w.attendance)}</td>
+                                <td className="px-2 py-2 text-center text-gray-800">{formatCell(w.classExercise)}</td>
+                                <td className="px-2 py-2 text-center text-gray-800">{formatCell(w.assignment)}</td>
+                                <td className="px-2 py-2 text-center text-gray-800">{formatCell(w.project)}</td>
+                                <td className="px-2 py-2 text-center text-gray-800 font-bold text-emerald-600">
+                                  {formatCell(w.hundredDays)}
+                                </td>
+                              </React.Fragment>
+                            ))}
+                            <td className="px-3 py-2 font-bold text-gray-900 text-center sticky right-0 bg-inherit">{s.totalPoints}</td>
+                          </tr>
                         ))}
-                        <td className="px-3 py-2 font-bold text-gray-900">{s.totalPoints}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
