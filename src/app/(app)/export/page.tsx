@@ -360,7 +360,7 @@ const PerformanceExportSystem = () => {
                         <tr>
                           <th className="px-3 py-2 text-left sticky left-0 bg-gray-50 text-gray-900 font-medium z-10">ID</th>
                           <th className="px-3 py-2 text-left sticky left-16 bg-gray-50 text-gray-900 font-medium z-10">Name</th>
-                          {weeksFromRoadmap.slice(0, Math.min(10, TOTAL_WEEKS)).map((week, i) => (
+                          {weeksFromRoadmap.slice(0, Math.min(50, TOTAL_WEEKS)).map((week, i) => (
                             <th key={i} colSpan={5} className="px-3 py-2 text-center border-l text-gray-900 font-medium">
                               Week {i + 1}<br/><span className="text-xs font-normal text-gray-600">({week.subject})</span>
                             </th>
@@ -369,7 +369,7 @@ const PerformanceExportSystem = () => {
                         </tr>
                         <tr className="bg-gray-50 text-gray-700">
                           <th colSpan={2} className="sticky left-0 bg-gray-50 z-10"></th>
-                          {Array.from({ length: Math.min(10, TOTAL_WEEKS) }, () => (
+                          {Array.from({ length: Math.min(50, TOTAL_WEEKS) }, () => (
                             <>
                               <th className="px-2 py-1 text-xs font-medium">Att</th>
                               <th className="px-2 py-1 text-xs font-medium">Ex</th>
@@ -386,7 +386,7 @@ const PerformanceExportSystem = () => {
                           <tr key={s.studentId} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                             <td className="px-3 py-2 sticky left-0 bg-inherit font-medium text-gray-900 z-10">{s.studentId}</td>
                             <td className="px-3 py-2 sticky left-16 bg-inherit font-medium text-gray-900 z-10">{s.studentName}</td>
-                            {s.weeks.slice(0, Math.min(10, TOTAL_WEEKS)).map((w, i) => (
+                            {s.weeks.slice(0, Math.min(50, TOTAL_WEEKS)).map((w, i) => (
                               <React.Fragment key={i}>
                                 <td className="px-2 py-2 text-center text-gray-800">{formatCell(w.attendance)}</td>
                                 <td className="px-2 py-2 text-center text-gray-800">{formatCell(w.classExercise)}</td>
