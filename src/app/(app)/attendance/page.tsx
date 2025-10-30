@@ -483,27 +483,60 @@ export default function AttendancePage() {
                 </FormItem>
               )} />
 
-              {/* Rating */}
-              <FormField control={form.control} name="rating" render={({ field }: { field: FieldValues }) => (
-                <FormItem>
-                  <FormLabel>Rate the session (1–10)</FormLabel>
-                  <FormControl>
-                    <Input type="number" min={1} max={10} {...field} onChange={e => field.onChange(+e.target.value)} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
+             {/* Rating */}
+<FormField
+  control={form.control}
+  name="rating"
+  render={({ field }) => (
+    <FormItem>
+      <FormLabel>Rate the session (1–10)</FormLabel>
+      <FormControl>
+        <Input
+          type="number"
+          min={1}
+          max={10}
+          step={1}
+          {...field}
+          className="w-24 text-center"
+          onChange={(e) => field.onChange(+e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowUp') field.onChange(Math.min((field.value || 0) + 1, 10));
+            if (e.key === 'ArrowDown') field.onChange(Math.max((field.value || 0) - 1, 1));
+          }}
+        />
+      </FormControl>
+      <FormMessage />
+    </FormItem>
+  )}
+/>
+
 
               {/* Understanding */}
-              <FormField control={form.control} name="understanding" render={({ field }: { field: FieldValues }) => (
-                <FormItem>
-                  <FormLabel>How well do you understand the topic? (1–10)</FormLabel>
-                  <FormControl>
-                    <Input type="number" min={1} max={10} {...field} onChange={e => field.onChange(+e.target.value)} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
+<FormField
+  control={form.control}
+  name="understanding"
+  render={({ field }) => (
+    <FormItem>
+      <FormLabel>How well do you understand the topic? (1–10)</FormLabel>
+      <FormControl>
+        <Input
+          type="number"
+          min={1}
+          max={10}
+          step={1}
+          {...field}
+          className="w-24 text-center"
+          onChange={(e) => field.onChange(+e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowUp') field.onChange(Math.min((field.value || 0) + 1, 10));
+            if (e.key === 'ArrowDown') field.onChange(Math.max((field.value || 0) - 1, 1));
+          }}
+        />
+      </FormControl>
+      <FormMessage />
+    </FormItem>
+  )}
+/>
 
               {/* Action Plan */}
               <FormField control={form.control} name="actionPlan" render={({ field }: { field: FieldValues }) => (

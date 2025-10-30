@@ -3,7 +3,7 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, PencilRuler, Loader2, ArrowRight, CheckCircle, BookCheck } from 'lucide-react';
+import { PlusCircle, PencilRuler, Loader2, ArrowRight, CheckCircle, BookCheck, Filter } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useExercises } from '@/contexts/ExercisesContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -14,6 +14,7 @@ import { SubmitExerciseDialog } from '@/components/exercises/SubmitExerciseDialo
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function ExercisesPage() {
   const { role, userData, user } = useAuth();
@@ -22,6 +23,7 @@ export default function ExercisesPage() {
   const router = useRouter();
   const [submittedExerciseIds, setSubmittedExerciseIds] = useState<Set<string>>(new Set());
   const [checkingSubmissions, setCheckingSubmissions] = useState(true);
+  const [genFilter, setGenFilter] = useState<string>('my-gen');
 
   useEffect(() => {
     const fetchSubmissions = async () => {
@@ -49,8 +51,59 @@ export default function ExercisesPage() {
        fetchSubmissions();
     }
   }, [user, role, loading, exercises]);
+
+  // Get available generations from exercises
+  const availableGens = useMemo(() => {
+    const gens = new Set<string>();
+    exercises.forEach(exercise => {
+      if (exercise.targetGen && 
+          exercise.targetGen !== 'Everyone' && 
+          exercise.targetGen !== 'All Students') {
+        gens.add(exercise.targetGen);
+      }
+    });
+    return Array.from(gens).sort();
+  }, [exercises]);
+
+  // Filter exercises based on role and selected filter
+  const filteredExercises = useMemo(() => {
+    if (role === 'student') {
+      // Students see exercises targeted to them
+      return exercises.filter(exercise => 
+        exercise.targetGen === 'Everyone' ||
+        exercise.targetGen === 'All Students' ||
+        exercise.targetGen === userData?.gen
+      );
+    }
+
+    if (role === 'teacher') {
+      const teacherGen = userData?.gen;
+      
+      if (genFilter === 'all') {
+        // Show all exercises when "All Exercises" is selected
+        return exercises;
+      } else if (genFilter === 'my-gen' && teacherGen) {
+        // Show only exercises for teacher's generation
+        return exercises.filter(exercise => 
+          exercise.targetGen === teacherGen ||
+          exercise.targetGen === 'Everyone' ||
+          exercise.targetGen === 'All Students'
+        );
+      } else if (genFilter !== 'my-gen' && genFilter !== 'all') {
+        // Show exercises for a specific generation
+        return exercises.filter(exercise => 
+          exercise.targetGen === genFilter ||
+          exercise.targetGen === 'Everyone' ||
+          exercise.targetGen === 'All Students'
+        );
+      }
+    }
+
+    // Admin sees everything
+    return exercises;
+  }, [exercises, role, userData?.gen, genFilter]);
   
-  const sortedExercises = [...exercises].sort((a, b) => {
+  const sortedExercises = [...filteredExercises].sort((a, b) => {
     const aTime = a.createdAt?.toMillis() || 0;
     const bTime = b.createdAt?.toMillis() || 0;
     return bTime - aTime;
@@ -67,14 +120,31 @@ export default function ExercisesPage() {
             {isTeacherOrAdmin ? 'Create and manage exercises.' : 'View and submit your exercises.'}
           </p>
         </div>
-        {isTeacherOrAdmin && (
-          <CreateExerciseDialog>
-            <Button>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              New Exercise
-            </Button>
-          </CreateExerciseDialog>
-        )}
+        <div className="flex gap-2 items-center">
+          {role === 'teacher' && (
+            <Select value={genFilter} onValueChange={setGenFilter}>
+              <SelectTrigger className="w-[180px]">
+                <Filter className="mr-2 h-4 w-4" />
+                <SelectValue placeholder="Filter by Gen" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="my-gen">My Generation</SelectItem>
+                <SelectItem value="all">All Exercises</SelectItem>
+                {availableGens.map(gen => (
+                  <SelectItem key={gen} value={gen}>{gen}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {isTeacherOrAdmin && (
+            <CreateExerciseDialog>
+              <Button>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                New Exercise
+              </Button>
+            </CreateExerciseDialog>
+          )}
+        </div>
       </div>
 
       {isLoading ? (

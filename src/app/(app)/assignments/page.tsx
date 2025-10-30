@@ -3,7 +3,7 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import {Button} from '@/components/ui/button';
-import {PlusCircle, ListOrdered, ArrowRight, Clock, Loader2, BookCheck, CheckCircle, Eye} from 'lucide-react';
+import {PlusCircle, ListOrdered, ArrowRight, Clock, Loader2, BookCheck, CheckCircle, Eye, Filter} from 'lucide-react';
 import {useAuth} from '@/contexts/AuthContext';
 import {useAssignments} from '@/contexts/AssignmentsContext';
 import {Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle} from '@/components/ui/card';
@@ -16,6 +16,7 @@ import { useRouter } from 'next/navigation';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { ViewAssignmentDialog } from '@/components/assignments/ViewAssignmentDialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
 export default function AssignmentsPage() {
@@ -25,6 +26,7 @@ export default function AssignmentsPage() {
   const router = useRouter();
   const [submittedAssignmentIds, setSubmittedAssignmentIds] = useState<Set<string>>(new Set());
   const [checkingSubmissions, setCheckingSubmissions] = useState(true);
+  const [genFilter, setGenFilter] = useState<string>('my-gen');
 
   useEffect(() => {
     const fetchSubmissions = async () => {
@@ -47,7 +49,58 @@ export default function AssignmentsPage() {
     }
   }, [user, role, loading]);
 
-  const sortedAssignments = [...assignments].sort((a, b) => {
+  // Get available generations from assignments
+  const availableGens = useMemo(() => {
+    const gens = new Set<string>();
+    assignments.forEach(assignment => {
+      if (assignment.targetGen && 
+          assignment.targetGen !== 'Everyone' && 
+          assignment.targetGen !== 'All Students') {
+        gens.add(assignment.targetGen);
+      }
+    });
+    return Array.from(gens).sort();
+  }, [assignments]);
+
+  // Filter assignments based on role and selected filter
+  const filteredAssignments = useMemo(() => {
+    if (role === 'student') {
+      // Students see assignments targeted to them
+      return assignments.filter(assignment => 
+        assignment.targetGen === 'Everyone' ||
+        assignment.targetGen === 'All Students' ||
+        assignment.targetGen === userData?.gen
+      );
+    }
+
+    if (role === 'teacher') {
+      const teacherGen = userData?.gen;
+      
+      if (genFilter === 'all') {
+        // Show all assignments when "All Assignments" is selected
+        return assignments;
+      } else if (genFilter === 'my-gen' && teacherGen) {
+        // Show only assignments for teacher's generation
+        return assignments.filter(assignment => 
+          assignment.targetGen === teacherGen ||
+          assignment.targetGen === 'Everyone' ||
+          assignment.targetGen === 'All Students'
+        );
+      } else if (genFilter !== 'my-gen' && genFilter !== 'all') {
+        // Show assignments for a specific generation
+        return assignments.filter(assignment => 
+          assignment.targetGen === genFilter ||
+          assignment.targetGen === 'Everyone' ||
+          assignment.targetGen === 'All Students'
+        );
+      }
+    }
+
+    // Admin sees everything
+    return assignments;
+  }, [assignments, role, userData?.gen, genFilter]);
+
+  const sortedAssignments = [...filteredAssignments].sort((a, b) => {
     return (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0);
   });
 
@@ -62,14 +115,31 @@ export default function AssignmentsPage() {
             {isTeacherOrAdmin ? 'Create and manage assignments.' : 'View and submit your assignments.'}
           </p>
         </div>
-        {isTeacherOrAdmin && (
-          <CreateAssignmentDialog>
-            <Button>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              New Assignment
-            </Button>
-          </CreateAssignmentDialog>
-        )}
+        <div className="flex gap-2 items-center">
+          {role === 'teacher' && (
+            <Select value={genFilter} onValueChange={setGenFilter}>
+              <SelectTrigger className="w-[180px]">
+                <Filter className="mr-2 h-4 w-4" />
+                <SelectValue placeholder="Filter by Gen" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="my-gen">My Generation</SelectItem>
+                <SelectItem value="all">All Assignments</SelectItem>
+                {availableGens.map(gen => (
+                  <SelectItem key={gen} value={gen}>{gen}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {isTeacherOrAdmin && (
+            <CreateAssignmentDialog>
+              <Button>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                New Assignment
+              </Button>
+            </CreateAssignmentDialog>
+          )}
+        </div>
       </div>
 
       {isLoading ? (
