@@ -1,4 +1,4 @@
-// src/services/materials-tracking.ts (UPDATED)
+// src/services/materials-tracking.ts (UPDATED WITH ROADMAP ORDERING)
 import {
   collection,
   addDoc,
@@ -22,6 +22,7 @@ export interface Material {
   subject: string;
   week: string;
   createdAt: Timestamp;
+  order?: number; // NEW: for maintaining roadmap order
 }
 
 export interface MaterialView {
@@ -31,7 +32,7 @@ export interface MaterialView {
   studentName: string;
   gen: string;
   viewedAt: Timestamp;
-  duration: number; // in seconds
+  duration: number;
   completed: boolean;
 }
 
@@ -46,7 +47,7 @@ export interface MaterialStatus {
   lastViewedAt?: Timestamp;
 }
 
-export type NewMaterialData = Omit<Material, 'id' | 'createdAt'>;
+export type NewMaterialData = Omit<Material, 'id' | 'createdAt' | 'order'>;
 
 /**
  * Get ordered list of all weeks from roadmap
@@ -67,8 +68,46 @@ export const getAllWeeksInOrder = (roadmapData: any[]): Array<{ subject: string;
 };
 
 /**
+ * NEW: Create a map of subject-week to order index
+ */
+export const createRoadmapOrderMap = (roadmapData: any[]): Map<string, number> => {
+  const orderMap = new Map<string, number>();
+  let index = 0;
+  
+  roadmapData.forEach(subject => {
+    subject.weeks.forEach((week: any) => {
+      const key = `${subject.title}-${week.title}`;
+      orderMap.set(key, index);
+      index++;
+    });
+  });
+  
+  return orderMap;
+};
+
+/**
+ * NEW: Sort materials according to roadmap order
+ */
+export const sortMaterialsByRoadmap = (
+  materials: Material[],
+  roadmapData: any[]
+): Material[] => {
+  const orderMap = createRoadmapOrderMap(roadmapData);
+  
+  return [...materials].sort((a, b) => {
+    const keyA = `${a.subject}-${a.week}`;
+    const keyB = `${b.subject}-${b.week}`;
+    
+    const orderA = orderMap.get(keyA) ?? 999999;
+    const orderB = orderMap.get(keyB) ?? 999999;
+    
+    return orderA - orderB;
+  });
+};
+
+/**
  * Determines which materials should be visible to a student based on roadmap completion
- * FIXED: Only shows materials up to the last completed week + the next incomplete week
+ * Returns materials sorted by roadmap order
  */
 export const getUnlockedMaterials = (
   completedWeeks: Set<string>,
@@ -79,9 +118,7 @@ export const getUnlockedMaterials = (
     return [];
   }
 
-  // Get all weeks in order from the roadmap
   const allWeeksInOrder = getAllWeeksInOrder(roadmapData);
-
   const unlockedWeeks = new Set<string>();
 
   // Find the index of the last completed week
@@ -112,10 +149,13 @@ export const getUnlockedMaterials = (
   }
 
   // Filter materials to only those in unlocked weeks
-  return materials.filter(material => {
+  const unlockedMaterials = materials.filter(material => {
     const weekId = `${material.subject}-${material.week}`;
     return unlockedWeeks.has(weekId);
   });
+
+  // Sort by roadmap order before returning
+  return sortMaterialsByRoadmap(unlockedMaterials, roadmapData);
 };
 
 /**
@@ -236,14 +276,13 @@ export const onMaterialViewsForGen = (
 };
 
 /**
- * Get current active material for a generation (the material students should see)
+ * Get current active material for a generation
  */
 export const getCurrentActiveMaterial = async (
   gen: string,
   completedWeeks: Set<string>
 ): Promise<{ subject: string; week: string } | null> => {
   try {
-    // Get the latest view for this generation
     const viewsQuery = query(
       collection(db, 'material_views'),
       where('gen', '==', gen)

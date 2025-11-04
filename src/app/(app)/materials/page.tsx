@@ -1,4 +1,4 @@
-// src/app/(app)/materials/page.tsx (updated)
+// src/app/(app)/materials/page.tsx (UPDATED WITH ROADMAP ORDERING)
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -16,7 +16,15 @@ import { PlusCircle, Youtube, FileText, Loader2, Eye, Users, Calendar, Clock } f
 import { db } from '@/lib/firebase';
 import { collection, addDoc, onSnapshot, query, orderBy, Timestamp, getDocs } from 'firebase/firestore';
 import { useAuth } from '@/contexts/AuthContext';
-import { Material, addMaterial, getUnlockedMaterials, trackMaterialView, onMaterialViewsForGen, MaterialView } from '@/services/materials-tracking';
+import { 
+  Material, 
+  addMaterial, 
+  getUnlockedMaterials, 
+  trackMaterialView, 
+  onMaterialViewsForGen, 
+  MaterialView,
+  sortMaterialsByRoadmap // NEW IMPORT
+} from '@/services/materials-tracking';
 import { MaterialActions } from '@/components/materials/MaterialActions';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -71,7 +79,7 @@ export default function MaterialsPage() {
     return userData?.gensTaught?.split(',').map(g => g.trim()).filter(Boolean) || [];
   }, [userData, isTeacherOrAdmin, role, allUsers]);
 
-  // Materials listener
+  // Materials listener - now they come in any order from Firestore
   useEffect(() => {
     setIsLoading(true);
     const materialsCollection = collection(db, 'materials');
@@ -105,9 +113,13 @@ export default function MaterialsPage() {
     return () => unsubscribe();
   }, [selectedGen, isTeacherOrAdmin]);
 
-  // Determine unlocked materials for students (curriculum-wide gating)
+  // Sort materials by roadmap order for both teachers and students
   const filteredMaterials = useMemo(() => {
-    if (isTeacherOrAdmin) return materials;
+    if (isTeacherOrAdmin) {
+      // Teachers see all materials, sorted by roadmap order
+      return sortMaterialsByRoadmap(materials, roadmapData);
+    }
+    // Students see unlocked materials, already sorted inside getUnlockedMaterials
     return getUnlockedMaterials(completedWeeks, roadmapData, materials);
   }, [isTeacherOrAdmin, materials, completedWeeks, roadmapData]);
 
@@ -273,18 +285,18 @@ export default function MaterialsPage() {
             </Card>
 
             <div className="space-y-4">
-              <h2 className="text-2xl font-semibold tracking-tight">All Materials</h2>
+              <h2 className="text-2xl font-semibold tracking-tight">All Materials (Roadmap Order)</h2>
               {isLoading ? (
                 <div className="flex justify-center items-center h-48">
                   <Loader2 className="h-8 w-8 animate-spin" />
                 </div>
-              ) : materials.length === 0 ? (
+              ) : filteredMaterials.length === 0 ? (
                 <div className="text-center text-muted-foreground py-10">
                   No materials have been added yet.
                 </div>
               ) : (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  {materials.map(material => (
+                  {filteredMaterials.map(material => (
                     <Card key={material.id}>
                       <CardHeader>
                         <div className="flex justify-between items-start">
@@ -343,11 +355,11 @@ export default function MaterialsPage() {
                   </Select>
                 </div>
 
-                {selectedGen && materials.length > 0 && (
+                {selectedGen && filteredMaterials.length > 0 && (
                   <div className="space-y-4">
-                    <h3 className="font-semibold">Material Access Report</h3>
+                    <h3 className="font-semibold">Material Access Report (Roadmap Order)</h3>
                     <div className="grid gap-4">
-                      {materials.map(material => {
+                      {filteredMaterials.map(material => {
                         const views = getViewsForMaterial(material);
                         return (
                           <Card key={material.id} className="bg-muted/50">
@@ -382,7 +394,7 @@ export default function MaterialsPage() {
         </Tabs>
       ) : (
         <div className="space-y-4">
-          <h2 className="text-2xl font-semibold tracking-tight">Available Materials</h2>
+          <h2 className="text-2xl font-semibold tracking-tight">Available Materials (In Roadmap Order)</h2>
            {isLoading ? (
             <div className="flex justify-center items-center h-48">
               <Loader2 className="h-8 w-8 animate-spin" />
