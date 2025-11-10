@@ -15,7 +15,7 @@ import { Badge } from '../ui/badge';
 import { format } from 'date-fns';
 import { Clock } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-
+import { linkify } from '@/lib/linkify';
 
 interface ViewAssignmentDialogProps {
   children: ReactNode;
@@ -33,7 +33,7 @@ export function ViewAssignmentDialog({ children, assignment }: ViewAssignmentDia
         <DialogHeader>
           <DialogTitle>{assignment.title}</DialogTitle>
           <DialogDescription className="pt-4 whitespace-pre-wrap">
-            {assignment.description}
+            {linkify(assignment.description)}
           </DialogDescription>
         </DialogHeader>
         {(assignment.subject && assignment.week) && (

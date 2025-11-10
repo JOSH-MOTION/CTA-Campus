@@ -3,7 +3,7 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, PencilRuler, Loader2, ArrowRight, CheckCircle, BookCheck, Filter } from 'lucide-react';
+import { PlusCircle, PencilRuler, Loader2, ArrowRight, CheckCircle, BookCheck, Filter, Eye } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useExercises } from '@/contexts/ExercisesContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -11,6 +11,7 @@ import { CreateExerciseDialog } from '@/components/exercises/CreateExerciseDialo
 import { Badge } from '@/components/ui/badge';
 import { ExerciseActions } from '@/components/exercises/ExerciseActions';
 import { SubmitExerciseDialog } from '@/components/exercises/SubmitExerciseDialog';
+import { ViewExerciseDialog } from '@/components/exercises/ViewExerciseDialog';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
@@ -157,24 +158,35 @@ export default function ExercisesPage() {
             const hasSubmitted = submittedExerciseIds.has(exercise.id);
             return (
               <Card key={exercise.id} className="flex flex-col">
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1 pr-2">
-                      <CardTitle>{exercise.title}</CardTitle>
-                      {(exercise.subject && exercise.week) && (
-                        <div className="mt-1 flex flex-wrap gap-2">
-                          <Badge variant="outline">{exercise.subject}</Badge>
-                          <Badge variant="secondary">{exercise.week}</Badge>
+                <ViewExerciseDialog exercise={exercise}>
+                  <div className="flex-grow cursor-pointer hover:bg-muted/50">
+                    <CardHeader>
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1 pr-2">
+                          <CardTitle>{exercise.title}</CardTitle>
+                          {(exercise.subject && exercise.week) && (
+                            <div className="mt-1 flex flex-wrap gap-2">
+                              <Badge variant="outline">{exercise.subject}</Badge>
+                              <Badge variant="secondary">{exercise.week}</Badge>
+                            </div>
+                          )}
+                          {isTeacherOrAdmin && <Badge variant={exercise.targetGen === 'Everyone' ? 'destructive' : exercise.targetGen === 'All Students' ? 'default' : 'secondary'} className="mt-1">{exercise.targetGen}</Badge>}
                         </div>
-                      )}
-                      {isTeacherOrAdmin && <Badge variant={exercise.targetGen === 'Everyone' ? 'destructive' : exercise.targetGen === 'All Students' ? 'default' : 'secondary'} className="mt-1">{exercise.targetGen}</Badge>}
-                    </div>
-                    {isTeacherOrAdmin && <ExerciseActions exercise={exercise} />}
+                        {isTeacherOrAdmin && <ExerciseActions exercise={exercise} />}
+                      </div>
+                      <CardDescription className="pt-2 line-clamp-2">{exercise.description}</CardDescription>
+                    </CardHeader>
                   </div>
-                  <CardDescription className="pt-2">{exercise.description}</CardDescription>
-                </CardHeader>
-                <CardContent className="flex-grow"></CardContent>
-                <CardFooter>
+                </ViewExerciseDialog>
+                <CardFooter className="flex flex-col items-start gap-2 pt-4">
+                  {!isTeacherOrAdmin && (
+                    <ViewExerciseDialog exercise={exercise}>
+                      <Button variant="outline" className="w-full">
+                        <Eye className="mr-2 h-4 w-4" />
+                        View Details
+                      </Button>
+                    </ViewExerciseDialog>
+                  )}
                   {isTeacherOrAdmin ? (
                      <Button variant="outline" className="w-full" onClick={() => router.push(`/exercises/${exercise.id}`)}>
                         <BookCheck className="mr-2 h-4 w-4" />
