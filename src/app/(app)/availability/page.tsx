@@ -1,17 +1,15 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Trash } from 'lucide-react';
+import { Loader2, Trash, Plus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -24,14 +22,15 @@ const timeSlots = Array.from({ length: 24 * 2 }, (_, i) => {
     return `${formattedHour}:${minute}`;
 });
 
+// New availability structure: { [day: string]: { startTime: string; endTime: string }[] }
+type DayAvailability = { startTime: string; endTime: string }[];
+type WeeklyAvailability = { [day: string]: DayAvailability };
+
 const availabilitySchema = z.object({
-  availableDays: z.array(z.string()).refine(value => value.some(item => item), {
-    message: 'You have to select at least one day.',
-  }),
-  timeSlots: z.array(z.object({
+  availability: z.record(z.array(z.object({
     startTime: z.string().nonempty(),
     endTime: z.string().nonempty(),
-  })).min(1, 'Please add at least one time slot.'),
+  }))),
 });
 
 type AvailabilityFormValues = z.infer<typeof availabilitySchema>;
@@ -40,29 +39,80 @@ export default function AvailabilityPage() {
   const { toast } = useToast();
   const { user, userData, setUserData, loading } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedDay, setSelectedDay] = useState('Monday');
+  const [newSlotStart, setNewSlotStart] = useState('09:00');
+  const [newSlotEnd, setNewSlotEnd] = useState('17:00');
 
   const form = useForm<AvailabilityFormValues>({
     resolver: zodResolver(availabilitySchema),
     defaultValues: {
-      availableDays: [],
-      timeSlots: [{ startTime: '09:00', endTime: '17:00' }],
+      availability: daysOfWeek.reduce((acc, day) => {
+        acc[day] = [];
+        return acc;
+      }, {} as WeeklyAvailability),
     },
   });
   
   useEffect(() => {
     if (userData) {
-      form.reset({
-        availableDays: userData.availableDays || [],
-        timeSlots: userData.timeSlots && userData.timeSlots.length > 0 ? userData.timeSlots : [{ startTime: '09:00', endTime: '17:00' }],
-      });
+      // Migrate old format if exists
+      if (userData.availableDays && userData.timeSlots) {
+        const migratedAvailability: WeeklyAvailability = daysOfWeek.reduce((acc, day) => {
+          acc[day] = userData.availableDays?.includes(day) ? (userData.timeSlots || []) : [];
+          return acc;
+        }, {} as WeeklyAvailability);
+        form.reset({ availability: migratedAvailability });
+      } else if (userData.availability) {
+        // Use new format
+        form.reset({ availability: userData.availability });
+      }
     }
   }, [userData, form]);
 
+  const addTimeSlot = () => {
+    if (newSlotStart >= newSlotEnd) {
+      toast({
+        variant: 'destructive',
+        title: 'Invalid time range',
+        description: 'End time must be after start time.',
+      });
+      return;
+    }
 
-  const { fields, append, remove } = useFieldArray({
-    name: 'timeSlots',
-    control: form.control,
-  });
+    const currentAvailability = form.getValues('availability');
+    const daySlots = [...(currentAvailability[selectedDay] || [])];
+    
+    // Check for overlapping slots
+    const hasOverlap = daySlots.some(slot => {
+      return (newSlotStart < slot.endTime && newSlotEnd > slot.startTime);
+    });
+
+    if (hasOverlap) {
+      toast({
+        variant: 'destructive',
+        title: 'Overlapping time slots',
+        description: 'This time slot overlaps with an existing one.',
+      });
+      return;
+    }
+
+    daySlots.push({ startTime: newSlotStart, endTime: newSlotEnd });
+    daySlots.sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+    form.setValue(`availability.${selectedDay}`, daySlots);
+    
+    toast({
+      title: 'Time slot added',
+      description: `Added ${newSlotStart} - ${newSlotEnd} to ${selectedDay}`,
+    });
+  };
+
+  const removeTimeSlot = (day: string, index: number) => {
+    const currentAvailability = form.getValues('availability');
+    const daySlots = [...(currentAvailability[day] || [])];
+    daySlots.splice(index, 1);
+    form.setValue(`availability.${day}`, daySlots);
+  };
 
   const onSubmit = async (data: AvailabilityFormValues) => {
     if (!user) return;
@@ -70,12 +120,19 @@ export default function AvailabilityPage() {
     try {
       const userRef = doc(db, 'users', user.uid);
       await updateDoc(userRef, {
-        availableDays: data.availableDays,
-        timeSlots: data.timeSlots,
+        availability: data.availability,
+        // Keep old fields for backwards compatibility temporarily
+        availableDays: Object.keys(data.availability).filter(day => data.availability[day].length > 0),
+        timeSlots: [], // Clear old timeSlots
       });
 
       if(setUserData) {
-        setUserData(prev => prev ? ({ ...prev, availableDays: data.availableDays, timeSlots: data.timeSlots }) : null);
+        setUserData(prev => prev ? ({ 
+          ...prev, 
+          availability: data.availability,
+          availableDays: Object.keys(data.availability).filter(day => data.availability[day].length > 0),
+          timeSlots: []
+        }) : null);
       }
 
       toast({
@@ -97,6 +154,8 @@ export default function AvailabilityPage() {
     return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   }
 
+  const currentAvailability = form.watch('availability');
+
   return (
     <div className="space-y-6">
       <div className="space-y-1">
@@ -108,133 +167,101 @@ export default function AvailabilityPage() {
         <CardHeader>
           <CardTitle>Set Your Schedule</CardTitle>
           <CardDescription>
-            Students will only be able to book you during these times.
+            Students will only be able to book you during these times. You can set different time slots for each day.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-              <FormField
-                control={form.control}
-                name="availableDays"
-                render={() => (
-                  <FormItem>
-                    <div className="mb-4">
-                      <FormLabel className="text-base">Available Days</FormLabel>
-                      <p className="text-sm text-muted-foreground">
-                        Select the days of the week you are available.
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                      {daysOfWeek.map((day) => (
-                        <FormField
-                          key={day}
-                          control={form.control}
-                          name="availableDays"
-                          render={({ field }) => {
-                            return (
-                              <FormItem
-                                key={day}
-                                className="flex flex-row items-start space-x-3 space-y-0"
-                              >
-                                <FormControl>
-                                  <Checkbox
-                                    checked={field.value?.includes(day)}
-                                    onCheckedChange={(checked) => {
-                                      return checked
-                                        ? field.onChange([...(field.value || []), day])
-                                        : field.onChange(
-                                            field.value?.filter(
-                                              (value) => value !== day
-                                            )
-                                          )
-                                    }}
-                                  />
-                                </FormControl>
-                                <FormLabel className="font-normal">
-                                  {day}
-                                </FormLabel>
-                              </FormItem>
-                            )
-                          }}
-                        />
-                      ))}
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div>
-                <FormLabel className="text-base">Available Time Slots</FormLabel>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Add time ranges for your selected days.
-                </p>
-                <div className="space-y-4">
-                  {fields.map((field, index) => (
-                    <div key={field.id} className="flex flex-wrap items-end gap-4">
-                       <FormField
-                          control={form.control}
-                          name={`timeSlots.${index}.startTime`}
-                          render={({ field }) => (
-                            <FormItem className="flex-grow">
-                              <FormLabel>Start Time</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Start" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                   {timeSlots.map(time => <SelectItem key={time} value={time}>{time}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name={`timeSlots.${index}.endTime`}
-                          render={({ field }) => (
-                            <FormItem className="flex-grow">
-                              <FormLabel>End Time</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="End" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  {timeSlots.map(time => <SelectItem key={time} value={time}>{time}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="icon"
-                        onClick={() => remove(index)}
-                        disabled={fields.length <= 1}
-                        className="shrink-0"
-                      >
-                        <Trash className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => append({ startTime: '09:00', endTime: '10:00' })}
-                  >
-                    Add Time Slot
-                  </Button>
+              
+              {/* Add Time Slot Section */}
+              <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
+                <FormLabel className="text-base">Add Time Slot</FormLabel>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+                  <div>
+                    <FormLabel>Day</FormLabel>
+                    <Select value={selectedDay} onValueChange={setSelectedDay}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {daysOfWeek.map(day => (
+                          <SelectItem key={day} value={day}>{day}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <FormLabel>Start Time</FormLabel>
+                    <Select value={newSlotStart} onValueChange={setNewSlotStart}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {timeSlots.map(time => (
+                          <SelectItem key={time} value={time}>{time}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <FormLabel>End Time</FormLabel>
+                    <Select value={newSlotEnd} onValueChange={setNewSlotEnd}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {timeSlots.map(time => (
+                          <SelectItem key={time} value={time}>{time}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-end">
+                    <Button type="button" onClick={addTimeSlot} className="w-full">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Slot
+                    </Button>
+                  </div>
                 </div>
               </div>
 
+              {/* Current Schedule Display */}
+              <div className="space-y-4">
+                <FormLabel className="text-base">Current Schedule</FormLabel>
+                <div className="space-y-3">
+                  {daysOfWeek.map((day) => (
+                    <div key={day} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <FormLabel className="font-semibold">{day}</FormLabel>
+                        {(!currentAvailability[day] || currentAvailability[day].length === 0) && (
+                          <span className="text-sm text-muted-foreground italic">Not available</span>
+                        )}
+                      </div>
+                      {currentAvailability[day] && currentAvailability[day].length > 0 && (
+                        <div className="space-y-2">
+                          {currentAvailability[day].map((slot, index) => (
+                            <div key={index} className="flex items-center justify-between bg-primary/10 p-3 rounded">
+                              <span className="font-medium">
+                                {slot.startTime} - {slot.endTime}
+                              </span>
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="icon"
+                                onClick={() => removeTimeSlot(day, index)}
+                                className="h-8 w-8"
+                              >
+                                <Trash className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
 
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

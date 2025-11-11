@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { CalendarIcon, Clock, Loader2, ExternalLink, CheckCircle, XCircle, Calendar as CalendarClock } from 'lucide-react';
+import { CalendarIcon, Clock, Loader2, ExternalLink, CheckCircle, XCircle, Calendar as CalendarClock, Video, MapPin, MessageSquare } from 'lucide-react';
 import { format, parse } from 'date-fns';
 import { useAuth, UserData } from '@/contexts/AuthContext';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -58,27 +58,59 @@ export default function BookSessionPage() {
   }, [fetchAllUsers]);
 
   const availableTimeSlots = useMemo(() => {
-    if (!selectedStaff || !selectedStaff.timeSlots) return [];
+    if (!selectedStaff) return [];
     
-    return selectedStaff.timeSlots.flatMap(slot => {
+    const selectedDate = form.watch('date');
+    if (!selectedDate) return [];
+    
+    const dayOfWeek = format(selectedDate, 'EEEE');
+    
+    // Use new availability structure if available
+    if (selectedStaff.availability && selectedStaff.availability[dayOfWeek]) {
+      const daySlots = selectedStaff.availability[dayOfWeek];
+      return daySlots.flatMap(slot => {
         const start = parse(slot.startTime, 'HH:mm', new Date());
         const end = parse(slot.endTime, 'HH:mm', new Date());
         const slots = [];
         let current = start;
         while(current < end) {
-            slots.push(format(current, 'HH:mm'));
-            current.setMinutes(current.getMinutes() + 30);
+          slots.push(format(current, 'HH:mm'));
+          current.setMinutes(current.getMinutes() + 30);
         }
         return slots;
+      });
+    }
+    
+    // Fallback to old structure
+    if (!selectedStaff.timeSlots) return [];
+    
+    return selectedStaff.timeSlots.flatMap(slot => {
+      const start = parse(slot.startTime, 'HH:mm', new Date());
+      const end = parse(slot.endTime, 'HH:mm', new Date());
+      const slots = [];
+      let current = start;
+      while(current < end) {
+        slots.push(format(current, 'HH:mm'));
+        current.setMinutes(current.getMinutes() + 30);
+      }
+      return slots;
     });
-  }, [selectedStaff]);
+  }, [selectedStaff, form.watch('date')]);
 
   const isDayDisabled = (date: Date) => {
-    if (!selectedStaff || !selectedStaff.availableDays) {
-        return true;
-    }
+    if (!selectedStaff) return true;
+    if (date < new Date(new Date().setHours(0, 0, 0, 0))) return true;
+    
     const dayOfWeek = format(date, 'EEEE');
-    return !selectedStaff.availableDays.includes(dayOfWeek) || date < new Date();
+    
+    // Check new availability structure
+    if (selectedStaff.availability) {
+      return !selectedStaff.availability[dayOfWeek] || selectedStaff.availability[dayOfWeek].length === 0;
+    }
+    
+    // Fallback to old structure
+    if (!selectedStaff.availableDays) return true;
+    return !selectedStaff.availableDays.includes(dayOfWeek);
   };
 
   const onSubmit = async (data: BookingFormValues) => {
@@ -114,7 +146,7 @@ export default function BookSessionPage() {
       case 'accepted':
         return <Badge className="bg-green-500"><CheckCircle className="h-3 w-3 mr-1" />Accepted</Badge>;
       case 'rejected':
-        return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>;
+        return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Declined</Badge>;
       default:
         return <Badge variant="secondary"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
     }
@@ -204,7 +236,10 @@ export default function BookSessionPage() {
                               <Calendar
                                 mode="single"
                                 selected={field.value}
-                                onSelect={field.onChange}
+                                onSelect={(date) => {
+                                  field.onChange(date);
+                                  form.setValue('time', ''); // Reset time when date changes
+                                }}
                                 disabled={isDayDisabled}
                                 initialFocus
                               />
@@ -221,7 +256,11 @@ export default function BookSessionPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Time</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!selectedStaffId || !form.getValues('date')}>
+                          <Select 
+                            onValueChange={field.onChange} 
+                            value={field.value}
+                            disabled={!selectedStaffId || !form.getValues('date')}
+                          >
                             <FormControl>
                               <SelectTrigger>
                                 <Clock className="mr-2 h-4 w-4" />
@@ -268,10 +307,12 @@ export default function BookSessionPage() {
                           >
                             <label className="flex items-center gap-2 rounded-md border p-3 cursor-pointer hover:bg-accent">
                               <RadioGroupItem value="online" />
+                              <Video className="h-4 w-4" />
                               <span>Online</span>
                             </label>
                             <label className="flex items-center gap-2 rounded-md border p-3 cursor-pointer hover:bg-accent">
                               <RadioGroupItem value="in-person" />
+                              <MapPin className="h-4 w-4" />
                               <span>In person</span>
                             </label>
                           </RadioGroup>
@@ -301,62 +342,78 @@ export default function BookSessionPage() {
                   <p className="mt-4 text-sm text-muted-foreground">No bookings yet. Create your first booking!</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date & Time</TableHead>
-                        <TableHead>Teacher</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Meeting Link</TableHead>
-                        <TableHead>Note</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {bookings.map((booking) => {
-                        const dateTime = booking.dateTime?.toDate?.() ?? new Date();
-                        return (
-                          <TableRow key={booking.id}>
-                            <TableCell>
-                              <div className="flex flex-col">
-                                <span className="font-medium">{format(dateTime, 'PPP')}</span>
-                                <span className="text-sm text-muted-foreground">{format(dateTime, 'p')}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>{booking.staffName ?? 'Staff'}</TableCell>
-                            <TableCell className="capitalize">{booking.meetingType}</TableCell>
-                            <TableCell>{getStatusBadge(booking.status)}</TableCell>
-                            <TableCell>
-                              {booking.meetingLink && booking.status === 'accepted' ? (
-                                <a 
-                                  href={booking.meetingLink} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-1 text-primary hover:underline"
-                                >
-                                  <ExternalLink className="h-3 w-3" />
-                                  Join
-                                </a>
+                <div className="space-y-4">
+                  {bookings.map((booking) => {
+                    const dateTime = booking.dateTime?.toDate?.() ?? new Date();
+                    return (
+                      <div key={booking.id} className="border rounded-lg p-5 hover:shadow-md transition-shadow">
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <span className="font-semibold text-lg">{booking.staffName ?? 'Staff'}</span>
+                              {getStatusBadge(booking.status)}
+                            </div>
+                            <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                              <CalendarIcon className="h-4 w-4" />
+                              <span>{format(dateTime, 'EEEE, MMMM d, yyyy')}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-muted-foreground mb-3">
+                              <Clock className="h-4 w-4" />
+                              <span>{format(dateTime, 'h:mm a')}</span>
+                            </div>
+                            <div className="flex items-center gap-2 mb-3">
+                              {booking.meetingType === 'online' ? (
+                                <Badge variant="outline" className="bg-blue-50">
+                                  <Video className="h-3 w-3 mr-1" />
+                                  Online Meeting
+                                </Badge>
                               ) : (
-                                <span className="text-muted-foreground text-sm">—</span>
+                                <Badge variant="outline" className="bg-green-50">
+                                  <MapPin className="h-3 w-3 mr-1" />
+                                  In-Person
+                                </Badge>
                               )}
-                            </TableCell>
-                            <TableCell className="max-w-[200px]">
-                              {booking.responseNote ? (
-                                <span className="text-sm" title={booking.responseNote}>
-                                  {booking.responseNote.substring(0, 30)}
-                                  {booking.responseNote.length > 30 && '...'}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="text-sm text-muted-foreground mb-3">
+                          <span className="font-medium text-foreground">Your reason:</span> {booking.reason}
+                        </div>
+
+                        {booking.meetingLink && booking.status === 'accepted' && (
+                          <div className="mb-3">
+                            <Button asChild size="sm" className="bg-blue-600 hover:bg-blue-700">
+                              <a 
+                                href={booking.meetingLink} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2"
+                              >
+                                <Video className="h-4 w-4" />
+                                Join Meeting
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            </Button>
+                          </div>
+                        )}
+
+                        {booking.responseNote && (
+                          <div className="mt-3 p-3 bg-muted/50 rounded-lg border">
+                            <div className="flex items-start gap-2">
+                              <MessageSquare className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                              <div className="flex-1">
+                                <span className="font-medium text-sm">
+                                  {booking.status === 'accepted' ? 'Note from teacher:' : 'Reason for decline:'}
                                 </span>
-                              ) : (
-                                <span className="text-muted-foreground text-sm">—</span>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
+                                <p className="text-sm text-muted-foreground mt-1">{booking.responseNote}</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </CardContent>

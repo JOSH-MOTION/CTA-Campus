@@ -9,6 +9,9 @@ import {onAuthStateChanged}from 'firebase/auth';
 import {doc, getDoc, setDoc, collection, getDocs, query, where, onSnapshot} from 'firebase/firestore';
 
 export type UserRole = 'student' | 'teacher' | 'admin';
+// Updated availability structure: day-specific time slots
+type DayAvailability = { startTime: string; endTime: string }[];
+type WeeklyAvailability = { [day: string]: DayAvailability };
 
 export interface UserData {
   uid: string;
@@ -26,8 +29,13 @@ export interface UserData {
   photoURL?: string;
   totalPoints?: number;
   // Teacher specific
-  gensTaught?: string;
+  // Teacher specific
+ 
+  // NEW: Day-specific availability
+  availability?: WeeklyAvailability;
+  // OLD: Keep for backwards compatibility (deprecated)
   availableDays?: string[];
+  gensTaught?: string;
   timeSlots?: { startTime: string; endTime: string }[];
   linkedin?: string;
   github?: string;
