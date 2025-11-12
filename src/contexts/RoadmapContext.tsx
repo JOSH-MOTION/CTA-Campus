@@ -1,33 +1,30 @@
-
 // src/contexts/RoadmapContext.tsx
 'use client';
 
-import {createContext, useContext, useState, ReactNode, FC, useEffect, useMemo} from 'react';
+import { createContext, useContext, useState, ReactNode, FC, useEffect, useMemo } from 'react';
 import { useAuth } from './AuthContext';
 import { onRoadmapStatus, setWeekCompletion, WeekCompletionStatusMap } from '@/services/roadmap';
 
-// The structure for a single topic, including its unique ID
 export interface Topic {
   id: string;
   title: string;
 }
 
-// The structure for a week, containing multiple topics
 export interface Week {
   title: string;
   topics: Topic[];
 }
 
-// The structure for a main subject area in the roadmap
 export interface RoadmapSubject {
   title: string;
   duration: string;
   weeks: Week[];
+  infoItems?: { title: string; description: string }[];
 }
 
 export interface WeekWithSubject extends Week {
-    subjectTitle: string;
-    weekTitle: string;
+  subjectTitle: string;
+  weekTitle: string;
 }
 
 interface RoadmapContextType {
@@ -39,7 +36,7 @@ interface RoadmapContextType {
   currentWeek: WeekWithSubject | null;
   nextWeek: WeekWithSubject | null;
   allWeeksCompleted: boolean;
-  setTeacherViewingGen: (gen: string) => void; // New function
+  setTeacherViewingGen: (gen: string) => void;
 }
 
 const roadmapData: RoadmapSubject[] = [
@@ -50,17 +47,20 @@ const roadmapData: RoadmapSubject[] = [
       {
         title: 'Week 1',
         topics: [
-          {id: 'git-1-1', title: 'Installing git'},
-          {id: 'git-1-2', title: 'Initialize git in repo'},
-          {id: 'git-1-3', title: 'Staging'},
-          {id: 'git-1-4', title: 'Committing'},
+          { id: 'git-1-1', title: 'Installing git' },
+          { id: 'git-1-2', title: 'Initialize git in repo' },
+          { id: 'git-1-3', title: 'Staging' },
+          { id: 'git-1-4', title: 'Committing' },
         ],
       },
-      {title: 'Week 2', topics: [
-          {id: 'git-2-1', title: 'Pushing'}, 
-          {id: 'git-2-2', title: 'Branching'}, 
-          {id: 'git-2-3', title: 'Pulling'}
-      ]},
+      {
+        title: 'Week 2',
+        topics: [
+          { id: 'git-2-1', title: 'Pushing' },
+          { id: 'git-2-2', title: 'Branching' },
+          { id: 'git-2-3', title: 'Pulling' },
+        ],
+      },
     ],
   },
   {
@@ -70,20 +70,20 @@ const roadmapData: RoadmapSubject[] = [
       {
         title: 'Week 1',
         topics: [
-          {id: 'html-1-1', title: 'Basic html structure'},
-          {id: 'html-1-2', title: 'Html elements'},
-          {id: 'html-1-3', title: 'Html attributes'},
-          {id: 'html-1-4', title: 'Content (p, link, img, headings, lists)'},
-          {id: 'html-1-5', title: 'Comments'},
+          { id: 'html-1-1', title: 'Basic html structure' },
+          { id: 'html-1-2', title: 'Html elements' },
+          { id: 'html-1-3', title: 'Html attributes' },
+          { id: 'html-1-4', title: 'Content (p, link, img, headings, lists)' },
+          { id: 'html-1-5', title: 'Comments' },
         ],
       },
       {
         title: 'Week 2',
         topics: [
-            {id: 'html-2-1', title: 'Tables'}, 
-            {id: 'html-2-2', title: 'Classes and id'}, 
-            {id: 'html-2-3', title: 'Div/section'}, 
-            {id: 'html-2-4', title: 'Forms'}
+          { id: 'html-2-1', title: 'Tables' },
+          { id: 'html-2-2', title: 'Classes and id' },
+          { id: 'html-2-3', title: 'Div/section' },
+          { id: 'html-2-4', title: 'Forms' },
         ],
       },
     ],
@@ -95,46 +95,50 @@ const roadmapData: RoadmapSubject[] = [
       {
         title: 'Week 1',
         topics: [
-          {id: 'css-1-1', title: 'Css syntax'},
-          {id: 'css-1-2', title: 'Selectors (element, id, class, combination)'},
-          {id: 'css-1-3', title: 'Css properties (color, width, height, background, border, margin, padding, fonts, display)'},
+          { id: 'css-1-1', title: 'Css syntax' },
+          { id: 'css-1-2', title: 'Selectors (element, id, class, combination)' },
+          { id: 'css-1-3', title: 'Css properties (color, width, height, background, border, margin, padding, fonts, display)' },
         ],
       },
-      {title: 'Week 2', topics: [
-          {id: 'css-2-1', title: 'Box model'}, 
-          {id: 'css-2-2', title: 'Float'}, 
-          {id: 'css-2-3', title: 'Flexbox'}
-      ]},
+      {
+        title: 'Week 2',
+        topics: [
+          { id: 'css-2-1', title: 'Box model' },
+          { id: 'css-2-2', title: 'Float' },
+          { id: 'css-2-3', title: 'Flexbox' },
+        ],
+      },
     ],
   },
   {
     title: 'Tailwind',
     duration: '4 weeks',
     weeks: [
-      {title: 'Week 1', topics: [
-          {id: 'tailwind-1-1', title: 'Responsive design'}, 
-          {id: 'tailwind-1-2', title: 'Grid system'}
-      ]},
-      {title: 'Week 2', topics: [
-          {id: 'tailwind-2-1', title: 'Components'}
-      ]},
+      { title: 'Week 1', topics: [{ id: 'tailwind-1-1', title: 'Responsive design' }, { id: 'tailwind-1-2', title: 'Grid system' }] },
+      { title: 'Week 2', topics: [{ id: 'tailwind-2-1', title: 'Components' }] },
       {
         title: 'Week 3',
         topics: [
-          {id: 'tailwind-3-1', title: 'Calculator project (in class)'}, 
-          {id: 'tailwind-3-2', title: 'Horizons website (homework)'}
+          { id: 'tailwind-3-1', title: 'Calculator project (in class)' },
+          { id: 'tailwind-3-2', title: 'Horizons website (homework)' },
         ],
       },
       {
         title: 'Week 4',
         topics: [
-            {id: 'tailwind-4-1', title: 'Shopping Cart (in class)'}, 
-            {id: 'tailwind-4-2', title: 'DentaCare (homework)'}
+          { id: 'tailwind-4-1', title: 'Shopping Cart (in class)' },
+          { id: 'tailwind-4-2', title: 'DentaCare (homework)' },
         ],
       },
     ],
+    infoItems: [
+      {
+        title: 'Tailwind Mini Demo',
+        description:
+          'After completing the Tailwind CSS module, students will be required to choose a project of their choice. This project will demonstrate their understanding of Tailwind utility classes, responsive design, and modern UI building techniques.',
+      },
+    ],
   },
- 
   {
     title: 'JS',
     duration: '5 weeks',
@@ -142,54 +146,58 @@ const roadmapData: RoadmapSubject[] = [
       {
         title: 'Week 1',
         topics: [
-          {id: 'js-1-1', title: 'Output (console.log, document.write)'},
-          {id: 'js-1-2', title: 'Variables (var, let, const)'},
-          {id: 'js-1-3', title: 'Data types (string, float, int, bool)'},
-          {id: 'js-1-4', title: 'Arithmetic operators (+, -, x, %)'},
-          {id: 'js-1-5', title: 'Comparisons (==, ===, !=, !==, >, <, >=, <=)'},
-          {id: 'js-1-6', title: 'Logical operators (AND, OR, NOT, ||, &&)'},
+          { id: 'js-1-1', title: 'Output (console.log, document.write)' },
+          { id: 'js-1-2', title: 'Variables (var, let, const)' },
+          { id: 'js-1-3', title: 'Data types (string, float, int, bool)' },
+          { id: 'js-1-4', title: 'Arithmetic operators (+, -, x, %)' },
+          { id: 'js-1-5', title: 'Comparisons (==, ===, !=, !==, >, <, >=, <=)' },
+          { id: 'js-1-6', title: 'Logical operators (AND, OR, NOT, ||, &&)' },
         ],
       },
       {
         title: 'Week 2',
         topics: [
-            {id: 'js-2-1', title: 'Arrays'}, 
-            {id: 'js-2-2', title: 'Conditionals (if, else, else if, switch)'}, 
-            {id: 'js-2-3', title: 'Loops (for, while, map)'}
+          { id: 'js-2-1', title: 'Arrays' },
+          { id: 'js-2-2', title: 'Conditionals (if, else, else if, switch)' },
+          { id: 'js-2-3', title: 'Loops (for, while, map)' },
         ],
       },
       {
         title: 'Week 3',
         topics: [
-            {id: 'js-3-1', title: 'Functions(plain old functions, Arrow functions)'}, 
-            {id: 'js-3-2', title: 'Objects'}
+          { id: 'js-3-1', title: 'Functions(plain old functions, Arrow functions)' },
+          { id: 'js-3-2', title: 'Objects' },
         ],
       },
-      {title: 'Week 4', topics: [
-          {id: 'js-4-1', title: 'OOP'},
-          {id: 'js-4-2', title: 'Scope (this keyword)'},
-      ]},
+      {
+        title: 'Week 4',
+        topics: [{ id: 'js-4-1', title: 'OOP' }, { id: 'js-4-2', title: 'Scope (this keyword)' }],
+      },
       {
         title: 'Week 5',
         topics: [
-          {id: 'js-5-1', title: 'JS Q&A, JS overview'},
-          {id: 'js-5-2', title: 'JS simple algorithms'},
-          {id: 'js-5-3', title: 'DOM manipulation'},
+          { id: 'js-5-1', title: 'JS Q&A, JS overview' },
+          { id: 'js-5-2', title: 'JS simple algorithms' },
+          { id: 'js-5-3', title: 'DOM manipulation' },
         ],
       },
     ],
   },
-   {
+  {
     title: 'System Design',
     duration: '1 week',
     weeks: [
       {
         title: 'Week 1',
-        topics: [
-          {id: 'System Design-1-1', title: 'System Design'},
-        ],
+        topics: [{ id: 'System Design-1-1', title: 'System Design' }],
       },
-  
+    ],
+    infoItems: [
+      {
+        title: 'System Design Phase',
+        description:
+          'After learning System Design, each student will receive their app idea and bring it to the instructors for review and agreement. Once approved, students will begin building their applications based on their individual system designs.',
+      },
     ],
   },
   {
@@ -199,31 +207,31 @@ const roadmapData: RoadmapSubject[] = [
       {
         title: 'Data structures in JS',
         topics: [
-          {id: 'ds-1-1', title: 'Arrays(stack,queue)'},
-          {id: 'ds-1-2', title: 'Push, Pop, slice, splice'},
-          {id: 'ds-1-3', title: 'objects, classes'},
+          { id: 'ds-1-1', title: 'Arrays(stack,queue)' },
+          { id: 'ds-1-2', title: 'Push, Pop, slice, splice' },
+          { id: 'ds-1-3', title: 'objects, classes' },
         ],
       },
       {
         title: 'Algorithms',
         topics: [
-          {id: 'ds-2-1', title: 'Big O notation'},
-          {id: 'ds-2-2', title: 'Sort algorithms(bubble sort / quick sort)(intermediate)'},
-          {id: 'ds-2-3', title: 'Search algorithms(linear search,/ binary search)(intermediate)'},
-          {id: 'ds-2-4', title: 'List of even/odd/prime numbers (basic)'},
-          {id: 'ds-2-5', title: 'Sum of even/odd/prime numbers(basic)'},
-          {id: 'ds-2-6', title: 'Search and replace (intermediate)'},
+          { id: 'ds-2-1', title: 'Big O notation' },
+          { id: 'ds-2-2', title: 'Sort algorithms(bubble sort / quick sort)(intermediate)' },
+          { id: 'ds-2-3', title: 'Search algorithms(linear search,/ binary search)(intermediate)' },
+          { id: 'ds-2-4', title: 'List of even/odd/prime numbers (basic)' },
+          { id: 'ds-2-5', title: 'Sum of even/odd/prime numbers(basic)' },
+          { id: 'ds-2-6', title: 'Search and replace (intermediate)' },
         ],
       },
-       {
+      {
         title: 'Search Algorithms',
         topics: [
-          {id: 'ds-3-1', title: 'Big O notation'},
-          {id: 'ds-3-2', title: 'Sort algorithms(bubble sort / quick sort)(intermediate)'},
-          {id: 'ds-3-3', title: 'Search algorithms(linear search,/ binary search)(intermediate)'},
-          {id: 'ds-3-4', title: 'List of even/odd/prime numbers (basic)'},
-          {id: 'ds-3-5', title: 'Sum of even/odd/prime numbers(basic)'},
-          {id: 'ds-3-6', title: 'Search and replace (intermediate)'},
+          { id: 'ds-3-1', title: 'Big O notation' },
+          { id: 'ds-3-2', title: 'Sort algorithms(bubble sort / quick sort)(intermediate)' },
+          { id: 'ds-3-3', title: 'Search algorithms(linear search,/ binary search)(intermediate)' },
+          { id: 'ds-3-4', title: 'List of even/odd/prime numbers (basic)' },
+          { id: 'ds-3-5', title: 'Sum of even/odd/prime numbers(basic)' },
+          { id: 'ds-3-6', title: 'Search and replace (intermediate)' },
         ],
       },
     ],
@@ -235,89 +243,80 @@ const roadmapData: RoadmapSubject[] = [
       {
         title: 'Week 1',
         topics: [
-          {id: 'react-1-1', title: 'Overview of React and SPAs'},
-          {id: 'react-1-2', title: 'Installing package managers (NPM, Yarn)'},
-          {id: 'react-1-3', title: 'Create React App (CRA)'},
+          { id: 'react-1-1', title: 'Overview of React and SPAs' },
+          { id: 'react-1-2', title: 'Installing package managers (NPM, Yarn)' },
+          { id: 'react-1-3', title: 'Create React App (CRA)' },
         ],
       },
       {
         title: 'Week 2',
         topics: [
-          {id: 'react-2-1', title: 'Js import/export'},
-          {id: 'react-2-2', title: 'How react server works (yarn start / npm start)'},
-          {id: 'react-2-3', title: 'JSX'},
-          {id: 'react-2-4', title: 'Styling in React (inline, external)'},
-          {id: 'react-2-5', title: 'Components (and Destructuring)'},
-          {id: 'react-2-6', title: 'Props'},
+          { id: 'react-2-1', title: 'Js import/export' },
+          { id: 'react-2-2', title: 'How react server works (yarn start / npm start)' },
+          { id: 'react-2-3', title: 'JSX' },
+          { id: 'react-2-4', title: 'Styling in React (inline, external)' },
+          { id: 'react-2-5', title: 'Components (and Destructuring)' },
+          { id: 'react-2-6', title: 'Props' },
         ],
       },
       {
         title: 'Week 3',
         topics: [
-          {id: 'react-3-1', title: 'Breaking content into components, how to link bootstrap (using the Pizza website)'},
-          {id: 'react-3-2', title: 'Passing props to replace hard coded text and content'},
+          { id: 'react-3-1', title: 'Breaking content into components, how to link bootstrap (using the Pizza website)' },
+          { id: 'react-3-2', title: 'Passing props to replace hard coded text and content' },
         ],
       },
       {
         title: 'Week 4',
         topics: [
-          {id: 'react-4-1', title: 'Events (onClick, onChange)'},
-          {id: 'react-4-2', title: 'State (and spread operator) - counter example using both class and function components.'},
-          {id: 'react-4-3', title: 'Forms ( simple form with multiple inputs to collect data into the state. On submit, we log the values in the state to confirm that form works)'},
+          { id: 'react-4-1', title: 'Events (onClick, onChange)' },
+          { id: 'react-4-2', title: 'State (and spread operator) - counter example using both class and function components.' },
+          { id: 'react-4-3', title: 'Forms ( simple form with multiple inputs to collect data into the state. On submit, we log the values in the state to confirm that form works)' },
         ],
       },
       {
         title: 'Week 5',
-        topics: [{id: 'react-5-1', title: 'CRUD Project 1 (create, retrieve) - add users/see users project'}],
+        topics: [{ id: 'react-5-1', title: 'CRUD Project 1 (create, retrieve) - add users/see users project' }],
       },
       {
         title: 'Week 6',
-        topics: [{id: 'react-6-1', title: 'CRUD Project 2 (update, delete) - update users/delete users'}],
+        topics: [{ id: 'react-6-1', title: 'CRUD Project 2 (update, delete) - update users/delete users' }],
       },
       {
         title: 'Week 7',
         topics: [
-          {id: 'react-7-1', title: 'Routing (react router, links, routes, route params)'},
-          {id: 'react-7-2', title: 'Kawolegal website project (assignment)'},
+          { id: 'react-7-1', title: 'Routing (react router, links, routes, route params)' },
+          { id: 'react-7-2', title: 'Kawolegal website project (assignment)' },
         ],
       },
-      {title: 'Week 8', topics: [{id: 'react-8-1', title: 'Making API requests (in functional components using fetch or axios)'}]},
-      {title: 'Week 9', topics: [{id: 'react-9-1', title: 'Zustand intro (flux architecture, setup - store, reducers, actions )'}]},
+      { title: 'Week 8', topics: [{ id: 'react-8-1', title: 'Making API requests (in functional components using fetch or axios)' }] },
+      { title: 'Week 9', topics: [{ id: 'react-9-1', title: 'Zustand intro (flux architecture, setup - store, reducers, actions )' }] },
       {
         title: 'Week 10',
         topics: [
-          {id: 'react-10-1', title: 'Zustand (connect to components, mapStateToProps, MapDispatchToProps - create and retrieve) - Bank account project (assignment)'},
+          { id: 'react-10-1', title: 'Zustand (connect to components, mapStateToProps, MapDispatchToProps - create and retrieve) - Bank account project (assignment)' },
         ],
       },
-      {title: 'Week 11', topics: [{id: 'react-11-1', title: 'Zustand (edit and delete) - continue Bank account management project (assignment)'}]},
-      {title: 'Week 12', topics: [{id: 'react-12-1', title: 'React Project(CRUD application with redux - Notes project)'}]},
+      { title: 'Week 11', topics: [{ id: 'react-11-1', title: 'Zustand (edit and delete) - continue Bank account management project (assignment)' }] },
+      { title: 'Week 12', topics: [{ id: 'react-12-1', title: 'React Project(CRUD application with redux - Notes project)' }] },
+    ],
+    infoItems: [
+      {
+        title: 'React CRUD Project',
+        description:
+          'After mastering React, students will work on building CRUD (Create, Read, Update, Delete) applications. This project will test their understanding of component structure, state management, and data handling in React.',
+      },
     ],
   },
   {
     title: 'Firebase',
     duration: '3 weeks',
     weeks: [
-      {
-        title: 'Week 1',
-        topics: [
-            {id: 'firebase-1-1', title: 'Firebase connection'}, 
-        ],
-      },
-      {
-        title: 'Week 2',
-        topics: [
-            {id: 'firebase-1-2', title: 'Firebase database / cloud firestore (CRUD)'}, 
-        ],
-      },
-      {
-        title: 'Week 3',
-        topics: [
-            {id: 'firebase-1-3', title: 'Firebase authentication'}
-        ],
-      },
+      { title: 'Week 1', topics: [{ id: 'firebase-1-1', title: 'Firebase connection' }] },
+      { title: 'Week 2', topics: [{ id: 'firebase-1-2', title: 'Firebase database / cloud firestore (CRUD)' }] },
+      { title: 'Week 3', topics: [{ id: 'firebase-1-3', title: 'Firebase authentication' }] },
     ],
   },
-  
   {
     title: 'Backend - NodeJS',
     duration: '9 weeks',
@@ -325,77 +324,81 @@ const roadmapData: RoadmapSubject[] = [
       {
         title: 'Week 1',
         topics: [
-          {id: 'node-1-1', title: 'Setup a basic node server with http package'},
-          {id: 'node-1-2', title: 'Learn request-response cycle and objects'},
-          {id: 'node-1-3', title: 'Headers - content-type, accept,'},
-          {id: 'node-1-4', title: 'body,'},
-          {id: 'node-1-5', title: 'Methods - post, get, put, patch,'},
-          {id: 'node-1-6', title: 'Url'},
-          {id: 'node-1-7', title: 'Status codes - 200, 404, 500'},
-          {id: 'node-1-8', title: 'Implement routing on the request objects url'},
-          {id: 'node-1-9', title: 'Sending responses'},
+          { id: 'node-1-1', title: 'Setup a basic node server with http package' },
+          { id: 'node-1-2', title: 'Learn request-response cycle and objects' },
+          { id: 'node-1-3', title: 'Headers - content-type, accept,' },
+          { id: 'node-1-4', title: 'body,' },
+          { id: 'node-1-5', title: 'Methods - post, get, put, patch,' },
+          { id: 'node-1-6', title: 'Url' },
+          { id: 'node-1-7', title: 'Status codes - 200, 404, 500' },
+          { id: 'node-1-8', title: 'Implement routing on the request objects url' },
+          { id: 'node-1-9', title: 'Sending responses' },
         ],
       },
       {
         title: 'Week 2',
         topics: [
-          {id: 'node-2-1', title: 'Npm and package.json'},
-          {id: 'node-2-2', title: 'Setup node server with express'},
-          {id: 'node-2-3', title: 'Routing with app.use(), app.get(), app.post()'},
-          {id: 'node-2-4', title: 'Implement response.send()'},
+          { id: 'node-2-1', title: 'Npm and package.json' },
+          { id: 'node-2-2', title: 'Setup node server with express' },
+          { id: 'node-2-3', title: 'Routing with app.use(), app.get(), app.post()' },
+          { id: 'node-2-4', title: 'Implement response.send()' },
         ],
       },
       {
         title: 'Week 3',
         topics: [
-          {id: 'node-3-1', title: 'Middlewares - the next() method'},
-          {id: 'node-3-2', title: 'General middlewares'},
-          {id: 'node-3-3', title: 'Route middlewares'},
-          {id: 'node-3-4', title: 'Serving static files - express.static middleware'},
-          {id: 'node-3-5', title: 'Parsing request objects - body-parser middleware'},
+          { id: 'node-3-1', title: 'Middlewares - the next() method' },
+          { id: 'node-3-2', title: 'General middlewares' },
+          { id: 'node-3-3', title: 'Route middlewares' },
+          { id: 'node-3-4', title: 'Serving static files - express.static middleware' },
+          { id: 'node-3-5', title: 'Parsing request objects - body-parser middleware' },
         ],
       },
       {
         title: 'Week 4',
         topics: [
-            {id: 'node-4-1', title: 'Postman'}, 
-            {id: 'node-4-2', title: 'REST architecture'}, 
-            {id: 'node-4-3', title: 'Getting organized - controllers, routes, models'}
+          { id: 'node-4-1', title: 'Postman' },
+          { id: 'node-4-2', title: 'REST architecture' },
+          { id: 'node-4-3', title: 'Getting organized - controllers, routes, models' },
         ],
       },
-      {title: 'Week 5', topics: [
-          {id: 'node-5-1', title: 'Databases - SQL and NoSQL'},
-          {id: 'node-5-2', title: 'Setting up Mongodb'},
-      ]},
+      { title: 'Week 5', topics: [{ id: 'node-5-1', title: 'Databases - SQL and NoSQL' }, { id: 'node-5-2', title: 'Setting up Mongodb' }] },
       {
         title: 'Week 6',
         topics: [
-          {id: 'node-6-1', title: 'Mongoose core - schema, models, queries'},
-          {id: 'node-6-2', title: 'Setup mongoose for node'},
-          {id: 'node-6-3', title: 'Mongoose models'},
-          {id: 'node-6-4', title: 'Create and Retrieve data with mongoose'},
+          { id: 'node-6-1', title: 'Mongoose core - schema, models, queries' },
+          { id: 'node-6-2', title: 'Setup mongoose for node' },
+          { id: 'node-6-3', title: 'Mongoose models' },
+          { id: 'node-6-4', title: 'Create and Retrieve data with mongoose' },
         ],
       },
       {
         title: 'Week 7',
         topics: [
-            {id: 'node-7-1', title: 'Update and Delete data with mongoose'}, 
-            {id: 'node-7-2', title: 'Relationships in mongoose'}, 
-            {id: 'node-7-3', title: 'Fetching relational data'}, 
-            {id: 'node-7-4', title: 'Delete relational data'}
+          { id: 'node-7-1', title: 'Update and Delete data with mongoose' },
+          { id: 'node-7-2', title: 'Relationships in mongoose' },
+          { id: 'node-7-3', title: 'Fetching relational data' },
+          { id: 'node-7-4', title: 'Delete relational data' },
         ],
       },
-      {title: 'Week 8', topics: [{id: 'node-8-1', title: 'validation - express validator?'}]},
+      { title: 'Week 8', topics: [{ id: 'node-8-1', title: 'validation - express validator?' }] },
       {
         title: 'Week 9',
         topics: [
-          {id: 'node-9-1', title: 'Authentication'},
-          {id: 'node-9-2', title: 'Sign up'},
-          {id: 'node-9-3', title: 'Sign in'},
-          {id: 'node-9-4', title: 'Tokens and authorizations'},
-          {id: 'node-9-5', title: 'Jwt - sign , verify , decode'},
-          {id: 'node-9-6', title: 'Route protection'},
+          { id: 'node-9-1', title: 'Authentication' },
+          { id: 'node-9-2', title: 'Sign up' },
+          { id: 'node-9-3', title: 'Sign in' },
+          { id: 'node-9-4', title: 'Tokens and authorizations' },
+          { id: 'node-9-5', title: 'Jwt - sign , verify , decode' },
+          { id: 'node-9-6', title: 'Route protection' },
         ],
+      },
+    ],
+    infoItems: [
+      {
+        title: 'Full-Stack Development Project',
+        description:
+          'Students will then proceed to build any project that includes a backend. This phase introduces server-side development, API creation, and database connectivity, helping students understand how the frontend communicates with the backend.',
       },
     ],
   },
@@ -406,51 +409,55 @@ const roadmapData: RoadmapSubject[] = [
       {
         title: 'Week 1',
         topics: [
-          {id: 'rn-1-1', title: 'Setup React Native (install expo cli)'},
-          {id: 'rn-1-2', title: 'Basic Components (Text, View)'},
-          {id: 'rn-1-3', title: 'React Native Styles (Stylesheet.Create, flexbox)'},
-          {id: 'rn-1-4', title: 'Available Core Library Components (Image, ImageBackground, Modal)'},
+          { id: 'rn-1-1', title: 'Setup React Native (install expo cli)' },
+          { id: 'rn-1-2', title: 'Basic Components (Text, View)' },
+          { id: 'rn-1-3', title: 'React Native Styles (Stylesheet.Create, flexbox)' },
+          { id: 'rn-1-4', title: 'Available Core Library Components (Image, ImageBackground, Modal)' },
         ],
       },
       {
         title: 'Week 2',
         topics: [
-          {id: 'rn-2-1', title: 'Forms and Buttons (TextInput, TouchableOpacity, KeyboardAvoidingView, SafeAreaView, Validation)'},
-          {id: 'rn-2-2', title: 'Displaying List (FlatList, ScrollView)'},
+          { id: 'rn-2-1', title: 'Forms and Buttons (TextInput, TouchableOpacity, KeyboardAvoidingView, SafeAreaView, Validation)' },
+          { id: 'rn-2-2', title: 'Displaying List (FlatList, ScrollView)' },
         ],
       },
-      {title: 'Week 3', topics: [
-          {id: 'rn-3-1', title: 'Onboarding project exercise'},
-          {id: 'rn-3-2', title: 'Ecommerce app assignment'},
-      ]},
+      {
+        title: 'Week 3',
+        topics: [{ id: 'rn-3-1', title: 'Onboarding project exercise' }, { id: 'rn-3-2', title: 'Ecommerce app assignment' }],
+      },
       {
         title: 'Week 4',
-        topics: [
-            {id: 'rn-4-1', title: 'Routing with React Navigation (Stack)'}, 
-            {id: 'rn-4-2', title: 'React native blog app'}
-        ],
+        topics: [{ id: 'rn-4-1', title: 'Routing with React Navigation (Stack)' }, { id: 'rn-4-2', title: 'React native blog app' }],
       },
       {
         title: 'Week 5',
         topics: [
-          {id: 'rn-5-1', title: 'Ampersand contact app first 4 screens as exercise'},
-          {id: 'rn-5-2', title: 'Ampersand contact app last 4 screens as assignment'},
+          { id: 'rn-5-1', title: 'Ampersand contact app first 4 screens as exercise' },
+          { id: 'rn-5-2', title: 'Ampersand contact app last 4 screens as assignment' },
         ],
       },
       {
         title: 'Week 6',
         topics: [
-          {id: 'rn-6-1', title: 'Redux'},
-          {id: 'rn-6-2', title: 'Firebase'},
-          {id: 'rn-6-3', title: 'Authentication'},
-          {id: 'rn-6-4', title: 'Add authentication to form and list project from week 2'},
-          {id: 'rn-6-5', title: 'React Native Project (Ampersand project) - add authentication as assignment'},
+          { id: 'rn-6-1', title: 'Redux' },
+          { id: 'rn-6-2', title: 'Firebase' },
+          { id: 'rn-6-3', title: 'Authentication' },
+          { id: 'rn-6-4', title: 'Add authentication to form and list project from week 2' },
+          { id: 'rn-6-5', title: 'React Native Project (Ampersand project) - add authentication as assignment' },
         ],
       },
-      {title: 'Week 7', topics: [
-          {id: 'rn-7-1', title: 'How react native works under the hood'},
-          {id: 'rn-7-2', title: 'Wrap up'},
-      ]},
+      {
+        title: 'Week 7',
+        topics: [{ id: 'rn-7-1', title: 'How react native works under the hood' }, { id: 'rn-7-2', title: 'Wrap up' }],
+      },
+    ],
+    infoItems: [
+      {
+        title: 'React Native Project',
+        description:
+          'In the final stage, students will build mobile applications using React Native. This allows them to gain hands-on experience in developing cross-platform mobile apps that work on both Android and iOS.',
+      },
     ],
   },
   {
@@ -462,10 +469,10 @@ const roadmapData: RoadmapSubject[] = [
 
 const RoadmapContext = createContext<RoadmapContextType | undefined>(undefined);
 
-export const RoadmapProvider: FC<{children: ReactNode}> = ({children}) => {
+export const RoadmapProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const [completionMap, setCompletionMap] = useState<WeekCompletionStatusMap>({});
   const [loading, setLoading] = useState(true);
-  const [teacherViewingGen, setTeacherViewingGen] = useState<string>(''); // New state
+  const [teacherViewingGen, setTeacherViewingGen] = useState<string>('');
   const { user, userData, role } = useAuth();
 
   useEffect(() => {
@@ -475,82 +482,71 @@ export const RoadmapProvider: FC<{children: ReactNode}> = ({children}) => {
       return;
     }
     unsubscribe = onRoadmapStatus((statusMap) => {
-        setCompletionMap(statusMap);
-        setLoading(false);
+      setCompletionMap(statusMap);
+      setLoading(false);
     });
 
     return () => {
-        if (unsubscribe) {
-            unsubscribe();
-        }
+      if (unsubscribe) unsubscribe();
     };
   }, [user]);
 
   const completedWeeks = useMemo(() => {
-      const completed = new Set<string>();
-      // Determine which generation's progress to view
-      const genToView = role === 'student' ? userData?.gen : teacherViewingGen;
-
-      if (genToView) {
-        Object.entries(completionMap).forEach(([weekId, genMap]) => {
-            if (genMap[genToView]) {
-                completed.add(weekId);
-            }
-        });
-      }
-      return completed;
+    const completed = new Set<string>();
+    const genToView = role === 'student' ? userData?.gen : teacherViewingGen;
+    if (genToView) {
+      Object.entries(completionMap).forEach(([weekId, genMap]) => {
+        if (genMap[genToView]) completed.add(weekId);
+      });
+    }
+    return completed;
   }, [completionMap, userData?.gen, role, teacherViewingGen]);
 
-
   const allFlattenedWeeks = useMemo(() => {
-    return roadmapData.flatMap(subject => 
-        subject.weeks.map(week => ({
-            ...week,
-            subjectTitle: subject.title,
-            weekTitle: week.title
-        }))
+    return roadmapData.flatMap((subject) =>
+      subject.weeks.map((week) => ({
+        ...week,
+        subjectTitle: subject.title,
+        weekTitle: week.title,
+      }))
     );
   }, []);
 
   const { currentWeek, nextWeek, allWeeksCompleted } = useMemo(() => {
     if (allFlattenedWeeks.length === 0) {
-        return { currentWeek: null, nextWeek: null, allWeeksCompleted: false };
+      return { currentWeek: null, nextWeek: null, allWeeksCompleted: false };
     }
-    
-    // Find the index of the last completed week in the flattened list.
+
     let lastCompletedIndex = -1;
     allFlattenedWeeks.forEach((week, index) => {
-        if(completedWeeks.has(`${week.subjectTitle}-${week.weekTitle}`)){
-            lastCompletedIndex = index;
-        }
+      if (completedWeeks.has(`${week.subjectTitle}-${week.weekTitle}`)) {
+        lastCompletedIndex = index;
+      }
     });
 
-    // If no weeks are completed, the current week is the first one.
     if (lastCompletedIndex === -1) {
-        return {
-            currentWeek: allFlattenedWeeks[0],
-            nextWeek: allFlattenedWeeks[1] || null,
-            allWeeksCompleted: false
-        };
+      return {
+        currentWeek: allFlattenedWeeks[0],
+        nextWeek: allFlattenedWeeks[1] || null,
+        allWeeksCompleted: false,
+      };
     }
 
-    // If the last completed week is the last week of the whole curriculum.
     if (lastCompletedIndex === allFlattenedWeeks.length - 1) {
-        return {
-            currentWeek: allFlattenedWeeks[lastCompletedIndex], // Show the last week
-            nextWeek: null,
-            allWeeksCompleted: true,
-        };
+      return {
+        currentWeek: allFlattenedWeeks[lastCompletedIndex],
+        nextWeek: null,
+        allWeeksCompleted: true,
+      };
     }
-    
-    // The current focus is the week right after the last completed one.
+
     const currentFocusWeek = allFlattenedWeeks[lastCompletedIndex + 1];
     const nextFocusWeek = allFlattenedWeeks[lastCompletedIndex + 2] || null;
 
     return {
-        currentWeek: currentFocusWeek,
-        nextWeek: nextFocusWeek,
-        allWeeksCompleted: false,
+      currentWeek: currentFocusWeek,
+      nextWeek: nextFocusWeek,
+      allWeeksCompleted: false,
     };
   }, [completedWeeks, allFlattenedWeeks]);
 
@@ -559,17 +555,19 @@ export const RoadmapProvider: FC<{children: ReactNode}> = ({children}) => {
   };
 
   return (
-    <RoadmapContext.Provider value={{
-      roadmapData, 
-      completedWeeks, 
-      completionMap, 
-      toggleWeekCompletion, 
-      loading,
-      currentWeek,
-      nextWeek,
-      allWeeksCompleted,
-      setTeacherViewingGen,
-    }}>
+    <RoadmapContext.Provider
+      value={{
+        roadmapData,
+        completedWeeks,
+        completionMap,
+        toggleWeekCompletion,
+        loading,
+        currentWeek,
+        nextWeek,
+        allWeeksCompleted,
+        setTeacherViewingGen,
+      }}
+    >
       {children}
     </RoadmapContext.Provider>
   );
@@ -577,8 +575,6 @@ export const RoadmapProvider: FC<{children: ReactNode}> = ({children}) => {
 
 export const useRoadmap = (): RoadmapContextType => {
   const context = useContext(RoadmapContext);
-  if (!context) {
-    throw new Error('useRoadmap must be used within a RoadmapProvider');
-  }
+  if (!context) throw new Error('useRoadmap must be used within a RoadmapProvider');
   return context;
 };
