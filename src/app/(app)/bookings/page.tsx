@@ -224,31 +224,33 @@ export default function BookingsPage() {
       </Card>
 
       {/* Response Dialog */}
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+     <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>
               {responseType === 'accept' ? 'Accept Booking' : 'Decline Booking'}
             </DialogTitle>
-            <DialogDescription>
-              {selectedBooking && (
-                <div className="mt-2 p-3 bg-muted rounded-lg space-y-1">
-                  <p className="font-medium">{selectedBooking.studentName}</p>
-                  <p className="text-sm">
-                    {format(selectedBooking.dateTime?.toDate?.() ?? new Date(), 'EEEE, MMMM d, yyyy')}
-                  </p>
-                  <p className="text-sm">
-                    {format(selectedBooking.dateTime?.toDate?.() ?? new Date(), 'h:mm a')}
-                  </p>
-                  <p className="text-sm capitalize flex items-center gap-1">
-                    {selectedBooking.meetingType === 'online' ? (
-                      <><Video className="h-3 w-3" /> Online Meeting</>
-                    ) : (
-                      <><MapPin className="h-3 w-3" /> In-Person</>
-                    )}
-                  </p>
-                </div>
-              )}
+            <DialogDescription asChild>
+              <div>
+                {selectedBooking && (
+                  <div className="mt-2 p-3 bg-muted rounded-lg space-y-1">
+                    <p className="font-medium">{selectedBooking.studentName}</p>
+                    <p className="text-sm">
+                      {format(selectedBooking.dateTime?.toDate?.() ?? new Date(), 'EEEE, MMMM d, yyyy')}
+                    </p>
+                    <p className="text-sm">
+                      {format(selectedBooking.dateTime?.toDate?.() ?? new Date(), 'h:mm a')}
+                    </p>
+                    <p className="text-sm capitalize flex items-center gap-1">
+                      {selectedBooking.meetingType === 'online' ? (
+                        <><Video className="h-3 w-3" /> Online Meeting</>
+                      ) : (
+                        <><MapPin className="h-3 w-3" /> In-Person</>
+                      )}
+                    </p>
+                  </div>
+                )}
+              </div>
             </DialogDescription>
           </DialogHeader>
 
