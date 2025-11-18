@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -34,7 +33,10 @@ import {
   School,
   Bug,
   FileSpreadsheet,
+  FileText,           // ← Added this
+  ScrollText,         // ← Alternative beautiful icon
 } from 'lucide-react';
+
 import {SidebarMenu, SidebarMenuItem, SidebarMenuButton} from '@/components/ui/sidebar';
 import Link from 'next/link';
 import {usePathname} from 'next/navigation';
@@ -59,6 +61,10 @@ export const studentNavItems = [
   {href: '/directory', label: 'Directory', icon: Contact},
   {href: '/book-session', label: 'Book a Session', icon: CalendarPlus},
   {href: '/work-ready', label: 'Work Ready', icon: Rocket},
+  
+  // ← NEW: Student can view their own report
+  {href: '/reports', label: 'My Evaluation Report', icon: FileText},
+
   {href: '/profile', label: 'Profile', icon: User},
 ];
 
@@ -80,9 +86,13 @@ export const teacherNavItems = [
   {href: '/directory', label: 'Directory', icon: Contact},
   {href: '/bookings', label: 'Manage Bookings', icon: CalendarClock},
   {href: '/availability', label: 'Manage Availability', icon: CalendarClock},
+  
+  // ← NEW: Teachers can view & edit all reports
+  {href: '/reports', label: 'Evaluation Reports', icon: ScrollText},
+
+  {href: '/export', label: 'Gradebook', icon: FileSpreadsheet},
   {href: '/profile', label: 'Profile', icon: User},
   {href: '/diag/grading', label: 'Auth Diag Tool', icon: Bug},
-  {href: '/export', label: 'Gradebook', icon: FileSpreadsheet},
 ];
 
 export const adminNavItems = [
@@ -99,6 +109,10 @@ export const adminNavItems = [
   {href: '/directory', label: 'Directory', icon: Contact},
   {href: '/export', label: 'Gradebook', icon: FileSpreadsheet},
   {href: '/career', label: 'Career Module', icon: GraduationCap},
+  
+  // ← NEW: Admin sees all reports
+  {href: '/reports', label: 'Evaluation Reports', icon: ScrollText},
+
   {href: '/profile', label: 'Profile', icon: User},
   {href: '/diag/grading', label: 'Auth Diag Tool', icon: Bug},
 ];
