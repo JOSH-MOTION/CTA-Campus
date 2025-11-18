@@ -34,7 +34,7 @@ import {
   Bug,
   FileSpreadsheet,
   FileText,           // ← Added this
-  ScrollText,         // ← Alternative beautiful icon
+  Award as SoftSkillsIcon        // ← Alternative beautiful icon
 } from 'lucide-react';
 
 import {SidebarMenu, SidebarMenuItem, SidebarMenuButton} from '@/components/ui/sidebar';
@@ -55,19 +55,18 @@ export const studentNavItems = [
   {href: '/attendance', label: 'Attendance', icon: UserCheck},
   {href: '/grading', label: 'Grading', icon: Award},
   {href: '/100-days-of-code', label: '100 Days of Code', icon: Code},
+   {href: '/soft-skills', label: 'Soft Skills', icon: SoftSkillsIcon},
   {href: '/roadmap', label: 'Roadmap', icon: Map},
   {href: '/materials', label: 'Class Materials', icon: BookCopy},
   {href: '/resources', label: 'Resources Library', icon: BookOpen},
   {href: '/directory', label: 'Directory', icon: Contact},
   {href: '/book-session', label: 'Book a Session', icon: CalendarPlus},
   {href: '/work-ready', label: 'Work Ready', icon: Rocket},
-  
-  // ← NEW: Student can view their own report
-  {href: '/reports', label: 'My Evaluation Report', icon: FileText},
-
+  {href: '/my-report', label: 'My Report', icon: FileText}, // NEW
   {href: '/profile', label: 'Profile', icon: User},
 ];
 
+// For teachers, add to teacherNavItems (around line 45)
 export const teacherNavItems = [
   {href: '/', label: 'Dashboard', icon: LayoutDashboard},
   {href: '/chat', label: 'Campus Connect', icon: MessageSquare},
@@ -80,21 +79,19 @@ export const teacherNavItems = [
   {href: '/exercises', label: 'Exercises', icon: PencilRuler},
   {href: '/projects', label: 'Projects', icon: BookMarked},
   {href: '/100-days-of-code/submissions', label: '100 Days of Code', icon: Code},
+   {href: '/soft-skills', label: 'Soft Skills', icon: SoftSkillsIcon},
   {href: '/attendance', label: 'Attendance', icon: UserCheck},
   {href: '/materials', label: 'Class Materials', icon: BookCopy},
   {href: '/roadmap', label: 'Roadmap', icon: Map},
   {href: '/directory', label: 'Directory', icon: Contact},
   {href: '/bookings', label: 'Manage Bookings', icon: CalendarClock},
   {href: '/availability', label: 'Manage Availability', icon: CalendarClock},
-  
-  // ← NEW: Teachers can view & edit all reports
-  {href: '/reports', label: 'Evaluation Reports', icon: ScrollText},
-
-  {href: '/export', label: 'Gradebook', icon: FileSpreadsheet},
+  {href: '/reports', label: 'Student Reports', icon: FileText}, // NEW
   {href: '/profile', label: 'Profile', icon: User},
-  {href: '/diag/grading', label: 'Auth Diag Tool', icon: Bug},
+  {href: '/export', label: 'Gradebook', icon: FileSpreadsheet},
 ];
 
+// For admins, add to adminNavItems (around line 70)
 export const adminNavItems = [
   {href: '/', label: 'Dashboard', icon: LayoutDashboard},
   {href: '/users', label: 'User Management', icon: UserCog},
@@ -105,16 +102,14 @@ export const adminNavItems = [
   {href: '/projects', label: 'Projects', icon: BookMarked},
   {href: '/bookings', label: 'Manage Bookings', icon: CalendarCheck},
   {href: '/availability', label: 'Manage Availability', icon: CalendarClock},
+   {href: '/soft-skills', label: 'Soft Skills', icon: SoftSkillsIcon},
   {href: '/roadmap', label: 'Roadmap', icon: Map},
   {href: '/directory', label: 'Directory', icon: Contact},
   {href: '/export', label: 'Gradebook', icon: FileSpreadsheet},
-  {href: '/career', label: 'Career Module', icon: GraduationCap},
-  
-  // ← NEW: Admin sees all reports
-  {href: '/reports', label: 'Evaluation Reports', icon: ScrollText},
+  {href: '/reports', label: 'Student Reports', icon: FileText}, // NEW
 
   {href: '/profile', label: 'Profile', icon: User},
-  {href: '/diag/grading', label: 'Auth Diag Tool', icon: Bug},
+
 ];
 
 export function SidebarNav() {
