@@ -50,7 +50,7 @@ const initialGradingData = [
         title: "Soft Skills & Product Training", 
         icon: Handshake, 
         current: 0, 
-        total: 6, 
+        total: 70, 
         description: "1 point per attendance"
     },
     { 
@@ -58,7 +58,7 @@ const initialGradingData = [
         icon: Presentation, 
         current: 0, 
         total: 5, 
-        description: "5 points per demo"
+        description: "1 points per demo"
     },
     { 
         title: "100 Days of Code", 

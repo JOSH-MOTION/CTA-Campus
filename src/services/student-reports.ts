@@ -178,7 +178,7 @@ const calculateAcademicPerformance = async (studentId: string) => {
       hundredDaysOfCode: 50,
       codeReview: 5,
       finalProject: 10,
-      softSkills: 6,
+      softSkills: 70,
       miniDemoDays: 5,
     };
     
@@ -255,7 +255,7 @@ const getDefaultAcademicPerformance = () => {
     hundredDaysOfCode: { current: 0, total: 50, percentage: 0 },
     codeReview: { current: 0, total: 5, percentage: 0 },
     finalProject: { current: 0, total: 10, percentage: 0 },
-    softSkills: { current: 0, total: 6, percentage: 0 },
+    softSkills: { current: 0, total: 70, percentage: 0 },
     miniDemoDays: { current: 0, total: 5, percentage: 0 },
     totalPoints: 0,
     maxPoints: 291,
@@ -314,7 +314,7 @@ export const getStudentReport = async (studentId: string): Promise<StudentReport
         softSkills: { current: 0, total: 6, percentage: 0 },
         miniDemoDays: { current: 0, total: 5, percentage: 0 },
         totalPoints: 0,
-        maxPoints: 291,
+        maxPoints: 350,
       };
     }
     

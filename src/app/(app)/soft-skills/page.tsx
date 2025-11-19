@@ -235,13 +235,10 @@ export default function SoftSkillsPage() {
     );
   }
 
-  // Calculate total points
-  const careerModulePoints = report.careerModules.completed * 10;
-  const eventsPoints = Math.min(report.eventsWorkshops.attended * 2, 24);
-  const applicationsPoints = 0; // No points for applications, just tracking
-  const sessionsPoints = Math.min(report.oneOnOneSessions.attended * 1, 24);
-  const totalEarnedPoints = careerModulePoints + eventsPoints + sessionsPoints;
-  const totalPossiblePoints = 100 + 24 + 24; // 148 total
+  // Calculate total points (only from career modules)
+  const careerModulePoints = report.careerModules.completed * 2; // 2 points per module
+  const totalEarnedPoints = careerModulePoints;
+  const totalPossiblePoints = 10; // 5 modules × 2 points
   const overallPercentage = Math.round((totalEarnedPoints / totalPossiblePoints) * 100);
 
   return (
@@ -259,7 +256,7 @@ export default function SoftSkillsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Trophy className="h-6 w-6 text-blue-600" />
-            Overall Progress
+            Career Module Progress
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -280,6 +277,9 @@ export default function SoftSkillsPage() {
             </div>
           </div>
           <Progress value={overallPercentage} className="h-3" />
+          <p className="text-xs text-muted-foreground">
+            Complete all 5 career modules to earn 10 points
+          </p>
         </CardContent>
       </Card>
 
@@ -293,18 +293,18 @@ export default function SoftSkillsPage() {
                 Career Modules
               </CardTitle>
               <CardDescription>
-                Complete 10 career development modules • 10 points each • Total: 100 points
+                Complete 5 career development modules • 2 points each • Total: 10 points
               </CardDescription>
             </div>
             <div className="text-right">
-              <p className="text-2xl font-bold text-purple-600">{careerModulePoints}/100</p>
-              <p className="text-sm text-gray-600">{report.careerModules.completed}/10 completed</p>
+              <p className="text-2xl font-bold text-purple-600">{careerModulePoints}/10</p>
+              <p className="text-sm text-gray-600">{report.careerModules.completed}/5 completed</p>
             </div>
           </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {report.careerModules.modules.map((module, index) => (
+            {report.careerModules.modules.slice(0, 5).map((module, index) => (
               <div
                 key={index}
                 className={`flex items-center justify-between p-4 rounded-lg border-2 transition-all ${
@@ -337,7 +337,7 @@ export default function SoftSkillsPage() {
                   </div>
                 </div>
                 <Badge variant={module.completed ? 'default' : 'outline'}>
-                  {module.points} pts
+                  2 pts
                 </Badge>
               </div>
             ))}
@@ -345,7 +345,7 @@ export default function SoftSkillsPage() {
         </CardContent>
       </Card>
 
-      {/* Events & Workshops */}
+      {/* Events & Workshops (No Points) */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -355,13 +355,13 @@ export default function SoftSkillsPage() {
                 Events & Workshops
               </CardTitle>
               <CardDescription>
-                Attend 12 events per year • 2 points each • Total: 24 points
+                Attend 12 events per year • No points, tracking only
               </CardDescription>
             </div>
             <div className="flex items-center gap-4">
               <div className="text-right">
-                <p className="text-2xl font-bold text-blue-600">{eventsPoints}/24</p>
-                <p className="text-sm text-gray-600">{report.eventsWorkshops.attended}/12 attended</p>
+                <p className="text-2xl font-bold text-blue-600">{report.eventsWorkshops.attended}/12</p>
+                <p className="text-sm text-gray-600">events attended</p>
               </div>
               <Dialog open={eventDialogOpen} onOpenChange={setEventDialogOpen}>
                 <DialogTrigger asChild>
@@ -421,7 +421,6 @@ export default function SoftSkillsPage() {
                     <p className="font-medium text-gray-900 truncate">{event.name}</p>
                     <p className="text-sm text-gray-600">{new Date(event.date).toLocaleDateString()}</p>
                   </div>
-                  <Badge variant="outline">2 pts</Badge>
                 </div>
               ))
             ) : (
@@ -431,7 +430,7 @@ export default function SoftSkillsPage() {
         </CardContent>
       </Card>
 
-      {/* Internship Applications */}
+      {/* Internship Applications (No Points) */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -441,7 +440,7 @@ export default function SoftSkillsPage() {
                 Internship & Job Applications
               </CardTitle>
               <CardDescription>
-                Apply to 24 positions per year (2 per month) • Tracking only
+                Apply to 24 positions per year (2 per month) • No points, tracking only
               </CardDescription>
             </div>
             <div className="flex items-center gap-4">
@@ -546,7 +545,7 @@ export default function SoftSkillsPage() {
         </CardContent>
       </Card>
 
-      {/* One-on-One Sessions */}
+      {/* One-on-One Sessions (No Points) */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -556,13 +555,13 @@ export default function SoftSkillsPage() {
                 One-on-One Sessions
               </CardTitle>
               <CardDescription>
-                Attend 24 sessions per year (2 per month) • 1 point each • Total: 24 points
+                Attend 24 sessions per year (2 per month) • No points, tracking only
               </CardDescription>
             </div>
             <div className="flex items-center gap-4">
               <div className="text-right">
-                <p className="text-2xl font-bold text-green-600">{sessionsPoints}/24</p>
-                <p className="text-sm text-gray-600">{report.oneOnOneSessions.attended}/24 attended</p>
+                <p className="text-2xl font-bold text-green-600">{report.oneOnOneSessions.attended}/24</p>
+                <p className="text-sm text-gray-600">sessions attended</p>
               </div>
               <Dialog open={sessionDialogOpen} onOpenChange={setSessionDialogOpen}>
                 <DialogTrigger asChild>
@@ -632,7 +631,6 @@ export default function SoftSkillsPage() {
                     <p className="text-sm text-gray-600">with {session.with}</p>
                     <p className="text-xs text-gray-500">{new Date(session.date).toLocaleDateString()}</p>
                   </div>
-                  <Badge variant="outline">1 pt</Badge>
                 </div>
               ))
             ) : (
