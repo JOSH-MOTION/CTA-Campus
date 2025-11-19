@@ -117,110 +117,147 @@ export interface StudentReport {
  * Calculate academic performance from existing points data
  */
 const calculateAcademicPerformance = async (studentId: string) => {
-  const userDoc = await getDoc(doc(db, 'users', studentId));
-  const userData = userDoc.data();
-  const totalPoints = userData?.totalPoints || 0;
-  
-  // Get points breakdown from the points subcollection
-  const pointsSnapshot = await getDocs(
-    collection(db, 'users', studentId, 'points')
-  );
-  
-  const pointsByCategory = {
-    attendance: 0,
-    assignments: 0,
-    exercises: 0,
-    weeklyProjects: 0,
-    monthlyProjects: 0,
-    hundredDays: 0,
-    codeReview: 0,
-    finalProject: 0,
-    softSkills: 0,
-    miniDemo: 0,
-  };
-  
-  pointsSnapshot.forEach((pointDoc) => {
-    const data = pointDoc.data();
-    const reason = data.reason?.toLowerCase() || '';
+  try {
+    const userDoc = await getDoc(doc(db, 'users', studentId));
     
-    if (reason.includes('attendance')) pointsByCategory.attendance += data.points;
-    else if (reason.includes('assignment')) pointsByCategory.assignments += data.points;
-    else if (reason.includes('exercise')) pointsByCategory.exercises += data.points;
-    else if (reason.includes('weekly project')) pointsByCategory.weeklyProjects += data.points;
-    else if (reason.includes('monthly') || reason.includes('personal project')) pointsByCategory.monthlyProjects += data.points;
-    else if (reason.includes('100 days')) pointsByCategory.hundredDays += data.points;
-    else if (reason.includes('code review')) pointsByCategory.codeReview += data.points;
-    else if (reason.includes('final project')) pointsByCategory.finalProject += data.points;
-    else if (reason.includes('soft skill')) pointsByCategory.softSkills += data.points;
-    else if (reason.includes('demo')) pointsByCategory.miniDemo += data.points;
-  });
-  
-  // Define totals based on grading system
-  const totals = {
-    attendance: 50,
-    assignments: 50,
-    exercises: 50,
-    weeklyProjects: 50,
-    monthlyProjects: 10,
-    hundredDaysOfCode: 50,
-    codeReview: 5,
-    finalProject: 10,
-    softSkills: 6,
-    miniDemoDays: 5,
-  };
-  
+    if (!userDoc.exists()) {
+      console.warn('User document not found for:', studentId);
+      // Return default values if user not found
+      return getDefaultAcademicPerformance();
+    }
+    
+    const userData = userDoc.data();
+    const totalPoints = userData?.totalPoints || 0;
+    
+    // Get points breakdown from the points subcollection
+    let pointsByCategory = {
+      attendance: 0,
+      assignments: 0,
+      exercises: 0,
+      weeklyProjects: 0,
+      monthlyProjects: 0,
+      hundredDays: 0,
+      codeReview: 0,
+      finalProject: 0,
+      softSkills: 0,
+      miniDemo: 0,
+    };
+    
+    try {
+      const pointsSnapshot = await getDocs(
+        collection(db, 'users', studentId, 'points')
+      );
+      
+      pointsSnapshot.forEach((pointDoc) => {
+        const data = pointDoc.data();
+        const reason = data.reason?.toLowerCase() || '';
+        
+        if (reason.includes('attendance')) pointsByCategory.attendance += data.points;
+        else if (reason.includes('assignment')) pointsByCategory.assignments += data.points;
+        else if (reason.includes('exercise')) pointsByCategory.exercises += data.points;
+        else if (reason.includes('weekly project')) pointsByCategory.weeklyProjects += data.points;
+        else if (reason.includes('monthly') || reason.includes('personal project')) pointsByCategory.monthlyProjects += data.points;
+        else if (reason.includes('100 days')) pointsByCategory.hundredDays += data.points;
+        else if (reason.includes('code review')) pointsByCategory.codeReview += data.points;
+        else if (reason.includes('final project')) pointsByCategory.finalProject += data.points;
+        else if (reason.includes('soft skill')) pointsByCategory.softSkills += data.points;
+        else if (reason.includes('demo')) pointsByCategory.miniDemo += data.points;
+      });
+    } catch (pointsError) {
+      console.warn('Error reading points subcollection:', pointsError);
+      // Continue with zero points if subcollection can't be read
+    }
+    
+    // Define totals based on grading system
+    const totals = {
+      attendance: 50,
+      assignments: 50,
+      exercises: 50,
+      weeklyProjects: 50,
+      monthlyProjects: 10,
+      hundredDaysOfCode: 50,
+      codeReview: 5,
+      finalProject: 10,
+      softSkills: 6,
+      miniDemoDays: 5,
+    };
+    
+    return {
+      attendance: {
+        current: pointsByCategory.attendance,
+        total: totals.attendance,
+        percentage: Math.round((pointsByCategory.attendance / totals.attendance) * 100),
+      },
+      assignments: {
+        current: pointsByCategory.assignments,
+        total: totals.assignments,
+        percentage: Math.round((pointsByCategory.assignments / totals.assignments) * 100),
+      },
+      exercises: {
+        current: pointsByCategory.exercises,
+        total: totals.exercises,
+        percentage: Math.round((pointsByCategory.exercises / totals.exercises) * 100),
+      },
+      weeklyProjects: {
+        current: pointsByCategory.weeklyProjects,
+        total: totals.weeklyProjects,
+        percentage: Math.round((pointsByCategory.weeklyProjects / totals.weeklyProjects) * 100),
+      },
+      monthlyProjects: {
+        current: pointsByCategory.monthlyProjects,
+        total: totals.monthlyProjects,
+        percentage: Math.round((pointsByCategory.monthlyProjects / totals.monthlyProjects) * 100),
+      },
+      hundredDaysOfCode: {
+        current: pointsByCategory.hundredDays,
+        total: totals.hundredDaysOfCode,
+        percentage: Math.round((pointsByCategory.hundredDays / totals.hundredDaysOfCode) * 100),
+      },
+      codeReview: {
+        current: pointsByCategory.codeReview,
+        total: totals.codeReview,
+        percentage: Math.round((pointsByCategory.codeReview / totals.codeReview) * 100),
+      },
+      finalProject: {
+        current: pointsByCategory.finalProject,
+        total: totals.finalProject,
+        percentage: Math.round((pointsByCategory.finalProject / totals.finalProject) * 100),
+      },
+      softSkills: {
+        current: pointsByCategory.softSkills,
+        total: totals.softSkills,
+        percentage: Math.round((pointsByCategory.softSkills / totals.softSkills) * 100),
+      },
+      miniDemoDays: {
+        current: pointsByCategory.miniDemo,
+        total: totals.miniDemoDays,
+        percentage: Math.round((pointsByCategory.miniDemo / totals.miniDemoDays) * 100),
+      },
+      totalPoints,
+      maxPoints: 291,
+    };
+  } catch (error) {
+    console.error('Error calculating academic performance:', error);
+    return getDefaultAcademicPerformance();
+  }
+};
+
+/**
+ * Helper function to return default academic performance
+ */
+const getDefaultAcademicPerformance = () => {
   return {
-    attendance: {
-      current: pointsByCategory.attendance,
-      total: totals.attendance,
-      percentage: Math.round((pointsByCategory.attendance / totals.attendance) * 100),
-    },
-    assignments: {
-      current: pointsByCategory.assignments,
-      total: totals.assignments,
-      percentage: Math.round((pointsByCategory.assignments / totals.assignments) * 100),
-    },
-    exercises: {
-      current: pointsByCategory.exercises,
-      total: totals.exercises,
-      percentage: Math.round((pointsByCategory.exercises / totals.exercises) * 100),
-    },
-    weeklyProjects: {
-      current: pointsByCategory.weeklyProjects,
-      total: totals.weeklyProjects,
-      percentage: Math.round((pointsByCategory.weeklyProjects / totals.weeklyProjects) * 100),
-    },
-    monthlyProjects: {
-      current: pointsByCategory.monthlyProjects,
-      total: totals.monthlyProjects,
-      percentage: Math.round((pointsByCategory.monthlyProjects / totals.monthlyProjects) * 100),
-    },
-    hundredDaysOfCode: {
-      current: pointsByCategory.hundredDays,
-      total: totals.hundredDaysOfCode,
-      percentage: Math.round((pointsByCategory.hundredDays / totals.hundredDaysOfCode) * 100),
-    },
-    codeReview: {
-      current: pointsByCategory.codeReview,
-      total: totals.codeReview,
-      percentage: Math.round((pointsByCategory.codeReview / totals.codeReview) * 100),
-    },
-    finalProject: {
-      current: pointsByCategory.finalProject,
-      total: totals.finalProject,
-      percentage: Math.round((pointsByCategory.finalProject / totals.finalProject) * 100),
-    },
-    softSkills: {
-      current: pointsByCategory.softSkills,
-      total: totals.softSkills,
-      percentage: Math.round((pointsByCategory.softSkills / totals.softSkills) * 100),
-    },
-    miniDemoDays: {
-      current: pointsByCategory.miniDemo,
-      total: totals.miniDemoDays,
-      percentage: Math.round((pointsByCategory.miniDemo / totals.miniDemoDays) * 100),
-    },
-    totalPoints,
+    attendance: { current: 0, total: 50, percentage: 0 },
+    assignments: { current: 0, total: 50, percentage: 0 },
+    exercises: { current: 0, total: 50, percentage: 0 },
+    weeklyProjects: { current: 0, total: 50, percentage: 0 },
+    monthlyProjects: { current: 0, total: 10, percentage: 0 },
+    hundredDaysOfCode: { current: 0, total: 50, percentage: 0 },
+    codeReview: { current: 0, total: 5, percentage: 0 },
+    finalProject: { current: 0, total: 10, percentage: 0 },
+    softSkills: { current: 0, total: 6, percentage: 0 },
+    miniDemoDays: { current: 0, total: 5, percentage: 0 },
+    totalPoints: 0,
     maxPoints: 291,
   };
 };
@@ -230,20 +267,56 @@ const calculateAcademicPerformance = async (studentId: string) => {
  */
 export const getStudentReport = async (studentId: string): Promise<StudentReport | null> => {
   try {
-    const reportDoc = await getDoc(doc(db, 'student_reports', studentId));
+    const reportRef = doc(db, 'student_reports', studentId);
+    const reportDoc = await getDoc(reportRef);
     
     if (reportDoc.exists()) {
       return { id: reportDoc.id, ...reportDoc.data() } as StudentReport;
     }
     
     // Create a new report if it doesn't exist
-    const userDoc = await getDoc(doc(db, 'users', studentId));
-    if (!userDoc.exists()) {
-      throw new Error('Student not found');
+    // First check if user document exists
+    const userDocRef = doc(db, 'users', studentId);
+    let userData;
+    
+    try {
+      const userDoc = await getDoc(userDocRef);
+      if (!userDoc.exists()) {
+        throw new Error('Student not found');
+      }
+      userData = userDoc.data();
+    } catch (userError) {
+      console.error('Error fetching user document:', userError);
+      // If we can't access user document, use placeholder data
+      userData = {
+        displayName: 'Student',
+        gen: 'Unknown',
+        email: '',
+      };
     }
     
-    const userData = userDoc.data();
-    const academicPerformance = await calculateAcademicPerformance(studentId);
+    // Calculate academic performance
+    let academicPerformance;
+    try {
+      academicPerformance = await calculateAcademicPerformance(studentId);
+    } catch (perfError) {
+      console.error('Error calculating academic performance:', perfError);
+      // Use default values if calculation fails
+      academicPerformance = {
+        attendance: { current: 0, total: 50, percentage: 0 },
+        assignments: { current: 0, total: 50, percentage: 0 },
+        exercises: { current: 0, total: 50, percentage: 0 },
+        weeklyProjects: { current: 0, total: 50, percentage: 0 },
+        monthlyProjects: { current: 0, total: 10, percentage: 0 },
+        hundredDaysOfCode: { current: 0, total: 50, percentage: 0 },
+        codeReview: { current: 0, total: 5, percentage: 0 },
+        finalProject: { current: 0, total: 10, percentage: 0 },
+        softSkills: { current: 0, total: 6, percentage: 0 },
+        miniDemoDays: { current: 0, total: 5, percentage: 0 },
+        totalPoints: 0,
+        maxPoints: 291,
+      };
+    }
     
     const newReport: Omit<StudentReport, 'id'> = {
       studentId,
@@ -307,9 +380,13 @@ export const getStudentReport = async (studentId: string): Promise<StudentReport
       lastUpdated: serverTimestamp() as Timestamp,
     };
     
-    await setDoc(doc(db, 'student_reports', studentId), newReport);
-    
-    return { id: studentId, ...newReport } as StudentReport;
+    try {
+      await setDoc(reportRef, newReport);
+      return { id: studentId, ...newReport } as StudentReport;
+    } catch (createError) {
+      console.error('Error creating report:', createError);
+      throw new Error('Failed to create student report. Please contact an administrator.');
+    }
   } catch (error) {
     console.error('Error fetching student report:', error);
     return null;
