@@ -104,12 +104,17 @@ const MemoizedProtectedLayout = memo(function ProtectedLayout({children}: {child
   }, [user, role, loading, router, pathname]);
 
   if (loading || !user) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <School className="h-12 w-12 animate-pulse text-primary" />
-      </div>
-    );
-  }
+  return (
+    <div className="flex h-screen items-center justify-center">
+      <img
+  src="/logob2.png"
+  alt="Logo"
+  className="h-60 w-60 animate-pulse object-contain"
+/>
+
+    </div>
+  );
+}
 
   const isChatPage = pathname === '/chat';
   
@@ -135,9 +140,14 @@ const MemoizedProtectedLayout = memo(function ProtectedLayout({children}: {child
                       <SidebarContent className="p-4">
                         <div className="flex items-center justify-between px-2">
                           <div className="flex items-center gap-2">
-                            <School className="h-6 w-6 text-primary" />
-                            <h1 className="text-xl font-semibold">Campus Compass</h1>
-                          </div>
+  <img
+    src="/logo1.png" // replace with your image file in public/
+    alt="Logo"
+    className="h-8 w-8 object-contain filter brightness-0 invert" // tints image white
+  />
+  <h1 className="text-xl font-semibold">Campus Compass</h1>
+</div>
+
                         </div>
                         <SidebarNav />
                       </SidebarContent>

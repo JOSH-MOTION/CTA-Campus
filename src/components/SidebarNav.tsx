@@ -61,7 +61,7 @@ export const studentNavItems = [
   {href: '/resources', label: 'Resources Library', icon: BookOpen},
   {href: '/directory', label: 'Directory', icon: Contact},
   {href: '/book-session', label: 'Book a Session', icon: CalendarPlus},
-  {href: '/work-ready', label: 'Work Ready', icon: Rocket},
+  // {href: '/work-ready', label: 'Work Ready', icon: Rocket},
   {href: '/my-report', label: 'My Report', icon: FileText}, // NEW
   {href: '/profile', label: 'Profile', icon: User},
 ];
