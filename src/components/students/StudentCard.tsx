@@ -155,13 +155,13 @@ export function StudentCard({ student }: StudentCardProps) {
       </CardContent>
      <CardFooter className="grid grid-cols-1 gap-2">
   <div className="grid grid-cols-2 gap-2">
-    <Button variant="outline" onClick={handleSendMessage}>
+    <Button variant="outline" onClick={handleSendMessage} className='w-full px-4 py-3 rounded-xl flex items-center justify-center gap-2 text-xs'>
       <MessageSquare className="mr-2 h-4 w-4" />
       Message
     </Button>
     <Dialog>
       <DialogTrigger asChild>
-        <Button>
+        <Button className='w-full px-4 py-3 rounded-xl flex items-center justify-center gap-2 text-xs'>
           <Info className="mr-2 h-4 w-4" />
           Details
         </Button>
@@ -228,20 +228,21 @@ export function StudentCard({ student }: StudentCardProps) {
   
   <div className="grid grid-cols-2 gap-2">
     <AwardPointsDialog student={student}>
-      <Button variant="secondary" className="w-full">
-        <Award className="mr-2 h-4 w-4" />
+      <Button variant="secondary" className="w-full px-4 py-3 rounded-xl flex items-center justify-center gap-2 text-xs">
+        <Award className="mr-1 h-4 w-4" />
         Award Points
       </Button>
     </AwardPointsDialog>
     
-    <Button 
-      variant="default" 
-      className="w-full"
-      onClick={() => window.location.href = `/reports/${student.uid}`}
-    >
-      <FileText className="mr-2 h-4 w-4" />
-      View Report
-    </Button>
+    <Button
+  variant="default"
+  className="w-full px-4 py-3 rounded-xl flex items-center justify-center gap-2 text-xs"
+  onClick={() => window.location.href = `/reports/${student.uid}`}
+>
+  <FileText className="h-4 w-4" />
+  View Report
+</Button>
+
   </div>
 </CardFooter>
     </Card>

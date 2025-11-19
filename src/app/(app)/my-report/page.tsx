@@ -4,41 +4,13 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { Loader2 } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Loader2, FileText, TrendingUp, CheckCircle, Award, Calendar, Briefcase, Users } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { getStudentReport, type StudentReport } from '@/services/student-reports';
-import { 
-  Award, 
-  CheckCircle, 
-  Edit, 
-  Projector, 
-  Handshake, 
-  Presentation, 
-  Code, 
-  GitBranch,
-  Calendar,
-  Briefcase,
-  Users,
-  FileText,
-  TrendingUp,
-  Target
-} from 'lucide-react';
-
-const categoryIcons = {
-  attendance: CheckCircle,
-  assignments: Edit,
-  exercises: Edit,
-  weeklyProjects: Projector,
-  monthlyProjects: Projector,
-  hundredDaysOfCode: Code,
-  codeReview: GitBranch,
-  finalProject: Award,
-  softSkills: Handshake,
-  miniDemoDays: Presentation,
-};
 
 export default function MyReportPage() {
   const router = useRouter();
@@ -49,12 +21,10 @@ export default function MyReportPage() {
   useEffect(() => {
     async function loadReport() {
       if (authLoading) return;
-      
       if (!user) {
         router.push('/login');
         return;
       }
-
       setLoading(true);
       try {
         const studentReport = await getStudentReport(user.uid);
@@ -65,7 +35,6 @@ export default function MyReportPage() {
         setLoading(false);
       }
     }
-
     loadReport();
   }, [user, authLoading, router]);
 
@@ -95,291 +64,179 @@ export default function MyReportPage() {
     );
   }
 
-  const academicCategories = [
-    { key: 'attendance', label: 'Class Attendance', data: report.attendance },
-    { key: 'assignments', label: 'Class Assignments', data: report.assignments },
-    { key: 'exercises', label: 'Class Exercises', data: report.exercises },
-    { key: 'weeklyProjects', label: 'Weekly Projects', data: report.weeklyProjects },
-    { key: 'monthlyProjects', label: 'Monthly Projects', data: report.monthlyProjects },
-    { key: 'softSkills', label: 'Soft Skills Training', data: report.softSkills },
-    { key: 'miniDemoDays', label: 'Mini Demo Days', data: report.miniDemoDays },
-    { key: 'hundredDaysOfCode', label: '100 Days of Code', data: report.hundredDaysOfCode },
-    { key: 'codeReview', label: 'Code Review', data: report.codeReview },
-    { key: 'finalProject', label: 'Final Project', data: report.finalProject },
-  ];
-
   const overallPercentage = Math.round((report.totalPoints / report.maxPoints) * 100);
 
+  const downloadReport = async () => {
+    const element = document.getElementById('report-card');
+    if (!element) return;
+    const canvas = await html2canvas(element, { scale: 2 });
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const imgProps = pdf.getImageProperties(imgData);
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+    pdf.save(`${user?.displayName || 'report'}-report.pdf`);
+  };
+
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="space-y-1">
-        <h1 className="text-3xl font-bold tracking-tight">My Progress Report</h1>
-        <p className="text-muted-foreground">
-          Track your academic progress and career development
-        </p>
+    <div className="container mx-auto p-6">
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-3xl font-bold">My Termly Report</h1>
+        <button
+          onClick={downloadReport}
+          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
+        >
+          <FileText className="h-4 w-4" /> Download PDF
+        </button>
       </div>
 
-      {/* Overall Progress */}
-      <Card className="border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-6 w-6 text-blue-600" />
-            Overall Progress
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Total Points Earned</p>
-              <p className="text-3xl font-bold text-blue-600">
-                {report.totalPoints}/{report.maxPoints}
-              </p>
+      {/* Report Card Container */}
+      <div id="report-card" className="bg-white p-6 rounded-xl shadow-lg w-full max-w-4xl mx-auto space-y-6">
+        {/* Header Info */}
+        <div className="text-center">
+          <h2 className="text-2xl font-bold">{user.displayName}</h2>
+          <p className="text-sm text-gray-600">{user.email} | Gen: {report.gen}</p>
+          <p className="text-sm text-gray-500">Term: 1 | Academic Year: 2025/2026</p>
+        </div>
+
+        {/* Overall Progress */}
+        <Card className="border-2 border-blue-200 bg-blue-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-blue-600" />
+              Overall Progress
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex justify-between items-center">
+              <span>Total Points: {report.totalPoints}/{report.maxPoints}</span>
+              <span className="font-bold text-lg">{overallPercentage}%</span>
             </div>
-            <div className="text-right">
-              <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full ${
-                overallPercentage >= 75 ? 'bg-green-100 text-green-700' :
-                overallPercentage >= 50 ? 'bg-yellow-100 text-yellow-700' :
-                'bg-orange-100 text-orange-700'
-              }`}>
-                <Target className="h-5 w-5" />
-                <span className="font-bold">{overallPercentage}%</span>
-              </div>
-            </div>
-          </div>
-          <Progress value={overallPercentage} className="h-3" />
-        </CardContent>
-      </Card>
+            <Progress value={overallPercentage} className="h-3" />
+          </CardContent>
+        </Card>
 
-      <Tabs defaultValue="academic" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="academic">Academic Performance</TabsTrigger>
-          <TabsTrigger value="career">Career Development</TabsTrigger>
-        </TabsList>
-
-        {/* Academic Performance Tab */}
-        <TabsContent value="academic" className="space-y-4 mt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {academicCategories.map(({ key, label, data }) => {
-              const Icon = categoryIcons[key as keyof typeof categoryIcons] || Award;
-              return (
-                <Card key={key}>
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center gap-3">
-                      <Icon className="h-5 w-5 text-muted-foreground" />
-                      <CardTitle className="text-base">{label}</CardTitle>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Progress</span>
-                      <span className="font-medium">
-                        {data.current} / {data.total} pts
-                      </span>
-                    </div>
-                    <Progress value={data.percentage} />
-                    <p className="text-xs text-muted-foreground text-right">
-                      {data.percentage}% Complete
-                    </p>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </TabsContent>
-
-        {/* Career Development Tab */}
-        <TabsContent value="career" className="space-y-4 mt-6">
-          {/* Career Modules */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Award className="h-5 w-5 text-purple-600" />
-                Career Modules
-              </CardTitle>
-              <CardDescription>
-                Complete 5 career development modules • 2 points each • Total: 10 points
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 mb-4">
-                <div className="flex justify-between text-sm">
-                  <span>Progress</span>
-                  <span className="font-medium">
-                    {report.careerModules.completed * 2} / 10 points
-                  </span>
-                </div>
-                <Progress 
-                  value={(report.careerModules.completed / 5) * 100} 
-                />
-              </div>
-              <div className="grid grid-cols-1 gap-2">
-                {report.careerModules.modules.map((module, index) => (
-                  <div
-                    key={index}
-                    className={`flex items-center justify-between p-3 rounded-lg border ${
-                      module.completed 
-                        ? 'bg-green-50 border-green-200' 
-                        : 'bg-gray-50 border-gray-200'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      {module.completed ? (
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                      ) : (
-                        <div className="h-5 w-5 rounded-full border-2 border-gray-300" />
-                      )}
-                      <span className={module.completed ? 'font-medium' : 'text-muted-foreground'}>
-                        {module.name}
-                      </span>
-                    </div>
-                    <Badge variant={module.completed ? 'default' : 'outline'}>
-                      2 pts
-                    </Badge>
+        {/* Academic Performance */}
+        <Card className="border-2 border-gray-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Award className="h-5 w-5 text-purple-600" />
+              Academic Performance
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {Object.entries(report).map(([key, value]: any) => {
+              if (
+                ['attendance', 'assignments', 'exercises', 'weeklyProjects', 'monthlyProjects'].includes(key)
+              ) {
+                return (
+                  <div key={key} className="p-4 border rounded-lg bg-gray-50">
+                    <h3 className="font-medium mb-1 capitalize">{key.replace(/([A-Z])/g, ' $1')}</h3>
+                    <p className="text-sm mb-1">{value.current}/{value.total} pts</p>
+                    <Progress value={value.percentage} className="h-2" />
+                    <p className="text-xs text-gray-500 text-right">{value.percentage}% Complete</p>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                );
+              }
+            })}
+          </CardContent>
+        </Card>
 
-          {/* Events & Workshops */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-blue-600" />
-                Events & Workshops
-              </CardTitle>
-              <CardDescription>
-                Attend 12 events per year • No points, tracking only
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 mb-4">
-                <div className="flex justify-between text-sm">
-                  <span>Progress</span>
-                  <span className="font-medium">
-                    {report.eventsWorkshops.attended} / 12 events
-                  </span>
+        {/* Career Development */}
+        <Card className="border-2 border-gray-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Briefcase className="h-5 w-5 text-orange-600" />
+              Career Development
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <p className="text-sm mb-2">Completed Modules: {report.careerModules.completed} / {report.careerModules.modules.length}</p>
+            <Progress value={(report.careerModules.completed / report.careerModules.modules.length) * 100} className="h-2" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+              {report.careerModules.modules.map((module, idx) => (
+                <div
+                  key={idx}
+                  className={`p-2 border rounded flex justify-between items-center ${
+                    module.completed ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
+                  }`}
+                >
+                  <span className={module.completed ? 'font-medium' : 'text-gray-500'}>{module.name}</span>
+                  <Badge variant={module.completed ? 'default' : 'outline'}>2 pts</Badge>
                 </div>
-                <Progress value={report.eventsWorkshops.percentage} />
-              </div>
-              <div className="space-y-2 max-h-48 overflow-y-auto">
-                {report.eventsWorkshops.events.length > 0 ? (
-                  report.eventsWorkshops.events.map((event, index) => (
-                    <div key={index} className="flex items-center gap-3 p-2 bg-blue-50 rounded border border-blue-100">
-                      <Calendar className="h-4 w-4 text-blue-600 flex-shrink-0" />
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">{event.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(event.date).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-center text-sm text-muted-foreground py-4">
-                    No events recorded yet
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
-          {/* Internship Applications */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Briefcase className="h-5 w-5 text-orange-600" />
-                Internship & Job Applications
-              </CardTitle>
-              <CardDescription>
-                Apply to 24 positions per year (2 per month) • No points, tracking only
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 mb-4">
-                <div className="flex justify-between text-sm">
-                  <span>Progress</span>
-                  <span className="font-medium">
-                    {report.internshipApplications.submitted} / 24 applications
-                  </span>
+        {/* Events & Workshops */}
+        <Card className="border-2 border-gray-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-blue-600" />
+              Events & Workshops
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {report.eventsWorkshops.events.map((event, idx) => (
+                <div key={idx} className="p-2 bg-blue-50 border border-blue-100 rounded flex justify-between items-center">
+                  <span>{event.name}</span>
+                  <span className="text-xs text-gray-500">{new Date(event.date).toLocaleDateString()}</span>
                 </div>
-                <Progress value={report.internshipApplications.percentage} />
-              </div>
-              <div className="space-y-2 max-h-48 overflow-y-auto">
-                {report.internshipApplications.applications.length > 0 ? (
-                  report.internshipApplications.applications.map((app, index) => (
-                    <div key={index} className="flex items-center justify-between p-2 bg-orange-50 rounded border border-orange-100">
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">{app.company}</p>
-                        <p className="text-xs text-muted-foreground">{app.role}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(app.date).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <Badge variant={
-                        app.status === 'Accepted' || app.status === 'Interview' ? 'default' :
-                        app.status === 'Pending' ? 'secondary' :
-                        'outline'
-                      }>
-                        {app.status}
-                      </Badge>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-center text-sm text-muted-foreground py-4">
-                    No applications recorded yet
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
-          {/* One-on-One Sessions */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-green-600" />
-                One-on-One Sessions
-              </CardTitle>
-              <CardDescription>
-                Attend 24 sessions per year (2 per month) • No points, tracking only
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 mb-4">
-                <div className="flex justify-between text-sm">
-                  <span>Progress</span>
-                  <span className="font-medium">
-                    {report.oneOnOneSessions.attended} / 24 sessions
-                  </span>
+        {/* Internship Applications */}
+        <Card className="border-2 border-gray-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Briefcase className="h-5 w-5 text-orange-600" />
+              Internship & Job Applications
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {report.internshipApplications.applications.map((app, idx) => (
+                <div key={idx} className="p-2 bg-orange-50 border border-orange-100 rounded flex justify-between items-center">
+                  <div>
+                    <p className="font-medium text-sm">{app.company}</p>
+                    <p className="text-xs text-gray-500">{app.role}</p>
+                  </div>
+                  <Badge variant={
+                    app.status === 'Accepted' || app.status === 'Interview' ? 'default' :
+                    app.status === 'Pending' ? 'secondary' :
+                    'outline'
+                  }>{app.status}</Badge>
                 </div>
-                <Progress value={report.oneOnOneSessions.percentage} />
-              </div>
-              <div className="space-y-2 max-h-48 overflow-y-auto">
-                {report.oneOnOneSessions.sessions.length > 0 ? (
-                  report.oneOnOneSessions.sessions.map((session, index) => (
-                    <div key={index} className="flex items-center gap-3 p-2 bg-green-50 rounded border border-green-100">
-                      <Users className="h-4 w-4 text-green-600 flex-shrink-0" />
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">{session.topic}</p>
-                        <p className="text-xs text-muted-foreground">with {session.with}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(session.date).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-center text-sm text-muted-foreground py-4">
-                    No sessions recorded yet
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* One-on-One Sessions */}
+        <Card className="border-2 border-gray-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-green-600" />
+              One-on-One Sessions
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {report.oneOnOneSessions.sessions.map((session, idx) => (
+                <div key={idx} className="p-2 bg-green-50 border border-green-100 rounded flex justify-between items-center">
+                  <span>{session.topic}</span>
+                  <span className="text-xs text-gray-500">with {session.with}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
