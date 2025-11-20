@@ -1,3 +1,5 @@
+"use client"
+
 import React, { useState, useEffect } from 'react';
 import { 
   Award, Calendar, CheckCircle, Circle, Plus, Loader2, TrendingUp, 
