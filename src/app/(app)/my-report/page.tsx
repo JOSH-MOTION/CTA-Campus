@@ -1,122 +1,50 @@
 "use client"
 
 import React, { useEffect, useState } from 'react';
-import { FileText, Download, Loader2, Award, TrendingUp, Calendar, Briefcase, Users, Code, BookOpen } from 'lucide-react';
-
-// Mock data - replace with actual API calls
-const mockUser = {
-  displayName: "John Doe",
-  email: "john.doe@student.edu",
-  photoURL: "https://api.dicebear.com/7.x/avataaars/svg?seed=John"
-};
-
-const mockReport = {
-  studentName: "John Doe",
-  gen: "Gen 30",
-  email: "john.doe@student.edu",
-  totalPoints: 245,
-  maxPoints: 350,
-  
-  // Academic Performance (280 points total)
-  attendance: { current: 42, total: 50, percentage: 84 },
-  assignments: { current: 38, total: 50, percentage: 76 },
-  exercises: { current: 45, total: 50, percentage: 90 },
-  weeklyProjects: { current: 40, total: 50, percentage: 80 },
-  monthlyProjects: { current: 8, total: 10, percentage: 80 },
-  hundredDaysOfCode: { current: 35, total: 50, percentage: 70 },
-  codeReview: { current: 4, total: 5, percentage: 80 },
-  finalProject: { current: 0, total: 10, percentage: 0 },
-  miniDemoDays: { current: 3, total: 5, percentage: 60 },
-  
-  // Soft Skills & Career (70 points total)
-  careerModules: {
-    completed: 3,
-    total: 5,
-    modules: [
-      { name: 'Resume Writing', completed: true, points: 2 },
-      { name: 'LinkedIn Optimization', completed: true, points: 2 },
-      { name: 'Interview Prep', completed: true, points: 2 },
-      { name: 'Portfolio Building', completed: false, points: 0 },
-      { name: 'Networking Skills', completed: false, points: 0 }
-    ]
-  },
-  
-  eventsWorkshops: {
-    attended: 8,
-    required: 12,
-    percentage: 67,
-    events: [
-      { name: 'Tech Career Workshop', date: '2024-01-15' },
-      { name: 'AI in Web Development', date: '2024-02-20' },
-      { name: 'Industry Networking Event', date: '2024-03-10' }
-    ]
-  },
-  
-  internshipApplications: {
-    submitted: 15,
-    required: 24,
-    percentage: 63,
-    applications: [
-      { company: 'Tech Corp', role: 'Frontend Developer', date: '2024-01-10', status: 'Interview' },
-      { company: 'StartupXYZ', role: 'Full Stack Intern', date: '2024-01-25', status: 'Pending' }
-    ]
-  },
-  
-  oneOnOneSessions: {
-    attended: 18,
-    required: 24,
-    percentage: 75,
-    sessions: [
-      { with: 'Career Counselor', topic: 'Career Planning', date: '2024-01-05' },
-      { with: 'Tech Mentor', topic: 'Portfolio Review', date: '2024-02-15' }
-    ]
-  },
-  
-  strengths: [
-    'Strong problem-solving skills',
-    'Excellent collaboration in team projects',
-    'Consistent attendance and participation'
-  ],
-  
-  areasForImprovement: [
-    'Time management on larger projects',
-    'More active participation in code reviews'
-  ],
-  
-  achievements: [
-    'Completed 35 days of 100 Days of Code challenge',
-    'Built 3 full-stack projects with modern frameworks'
-  ],
-  
-  recommendations: [
-    'Continue building portfolio projects',
-    'Focus on completing remaining career modules',
-    'Increase job application submissions to meet target'
-  ],
-  
-  teacherComments: "John has shown great improvement throughout the term. His dedication to learning is evident in his consistent work quality.",
-  
-  careerServiceComments: "Making good progress on job applications. Encourage to complete remaining career modules before graduation.",
-  
-  employerFeedback: "N/A"
-};
+import { FileText, Download, Loader2, Award, TrendingUp, Calendar, Briefcase, Users, Code, BookOpen, AlertTriangle } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { getStudentReport, StudentReport } from '@/services/student-reports';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const StudentReportPage = () => {
+  const { user, userData } = useAuth();
+  const [report, setReport] = useState<StudentReport | null>(null);
   const [loading, setLoading] = useState(true);
-  const [report, setReport] = useState(mockReport);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Simulate loading
-    setTimeout(() => setLoading(false), 1000);
-  }, []);
+    const loadReport = async () => {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const studentReport = await getStudentReport(user.uid);
+        if (studentReport) {
+          setReport(studentReport);
+        } else {
+          setError('Could not load your report. Please contact your instructor.');
+        }
+      } catch (err: any) {
+        console.error('Error loading report:', err);
+        setError(err.message || 'Failed to load report');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadReport();
+  }, [user]);
 
   const downloadReport = async () => {
     alert('PDF download functionality would be implemented here');
   };
 
-  const overallPercentage = Math.round((report.totalPoints / report.maxPoints) * 100);
-
-  const getPerformanceColor = (percentage) => {
+  const getPerformanceColor = (percentage: number) => {
     if (percentage >= 90) return 'text-green-600 bg-green-50 border-green-200';
     if (percentage >= 75) return 'text-blue-600 bg-blue-50 border-blue-200';
     if (percentage >= 60) return 'text-yellow-600 bg-yellow-50 border-yellow-200';
@@ -124,7 +52,7 @@ const StudentReportPage = () => {
     return 'text-red-600 bg-red-50 border-red-200';
   };
 
-  const getPerformanceLabel = (percentage) => {
+  const getPerformanceLabel = (percentage: number) => {
     if (percentage >= 90) return 'Excellent';
     if (percentage >= 75) return 'Very Good';
     if (percentage >= 60) return 'Good';
@@ -132,7 +60,13 @@ const StudentReportPage = () => {
     return 'Needs Improvement';
   };
 
-  const PerformanceCard = ({ title, current, total, percentage, icon: Icon }) => (
+  const PerformanceCard = ({ title, current, total, percentage, icon: Icon }: { 
+    title: string; 
+    current: number; 
+    total: number; 
+    percentage: number;
+    icon: React.ElementType;
+  }) => (
     <div className="bg-white rounded-lg border p-4 hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1">
@@ -164,10 +98,31 @@ const StudentReportPage = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading your report...</p>
+        </div>
       </div>
     );
   }
+
+  if (error || !report) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8 px-4">
+        <div className="max-w-5xl mx-auto">
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Error Loading Report</AlertTitle>
+            <AlertDescription>
+              {error || 'Could not load your report. Please try again later or contact your instructor.'}
+            </AlertDescription>
+          </Alert>
+        </div>
+      </div>
+    );
+  }
+
+  const overallPercentage = Math.round((report.totalPoints / report.maxPoints) * 100);
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
@@ -207,11 +162,17 @@ const StudentReportPage = () => {
           {/* Student Info */}
           <div className="p-8 border-b">
             <div className="flex items-center gap-6">
-              <img
-                src={mockUser.photoURL}
-                alt={mockUser.displayName}
-                className="h-24 w-24 rounded-full border-4 border-blue-100"
-              />
+              <div className="h-24 w-24 rounded-full overflow-hidden border-4 border-blue-100">
+  <img
+    src={
+      userData?.photoURL ||
+      `https://api.dicebear.com/7.x/avataaars/svg?seed=${report.studentName}`
+    }
+    alt={report.studentName}
+    className="h-full w-full object-cover"
+  />
+</div>
+
               <div className="flex-1">
                 <h2 className="text-2xl font-bold text-gray-900">{report.studentName}</h2>
                 <p className="text-gray-600">{report.email}</p>
@@ -362,57 +323,65 @@ const StudentReportPage = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               {/* Strengths */}
-              <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                <h4 className="font-semibold text-green-800 mb-3">Strengths</h4>
-                <ul className="space-y-2">
-                  {report.strengths.map((strength, idx) => (
-                    <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
-                      <span className="text-green-600 mt-1">•</span>
-                      {strength}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              {report.strengths && report.strengths.length > 0 && (
+                <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                  <h4 className="font-semibold text-green-800 mb-3">Strengths</h4>
+                  <ul className="space-y-2">
+                    {report.strengths.map((strength, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                        <span className="text-green-600 mt-1">•</span>
+                        {strength}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               {/* Areas for Improvement */}
-              <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
-                <h4 className="font-semibold text-orange-800 mb-3">Areas for Improvement</h4>
-                <ul className="space-y-2">
-                  {report.areasForImprovement.map((area, idx) => (
-                    <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
-                      <span className="text-orange-600 mt-1">•</span>
-                      {area}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              {report.areasForImprovement && report.areasForImprovement.length > 0 && (
+                <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                  <h4 className="font-semibold text-orange-800 mb-3">Areas for Improvement</h4>
+                  <ul className="space-y-2">
+                    {report.areasForImprovement.map((area, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                        <span className="text-orange-600 mt-1">•</span>
+                        {area}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
 
             {/* Achievements */}
-            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 mb-6">
-              <h4 className="font-semibold text-blue-800 mb-3">Notable Achievements</h4>
-              <ul className="space-y-2">
-                {report.achievements.map((achievement, idx) => (
-                  <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
-                    <Award className="h-4 w-4 text-blue-600 mt-1 flex-shrink-0" />
-                    {achievement}
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {report.achievements && report.achievements.length > 0 && (
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 mb-6">
+                <h4 className="font-semibold text-blue-800 mb-3">Notable Achievements</h4>
+                <ul className="space-y-2">
+                  {report.achievements.map((achievement, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                      <Award className="h-4 w-4 text-blue-600 mt-1 flex-shrink-0" />
+                      {achievement}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {/* Recommendations */}
-            <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-              <h4 className="font-semibold text-purple-800 mb-3">Recommendations</h4>
-              <ul className="space-y-2">
-                {report.recommendations.map((rec, idx) => (
-                  <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
-                    <span className="text-purple-600 mt-1">→</span>
-                    {rec}
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {report.recommendations && report.recommendations.length > 0 && (
+              <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                <h4 className="font-semibold text-purple-800 mb-3">Recommendations</h4>
+                <ul className="space-y-2">
+                  {report.recommendations.map((rec, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                      <span className="text-purple-600 mt-1">→</span>
+                      {rec}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
 
           {/* Comments Section */}
@@ -420,20 +389,31 @@ const StudentReportPage = () => {
             <h3 className="text-xl font-bold text-gray-900 mb-6">Additional Comments</h3>
             
             <div className="space-y-4">
-              <div className="bg-gray-50 p-4 rounded-lg border">
-                <h4 className="font-semibold text-gray-900 mb-2">Teacher's Comments</h4>
-                <p className="text-sm text-gray-700 italic">{report.teacherComments}</p>
-              </div>
+              {report.teacherComments && (
+                <div className="bg-gray-50 p-4 rounded-lg border">
+                  <h4 className="font-semibold text-gray-900 mb-2">Teacher's Comments</h4>
+                  <p className="text-sm text-gray-700 italic">{report.teacherComments}</p>
+                </div>
+              )}
 
-              <div className="bg-gray-50 p-4 rounded-lg border">
-                <h4 className="font-semibold text-gray-900 mb-2">Career Service Lead Comments</h4>
-                <p className="text-sm text-gray-700 italic">{report.careerServiceComments}</p>
-              </div>
+              {report.careerServiceComments && (
+                <div className="bg-gray-50 p-4 rounded-lg border">
+                  <h4 className="font-semibold text-gray-900 mb-2">Career Service Lead Comments</h4>
+                  <p className="text-sm text-gray-700 italic">{report.careerServiceComments}</p>
+                </div>
+              )}
 
               {report.employerFeedback && report.employerFeedback !== 'N/A' && (
                 <div className="bg-gray-50 p-4 rounded-lg border">
                   <h4 className="font-semibold text-gray-900 mb-2">Employer's Feedback</h4>
                   <p className="text-sm text-gray-700 italic">{report.employerFeedback}</p>
+                </div>
+              )}
+
+              {!report.teacherComments && !report.careerServiceComments && !report.employerFeedback && (
+                <div className="text-center text-gray-500 py-8">
+                  <p>No additional comments have been added yet.</p>
+                  <p className="text-sm mt-2">Your instructors will provide feedback as you progress through the program.</p>
                 </div>
               )}
             </div>
