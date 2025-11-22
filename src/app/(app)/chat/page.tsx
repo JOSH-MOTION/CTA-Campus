@@ -108,6 +108,47 @@ export default function ChatPage() {
     return groups.sort((a, b) => a.name.localeCompare(b.name));
   }, [role, userData, allUsers]);
 
+  // Sort contacts by last message time
+  const sortedContacts = useMemo(() => {
+    if (!currentUser) return [];
+    
+    // Create a map of last message timestamps for each chat
+    const lastMessageMap = new Map<string, number>();
+    chatMetadata.forEach((metadata, chatId) => {
+      if (metadata.lastMessageAt) {
+        lastMessageMap.set(chatId, metadata.lastMessageAt.toMillis());
+      }
+    });
+    
+    // Sort users by last message time (most recent first)
+    return [...otherUsers].sort((a, b) => {
+      const chatIdA = getChatId(currentUser.uid, a.uid);
+      const chatIdB = getChatId(currentUser.uid, b.uid);
+      
+      const timeA = lastMessageMap.get(chatIdA) || 0;
+      const timeB = lastMessageMap.get(chatIdB) || 0;
+      
+      return timeB - timeA; // Most recent first
+    });
+  }, [otherUsers, currentUser, chatMetadata]);
+
+  // Sort group chats by last message time
+  const sortedGroupChats = useMemo(() => {
+    const lastMessageMap = new Map<string, number>();
+    chatMetadata.forEach((metadata, chatId) => {
+      if (metadata.lastMessageAt) {
+        lastMessageMap.set(chatId, metadata.lastMessageAt.toMillis());
+      }
+    });
+    
+    return [...groupChats].sort((a, b) => {
+      const timeA = lastMessageMap.get(a.id) || 0;
+      const timeB = lastMessageMap.get(b.id) || 0;
+      
+      return timeB - timeA;
+    });
+  }, [groupChats, chatMetadata]);
+
   const handleSelectChat = useCallback(
     (entity: ChatEntity) => {
       const newPath =
@@ -127,7 +168,7 @@ export default function ChatPage() {
     let targetEntity: ChatEntity | null = null;
 
     if (groupChatId) {
-      const groupToSelect = groupChats.find((g) => g.id === `group-${groupChatId}`);
+      const groupToSelect = sortedGroupChats.find((g) => g.id === `group-${groupChatId}`);
       if (groupToSelect) {
         targetEntity = { ...groupToSelect, type: 'group' };
       }
@@ -144,7 +185,7 @@ export default function ChatPage() {
       }
     }
     setSelectedChat(targetEntity);
-  }, [loading, currentUser, allUsers, groupChats, searchParams]);
+  }, [loading, currentUser, allUsers, sortedGroupChats, searchParams]);
 
   useEffect(() => {
     if (!selectedChat || !currentUser) return;
@@ -241,12 +282,12 @@ export default function ChatPage() {
             </div>
           ) : (
             <>
-              {groupChats.length > 0 && (
+              {sortedGroupChats.length > 0 && (
                 <div className="p-3">
                   <h3 className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Group Channels</h3>
                 </div>
               )}
-              {groupChats.map((chatItem) => {
+              {sortedGroupChats.map((chatItem) => {
                 const unreadCount = getUnreadCountForChat(chatItem.id);
                 return (
                   <button
@@ -295,12 +336,12 @@ export default function ChatPage() {
                 );
               })}
 
-              {otherUsers.length > 0 && (
+              {sortedContacts.length > 0 && (
                 <div className="p-3 mt-4">
                   <h3 className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Direct Messages</h3>
                 </div>
               )}
-              {otherUsers.map((chatItem) => {
+              {sortedContacts.map((chatItem) => {
                 const dmChatId = getChatId(currentUser?.uid || '', chatItem.uid);
                 const unreadCount = getUnreadCountForChat(dmChatId);
                 return (

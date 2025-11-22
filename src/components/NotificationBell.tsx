@@ -18,13 +18,25 @@ export function NotificationBell() {
   const { notifications, unreadCount, markAllAsRead, markAsRead } = useNotifications();
   const hasUnread = unreadCount > 0;
 
+  // Handle clicking on the notification count badge
+  const handleBadgeClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent popover from opening
+    if (hasUnread) {
+      markAllAsRead();
+    }
+  };
+
   return (
     <Popover>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-5 w-5" />
           {hasUnread && (
-            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs text-white">
+            <span 
+              className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs text-white cursor-pointer hover:bg-red-600 transition-colors"
+              onClick={handleBadgeClick}
+              title="Click to mark all as read"
+            >
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}

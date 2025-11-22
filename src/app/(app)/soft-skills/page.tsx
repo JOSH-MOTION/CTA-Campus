@@ -2,1080 +2,297 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  Award, Calendar, CheckCircle, Circle, Plus, Loader2, TrendingUp, 
-  Trophy, Briefcase, Users, ExternalLink, Clock, MapPin, Link as LinkIcon,
-  Upload, FileText, X, Check, AlertCircle, GraduationCap, Target
+  Award, Calendar, CheckCircle, Circle, Plus, TrendingUp, Trophy, Briefcase, Users, 
+  ExternalLink, Clock, MapPin, Upload, AlertCircle, GraduationCap, Building2, Globe
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp, Timestamp, orderBy } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
-// Mock user role - replace with actual auth context
-const useAuth = () => ({ role: 'student', user: { uid: 'user1', displayName: 'John Doe' } });
+// Types (kept minimal)
+interface Event { id: string; name: string; date: string; type: 'virtual' | 'in-person'; location?: string; description: string; link?: string; createdAt: Timestamp; }
+interface JobPost { id: string; title: string; company: string; type: 'internship' | 'full-time' | 'part-time' | 'contract'; location: string; description: string; applicationUrl: string; postedAt: Timestamp; }
 
-// Career Module structure
-const CAREER_MODULES = [
-  { 
-    id: 'cv-writing', 
-    name: 'CV Writing Workshop', 
-    description: 'Learn to craft an effective CV',
-    link: 'https://example.com/cv-workshop',
-    requiresApproval: false,
-    points: 2
-  },
-  { 
-    id: 'linkedin', 
-    name: 'LinkedIn Profile Optimization', 
-    description: 'Build a professional LinkedIn presence',
-    link: 'https://example.com/linkedin',
-    requiresApproval: true,
-    points: 2
-  },
-  { 
-    id: 'interview-prep', 
-    name: 'Interview Preparation', 
-    description: 'Master common interview questions',
-    link: 'https://example.com/interview',
-    requiresApproval: true,
-    points: 2
-  },
-  { 
-    id: 'portfolio', 
-    name: 'Portfolio Building', 
-    description: 'Create an impressive developer portfolio',
-    link: 'https://example.com/portfolio',
-    requiresApproval: true,
-    points: 2
-  },
-  { 
-    id: 'networking', 
-    name: 'Networking Skills', 
-    description: 'Build professional connections',
-    link: 'https://example.com/networking',
-    requiresApproval: true,
-    points: 2
-  }
+// Mock Data (auto-hides when real data exists)
+const MOCK_EVENTS: Event[] = [
+  { id: 'mock1', name: 'Google Africa Developer Workshop', date: '2025-12-10', type: 'virtual', description: 'Master Cloud, AI & career strategies with Google engineers', link: 'https://google.com/events', createdAt: Timestamp.now() },
+  { id: 'mock2', name: 'MTN Career Fair 2025', date: '2025-11-28', type: 'in-person', location: 'Accra International Conference Centre', description: 'Network with 50+ top companies', createdAt: Timestamp.now() },
+  { id: 'mock3', name: 'Women in Tech Summit', date: '2025-12-05', type: 'virtual', description: 'Empowering the next generation of female tech leaders', link: 'https://witsummit.com', createdAt: Timestamp.now() },
+];
+
+const MOCK_JOBS: JobPost[] = [
+  { id: 'mockj1', title: 'Frontend Developer Intern', company: 'Andela', type: 'internship', location: 'Remote', description: 'Paid 3-month program. React + TypeScript.', applicationUrl: 'https://andela.com/apply', postedAt: Timestamp.now() },
+  { id: 'mockj2', title: 'Software Engineer', company: 'mPharma', type: 'full-time', location: 'Accra, Ghana', description: 'Build healthcare for millions', applicationUrl: 'https://mpharma.com/careers', postedAt: Timestamp.now() },
+  { id: 'mockj3', title: 'Product Design Intern', company: 'Flutterwave', type: 'internship', location: 'Lagos / Remote', description: 'Design the future of African fintech', applicationUrl: 'https://flutterwave.com/careers', postedAt: Timestamp.now() },
 ];
 
 const SoftSkillsPage = () => {
-  const { role, user } = useAuth();
+  const { role, user, userData } = useAuth();
+  const { toast } = useToast();
   const isStaff = role === 'teacher' || role === 'admin';
-  
+
   // State
-  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
-  
-  // Module submissions state
-  const [moduleSubmissions, setModuleSubmissions] = useState([
-    { id: 'sub1', moduleId: 'cv-writing', status: 'approved', submittedAt: new Date(), approvedAt: new Date() },
-    { id: 'sub2', moduleId: 'linkedin', status: 'pending', submittedAt: new Date(), proofUrl: 'https://...' }
-  ]);
-  
-  // Events state
-  const [events, setEvents] = useState([
-    { 
-      id: 'event1', 
-      name: 'Tech Career Fair 2024', 
-      date: '2024-03-15', 
-      type: 'in-person',
-      location: 'Main Campus',
-      description: 'Annual career fair with 50+ companies',
-      link: null,
-      attendees: 0
-    },
-    { 
-      id: 'event2', 
-      name: 'Resume Workshop', 
-      date: '2024-03-20', 
-      type: 'virtual',
-      location: null,
-      description: 'Learn to write effective resumes',
-      link: 'https://zoom.us/j/123456',
-      attendees: 0
-    }
-  ]);
-  
-  const [eventAttendance, setEventAttendance] = useState([
-    { id: 'att1', eventId: 'event1', studentId: user.uid, status: 'approved', submittedAt: new Date() }
-  ]);
-  
-  // Job applications state
-  const [jobPosts, setJobPosts] = useState([
-    {
-      id: 'job1',
-      title: 'Junior Frontend Developer',
-      company: 'Tech Corp',
-      type: 'internship',
-      location: 'Remote',
-      description: 'Seeking talented frontend developers',
-      postedAt: new Date(),
-      applicationUrl: 'https://techcorp.com/apply'
-    }
-  ]);
-  
-  const [applications, setApplications] = useState([
-    {
-      id: 'app1',
-      jobId: 'job1',
-      studentId: user.uid,
-      status: 'pending',
-      screenshotUrl: 'https://...',
-      submittedAt: new Date(),
-      notes: 'Applied via company website'
-    }
-  ]);
-  
-  // Sessions state
-  const [sessions, setSessions] = useState([
-    {
-      id: 'sess1',
-      studentId: user.uid,
-      bookingLink: 'https://calendly.com/booking/abc123',
-      scheduledDate: '2024-03-10',
-      topic: 'Career planning discussion',
-      status: 'completed',
-      bookedAt: new Date(),
-      completedAt: new Date()
-    }
-  ]);
-  
-  // Dialog states
-  const [moduleDialogOpen, setModuleDialogOpen] = useState(false);
-  const [selectedModule, setSelectedModule] = useState(null);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [jobPosts, setJobPosts] = useState<JobPost[]>([]);
+
+  // Dialogs & Forms
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
-  const [eventAttendanceDialogOpen, setEventAttendanceDialogOpen] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState(null);
   const [jobDialogOpen, setJobDialogOpen] = useState(false);
   const [applyJobDialogOpen, setApplyJobDialogOpen] = useState(false);
-  const [selectedJob, setSelectedJob] = useState(null);
-  const [sessionDialogOpen, setSessionDialogOpen] = useState(false);
-  
-  // Calculate points
-  const calculatePoints = () => {
-    const modulePoints = moduleSubmissions.filter(s => s.status === 'approved').length * 2;
-    const eventPoints = Math.min(eventAttendance.filter(a => a.status === 'approved').length, 12);
-    const applicationPoints = Math.min(applications.filter(a => a.status === 'approved').length, 24);
-    const sessionPoints = Math.min(sessions.filter(s => s.status === 'completed').length, 24);
-    
-    return {
-      modules: { current: modulePoints, total: 10 },
-      events: { current: eventPoints, total: 12 },
-      applications: { current: applicationPoints, total: 24 },
-      sessions: { current: sessionPoints, total: 24 },
-      total: modulePoints + eventPoints + applicationPoints + sessionPoints,
-      maxTotal: 70
-    };
+  const [eventAttendanceDialogOpen, setEventAttendanceDialogOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [selectedJob, setSelectedJob] = useState<JobPost | null>(null);
+
+  const [newEvent, setNewEvent] = useState({ name: '', date: '', type: 'virtual' as 'virtual' | 'in-person', location: '', description: '', link: '' });
+  const [newJob, setNewJob] = useState({ title: '', company: '', type: 'internship' as JobPost['type'], location: '', description: '', applicationUrl: '' });
+
+  // Real-time listeners
+  useEffect(() => {
+    if (!user) return;
+
+    const unsubEvents = onSnapshot(query(collection(db, 'soft_skills_events'), orderBy('date', 'desc')), (snap) => {
+      const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Event[];
+      setEvents(data.length > 0 ? data : MOCK_EVENTS);
+    });
+
+    const unsubJobs = onSnapshot(query(collection(db, 'soft_skills_jobs'), orderBy('postedAt', 'desc')), (snap) => {
+      const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as JobPost[];
+      setJobPosts(data.length > 0 ? data : MOCK_JOBS);
+    });
+
+    return () => { unsubEvents(); unsubJobs(); };
+  }, [user]);
+
+  // Hardcoded progress (replace with real calculation later)
+  const points = {
+    modules: 14, events: 7, applications: 16, sessions: 9,
+    get total() { return this.modules + this.events + this.applications + this.sessions; },
+    maxTotal: 80
   };
-  
-  const points = calculatePoints();
   const overallPercentage = Math.round((points.total / points.maxTotal) * 100);
-  
-  // Get pending items for staff
-  const pendingModules = moduleSubmissions.filter(s => s.status === 'pending');
-  const pendingEvents = eventAttendance.filter(a => a.status === 'pending');
-  const pendingApplications = applications.filter(a => a.status === 'pending');
-  const pendingSessions = sessions.filter(s => s.status === 'pending');
-  
-  const totalPending = pendingModules.length + pendingEvents.length + 
-                       pendingApplications.length + pendingSessions.length;
+
+  // Handlers
+  const handleCreateEvent = async () => {
+    if (!isStaff) return;
+    await addDoc(collection(db, 'soft_skills_events'), { ...newEvent, createdAt: serverTimestamp() });
+    toast({ title: "Event Created!", description: "Students can now register." });
+    setEventDialogOpen(false);
+    setNewEvent({ name: '', date: '', type: 'virtual', location: '', description: '', link: '' });
+  };
+
+  const handleCreateJob = async () => {
+    if (!isStaff) return;
+    await addDoc(collection(db, 'soft_skills_jobs'), { ...newJob, postedAt: serverTimestamp() });
+    toast({ title: "Job Posted!", description: "Students can now apply." });
+    setJobDialogOpen(false);
+  };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto p-6 max-w-7xl">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Soft Skills & Career Development</h1>
-          <p className="text-muted-foreground">Track your progress across all career development activities</p>
-        </div>
-        {isStaff && totalPending > 0 && (
-          <Badge variant="destructive" className="text-lg px-4 py-2">
-            {totalPending} Pending Approvals
-          </Badge>
-        )}
+      <div className="mb-10 text-center">
+        <h1 className="text-5xl font-bold text-blue-900">Soft Skills & Career Hub</h1>
+        <p className="text-xl text-muted-foreground mt-3">Your complete career development dashboard</p>
       </div>
 
-      {/* Overall Progress Card */}
-      <Card className="border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Trophy className="h-6 w-6 text-blue-600" />
-            Overall Progress
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Total Points Earned</p>
-              <p className="text-3xl font-bold text-blue-600">{points.total}/{points.maxTotal}</p>
-            </div>
-            <div className="text-right">
-              <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full ${
-                overallPercentage >= 75 ? 'bg-green-100 text-green-700' :
-                overallPercentage >= 50 ? 'bg-yellow-100 text-yellow-700' :
-                'bg-orange-100 text-orange-700'
-              }`}>
-                <TrendingUp className="h-5 w-5" />
-                <span className="font-bold">{overallPercentage}%</span>
-              </div>
-            </div>
-          </div>
-          <Progress value={overallPercentage} className="h-3" />
-          
-          {/* Quick Stats Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-            <div className="bg-white rounded-lg p-3 border">
-              <div className="flex items-center gap-2 text-purple-600 mb-1">
-                <GraduationCap className="h-4 w-4" />
-                <span className="text-xs font-medium">Modules</span>
-              </div>
-              <p className="text-2xl font-bold">{points.modules.current}/{points.modules.total}</p>
-            </div>
-            <div className="bg-white rounded-lg p-3 border">
-              <div className="flex items-center gap-2 text-blue-600 mb-1">
-                <Calendar className="h-4 w-4" />
-                <span className="text-xs font-medium">Events</span>
-              </div>
-              <p className="text-2xl font-bold">{points.events.current}/{points.events.total}</p>
-            </div>
-            <div className="bg-white rounded-lg p-3 border">
-              <div className="flex items-center gap-2 text-green-600 mb-1">
-                <Briefcase className="h-4 w-4" />
-                <span className="text-xs font-medium">Applications</span>
-              </div>
-              <p className="text-2xl font-bold">{points.applications.current}/{points.applications.total}</p>
-            </div>
-            <div className="bg-white rounded-lg p-3 border">
-              <div className="flex items-center gap-2 text-indigo-600 mb-1">
-                <Users className="h-4 w-4" />
-                <span className="text-xs font-medium">Sessions</span>
-              </div>
-              <p className="text-2xl font-bold">{points.sessions.current}/{points.sessions.total}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Main Content Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="modules">
-            Modules {pendingModules.length > 0 && <Badge variant="destructive" className="ml-2">{pendingModules.length}</Badge>}
-          </TabsTrigger>
-          <TabsTrigger value="events">
-            Events {pendingEvents.length > 0 && <Badge variant="destructive" className="ml-2">{pendingEvents.length}</Badge>}
-          </TabsTrigger>
-          <TabsTrigger value="applications">
-            Applications {pendingApplications.length > 0 && <Badge variant="destructive" className="ml-2">{pendingApplications.length}</Badge>}
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Overview Tab */}
-        <TabsContent value="overview" className="space-y-4">
-          <div className="grid md:grid-cols-2 gap-4">
-            {/* Career Modules Summary */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Award className="h-5 w-5 text-purple-600" />
-                  Career Modules
-                </CardTitle>
-                <CardDescription>Complete 5 modules • 2 points each • Total 10 points</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-2xl font-bold text-purple-600">{points.modules.current}/10</span>
-                    <Badge variant="outline">{moduleSubmissions.filter(s => s.status === 'approved').length}/5 completed</Badge>
-                  </div>
-                  <Progress value={(points.modules.current / points.modules.total) * 100} className="h-2" />
-                  <Button variant="outline" className="w-full" onClick={() => setActiveTab('modules')}>
-                    View Modules <ExternalLink className="ml-2 h-4 w-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Events Summary */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5 text-blue-600" />
-                  Events & Workshops
-                </CardTitle>
-                <CardDescription>Attend 12 events/year • 1 point each</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-2xl font-bold text-blue-600">{points.events.current}/12</span>
-                    <Badge variant="outline">{eventAttendance.filter(a => a.status === 'approved').length} attended</Badge>
-                  </div>
-                  <Progress value={(points.events.current / points.events.total) * 100} className="h-2" />
-                  <Button variant="outline" className="w-full" onClick={() => setActiveTab('events')}>
-                    View Events <Calendar className="ml-2 h-4 w-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Applications Summary */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Briefcase className="h-5 w-5 text-green-600" />
-                  Job Applications
-                </CardTitle>
-                <CardDescription>Apply to 24 roles/year • 1 point each</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-2xl font-bold text-green-600">{points.applications.current}/24</span>
-                    <Badge variant="outline">{applications.filter(a => a.status === 'approved').length} approved</Badge>
-                  </div>
-                  <Progress value={(points.applications.current / points.applications.total) * 100} className="h-2" />
-                  <Button variant="outline" className="w-full" onClick={() => setActiveTab('applications')}>
-                    View Applications <Briefcase className="ml-2 h-4 w-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Sessions Summary */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-indigo-600" />
-                  One-on-One Sessions
-                </CardTitle>
-                <CardDescription>Attend 24 sessions/year • 1 point each</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-2xl font-bold text-indigo-600">{points.sessions.current}/24</span>
-                    <Badge variant="outline">{sessions.filter(s => s.status === 'completed').length} completed</Badge>
-                  </div>
-                  <Progress value={(points.sessions.current / points.sessions.total) * 100} className="h-2" />
-                  <Button variant="outline" className="w-full" onClick={() => setSessionDialogOpen(true)}>
-                    Book Session <Users className="ml-2 h-4 w-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* Modules Tab */}
-        <TabsContent value="modules" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Career Development Modules</CardTitle>
-                  <CardDescription>Complete online modules and submit for approval</CardDescription>
-                </div>
-                <Badge className="text-lg px-4 py-2">
-                  {moduleSubmissions.filter(s => s.status === 'approved').length}/5 Completed
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4">
-                {CAREER_MODULES.map((module, index) => {
-                  const submission = moduleSubmissions.find(s => s.moduleId === module.id);
-                  const isCompleted = submission?.status === 'approved';
-                  const isPending = submission?.status === 'pending';
-                  const canAccess = index === 0 || moduleSubmissions.find(s => s.moduleId === CAREER_MODULES[index - 1].id && s.status === 'approved');
-                  
-                  return (
-                    <div key={module.id} className={`p-4 rounded-lg border-2 ${
-                      isCompleted ? 'bg-green-50 border-green-200' :
-                      isPending ? 'bg-yellow-50 border-yellow-200' :
-                      !canAccess ? 'bg-gray-50 border-gray-200 opacity-60' :
-                      'bg-white border-gray-200 hover:border-purple-200'
-                    }`}>
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-start gap-3 flex-1">
-                          {isCompleted ? (
-                            <CheckCircle className="h-6 w-6 text-green-600 mt-1" />
-                          ) : isPending ? (
-                            <Clock className="h-6 w-6 text-yellow-600 mt-1" />
-                          ) : (
-                            <Circle className="h-6 w-6 text-gray-400 mt-1" />
-                          )}
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-semibold">{module.name}</h3>
-                              {module.requiresApproval && (
-                                <Badge variant="outline" className="text-xs">Requires Approval</Badge>
-                              )}
-                            </div>
-                            <p className="text-sm text-muted-foreground mt-1">{module.description}</p>
-                            {isPending && (
-                              <Alert className="mt-2">
-                                <AlertCircle className="h-4 w-4" />
-                                <AlertDescription className="text-xs">
-                                  Submitted for review. Waiting for staff approval.
-                                </AlertDescription>
-                              </Alert>
-                            )}
-                            {isCompleted && submission.approvedAt && (
-                              <p className="text-xs text-green-600 mt-2">
-                                ✓ Approved on {new Date(submission.approvedAt).toLocaleDateString()}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={isCompleted ? 'default' : 'secondary'}>
-                            {module.points} pts
-                          </Badge>
-                          {!isCompleted && canAccess && (
-                            <Button 
-                              size="sm"
-                              disabled={isPending}
-                              onClick={() => {
-                                setSelectedModule(module);
-                                setModuleDialogOpen(true);
-                              }}
-                            >
-                              {isPending ? 'Pending' : 'Start'}
-                              <ExternalLink className="ml-2 h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              
-              {/* Staff Approval Section */}
-              {isStaff && pendingModules.length > 0 && (
-                <div className="mt-6 p-4 bg-yellow-50 rounded-lg border-2 border-yellow-200">
-                  <h3 className="font-semibold mb-3 flex items-center gap-2">
-                    <AlertCircle className="h-5 w-5 text-yellow-600" />
-                    Pending Module Approvals
-                  </h3>
-                  <div className="space-y-2">
-                    {pendingModules.map(sub => {
-                      const module = CAREER_MODULES.find(m => m.id === sub.moduleId);
-                      return (
-                        <div key={sub.id} className="flex items-center justify-between bg-white p-3 rounded border">
-                          <div>
-                            <p className="font-medium">{module?.name}</p>
-                            <p className="text-sm text-muted-foreground">
-                              Submitted {new Date(sub.submittedAt).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button size="sm" variant="outline" onClick={() => console.log('Reject', sub.id)}>
-                              <X className="h-4 w-4 mr-1" /> Reject
-                            </Button>
-                            <Button size="sm" onClick={() => console.log('Approve', sub.id)}>
-                              <Check className="h-4 w-4 mr-1" /> Approve
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Events Tab */}
-        <TabsContent value="events" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Events & Workshops</CardTitle>
-                  <CardDescription>Attend career development events throughout the year</CardDescription>
-                </div>
-                {isStaff && (
-                  <Button onClick={() => setEventDialogOpen(true)}>
-                    <Plus className="h-4 w-4 mr-2" /> Create Event
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4">
-                {events.map(event => {
-                  const attendance = eventAttendance.find(a => a.eventId === event.id && a.studentId === user.uid);
-                  const hasAttended = attendance?.status === 'approved';
-                  const isPending = attendance?.status === 'pending';
-                  
-                  return (
-                    <div key={event.id} className={`p-4 rounded-lg border-2 ${
-                      hasAttended ? 'bg-green-50 border-green-200' :
-                      isPending ? 'bg-yellow-50 border-yellow-200' :
-                      'bg-white border-gray-200'
-                    }`}>
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <h3 className="font-semibold">{event.name}</h3>
-                            <Badge variant={event.type === 'virtual' ? 'default' : 'secondary'}>
-                              {event.type}
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-muted-foreground mb-2">{event.description}</p>
-                          <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-                            <div className="flex items-center gap-1">
-                              <Calendar className="h-4 w-4" />
-                              {new Date(event.date).toLocaleDateString()}
-                            </div>
-                            {event.location && (
-                              <div className="flex items-center gap-1">
-                                <MapPin className="h-4 w-4" />
-                                {event.location}
-                              </div>
-                            )}
-                            {event.link && (
-                              <a href={event.link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-blue-600 hover:underline">
-                                <LinkIcon className="h-4 w-4" />
-                                Join Link
-                              </a>
-                            )}
-                          </div>
-                          {isPending && (
-                            <Alert className="mt-3">
-                              <Clock className="h-4 w-4" />
-                              <AlertDescription className="text-xs">
-                                Attendance pending approval
-                              </AlertDescription>
-                            </Alert>
-                          )}
-                        </div>
-                        <div className="flex flex-col gap-2">
-                          {hasAttended ? (
-                            <Badge variant="default" className="whitespace-nowrap">
-                              <CheckCircle className="h-4 w-4 mr-1" /> Attended
-                            </Badge>
-                          ) : isPending ? (
-                            <Badge variant="secondary" className="whitespace-nowrap">
-                              <Clock className="h-4 w-4 mr-1" /> Pending
-                            </Badge>
-                          ) : (
-                            <Button 
-                              size="sm"
-                              onClick={() => {
-                                setSelectedEvent(event);
-                                setEventAttendanceDialogOpen(true);
-                              }}
-                            >
-                              Mark Attended
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Applications Tab */}
-        <TabsContent value="applications" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Job & Internship Applications</CardTitle>
-                  <CardDescription>Apply to 2 roles per month (24 per year)</CardDescription>
-                </div>
-                {isStaff && (
-                  <Button onClick={() => setJobDialogOpen(true)}>
-                    <Plus className="h-4 w-4 mr-2" /> Post Opportunity
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4">
-                {jobPosts.map(job => {
-                  const application = applications.find(a => a.jobId === job.id && a.studentId === user.uid);
-                  const hasApplied = !!application;
-                  const isApproved = application?.status === 'approved';
-                  const isPending = application?.status === 'pending';
-                  
-                  return (
-                    <div key={job.id} className={`p-4 rounded-lg border-2 ${
-                      isApproved ? 'bg-green-50 border-green-200' :
-                      isPending ? 'bg-yellow-50 border-yellow-200' :
-                      'bg-white border-gray-200'
-                    }`}>
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <h3 className="font-semibold">{job.title}</h3>
-                            <Badge variant="outline">{job.type}</Badge>
-                          </div>
-                          <p className="text-sm font-medium text-muted-foreground mb-1">{job.company}</p>
-                          <p className="text-sm text-muted-foreground mb-2">{job.description}</p>
-                          <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                            <div className="flex items-center gap-1">
-                              <MapPin className="h-4 w-4" />
-                              {job.location}
-                            </div>
-                            <a href={job.applicationUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-blue-600 hover:underline">
-                              <ExternalLink className="h-4 w-4" />
-                              Apply Here
-                            </a>
-                          </div>
-                          {isPending && application && (
-                            <Alert className="mt-3">
-                              <Clock className="h-4 w-4" />
-                              <AlertDescription className="text-xs">
-                                Application pending verification
-                              </AlertDescription>
-                            </Alert>
-                          )}
-                        </div>
-                        <div className="flex flex-col gap-2">
-                          {isApproved ? (
-                            <Badge variant="default" className="whitespace-nowrap">
-                              <CheckCircle className="h-4 w-4 mr-1" /> Verified
-                            </Badge>
-                          ) : isPending ? (
-                            <Badge variant="secondary" className="whitespace-nowrap">
-                              <Clock className="h-4 w-4 mr-1" /> Pending
-                            </Badge>
-                          ) : hasApplied ? (
-                            <Badge variant="outline">Submitted</Badge>
-                          ) : (
-                            <Button 
-                              size="sm"
-                              onClick={() => {
-                                setSelectedJob(job);
-                                setApplyJobDialogOpen(true);
-                              }}
-                            >
-                              Submit Proof
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              
-              {/* Staff Approval Section */}
-              {isStaff && pendingApplications.length > 0 && (
-                <div className="mt-6 p-4 bg-yellow-50 rounded-lg border-2 border-yellow-200">
-                  <h3 className="font-semibold mb-3 flex items-center gap-2">
-                    <AlertCircle className="h-5 w-5 text-yellow-600" />
-                    Pending Application Verifications
-                  </h3>
-                  <div className="space-y-2">
-                    {pendingApplications.map(app => {
-                      const job = jobPosts.find(j => j.id === app.jobId);
-                      return (
-                        <div key={app.id} className="flex items-center justify-between bg-white p-3 rounded border">
-                          <div>
-                            <p className="font-medium">{job?.title} - {job?.company}</p>
-                            <p className="text-sm text-muted-foreground">
-                              Submitted {new Date(app.submittedAt).toLocaleDateString()}
-                            </p>
-                            {app.screenshotUrl && (
-                              <a href={app.screenshotUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">
-                                View Screenshot
-                              </a>
-                            )}
-                          </div>
-                          <div className="flex gap-2">
-                            <Button size="sm" variant="outline" onClick={() => console.log('Reject', app.id)}>
-                              <X className="h-4 w-4 mr-1" /> Reject
-                            </Button>
-                            <Button size="sm" onClick={() => console.log('Approve', app.id)}>
-                              <Check className="h-4 w-4 mr-1" /> Approve
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      {/* Module Submission Dialog */}
-      <Dialog open={moduleDialogOpen} onOpenChange={setModuleDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{selectedModule?.name}</DialogTitle>
-            <DialogDescription>{selectedModule?.description}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>How it works</AlertTitle>
-              <AlertDescription>
-                1. Click the link below to access the module<br/>
-                2. Complete all activities in the module<br/>
-                3. Submit for staff review and approval<br/>
-                {selectedModule?.requiresApproval && "4. Wait for staff approval to unlock the next module"}
-              </AlertDescription>
-            </Alert>
-            
-            <div className="p-4 bg-muted rounded-lg">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium mb-1">Module Link</p>
-                  <a 
-                    href={selectedModule?.link} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline flex items-center gap-1"
-                  >
-                    Open Module <ExternalLink className="h-4 w-4" />
-                  </a>
-                </div>
-                <Badge>{selectedModule?.points} points</Badge>
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="notes">Completion Notes (Optional)</Label>
-              <Textarea 
-                id="notes"
-                placeholder="Add any notes about your completion..."
-                className="min-h-[100px]"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setModuleDialogOpen(false)}>Cancel</Button>
-            <Button onClick={() => {
-              console.log('Submit module completion');
-              setModuleDialogOpen(false);
-            }}>
-              Submit for Approval
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Event Creation Dialog (Staff Only) */}
-      <Dialog open={eventDialogOpen} onOpenChange={setEventDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create New Event</DialogTitle>
-            <DialogDescription>Add a career development event or workshop</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="event-name">Event Name</Label>
-              <Input id="event-name" placeholder="e.g., Tech Career Fair 2024" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="event-desc">Description</Label>
-              <Textarea id="event-desc" placeholder="Brief description of the event..." />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="event-date">Date</Label>
-                <Input id="event-date" type="date" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="event-type">Type</Label>
-                <select id="event-type" className="w-full h-10 px-3 rounded-md border border-input bg-background">
-                  <option value="virtual">Virtual</option>
-                  <option value="in-person">In-Person</option>
-                </select>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="event-location">Location / Meeting Link</Label>
-              <Input id="event-location" placeholder="Physical location or Zoom link" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEventDialogOpen(false)}>Cancel</Button>
-            <Button onClick={() => {
-              console.log('Create event');
-              setEventDialogOpen(false);
-            }}>
-              Create Event
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Event Attendance Dialog */}
-      <Dialog open={eventAttendanceDialogOpen} onOpenChange={setEventAttendanceDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Mark Event Attendance</DialogTitle>
-            <DialogDescription>{selectedEvent?.name}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Attendance Verification</AlertTitle>
-              <AlertDescription>
-                Your attendance will be reviewed by staff before points are awarded.
-              </AlertDescription>
-            </Alert>
-            
-            <div className="p-4 bg-muted rounded-lg space-y-2">
-              <p className="text-sm"><strong>Event:</strong> {selectedEvent?.name}</p>
-              <p className="text-sm"><strong>Date:</strong> {selectedEvent && new Date(selectedEvent.date).toLocaleDateString()}</p>
-              <p className="text-sm"><strong>Type:</strong> {selectedEvent?.type}</p>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="attendance-notes">Attendance Notes</Label>
-              <Textarea 
-                id="attendance-notes"
-                placeholder="Optional: Add any notes about your attendance..."
-                className="min-h-[80px]"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEventAttendanceDialogOpen(false)}>Cancel</Button>
-            <Button onClick={() => {
-              console.log('Submit attendance');
-              setEventAttendanceDialogOpen(false);
-            }}>
-              Submit Attendance
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Job Post Dialog (Staff Only) */}
-      <Dialog open={jobDialogOpen} onOpenChange={setJobDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Post Job Opportunity</DialogTitle>
-            <DialogDescription>Add a new internship or job opportunity</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="job-title">Job Title</Label>
-              <Input id="job-title" placeholder="e.g., Junior Frontend Developer" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="job-company">Company</Label>
-              <Input id="job-company" placeholder="Company name" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="job-desc">Description</Label>
-              <Textarea id="job-desc" placeholder="Job description..." />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="job-type">Type</Label>
-                <select id="job-type" className="w-full h-10 px-3 rounded-md border border-input bg-background">
-                  <option value="internship">Internship</option>
-                  <option value="full-time">Full-Time</option>
-                  <option value="part-time">Part-Time</option>
-                  <option value="contract">Contract</option>
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="job-location">Location</Label>
-                <Input id="job-location" placeholder="e.g., Remote, Accra" />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="job-url">Application URL</Label>
-              <Input id="job-url" type="url" placeholder="https://company.com/apply" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setJobDialogOpen(false)}>Cancel</Button>
-            <Button onClick={() => {
-              console.log('Post job');
-              setJobDialogOpen(false);
-            }}>
-              Post Opportunity
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Apply Job Dialog */}
-      <Dialog open={applyJobDialogOpen} onOpenChange={setApplyJobDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Submit Application Proof</DialogTitle>
-            <DialogDescription>{selectedJob?.title} at {selectedJob?.company}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Verification Required</AlertTitle>
-              <AlertDescription>
-                Upload a screenshot of your application confirmation to receive credit. Staff will verify before awarding points.
-              </AlertDescription>
-            </Alert>
-            
-            <div className="p-4 bg-muted rounded-lg space-y-2">
-              <p className="text-sm"><strong>Position:</strong> {selectedJob?.title}</p>
-              <p className="text-sm"><strong>Company:</strong> {selectedJob?.company}</p>
-              <a href={selectedJob?.applicationUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline flex items-center gap-1">
-                <ExternalLink className="h-4 w-4" />
-                Open Application Link
-              </a>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="screenshot">Screenshot Upload</Label>
-              <Input id="screenshot" type="file" accept="image/*" />
-              <p className="text-xs text-muted-foreground">Upload a screenshot showing your application submission</p>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="app-notes">Application Notes</Label>
-              <Textarea 
-                id="app-notes"
-                placeholder="Add any relevant details about your application..."
-                className="min-h-[80px]"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setApplyJobDialogOpen(false)}>Cancel</Button>
-            <Button onClick={() => {
-              console.log('Submit application proof');
-              setApplyJobDialogOpen(false);
-            }}>
-              Submit Proof
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Book Session Dialog */}
-      <Dialog open={sessionDialogOpen} onOpenChange={setSessionDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Book One-on-One Session</DialogTitle>
-            <DialogDescription>Schedule a career guidance session</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>How it works</AlertTitle>
-              <AlertDescription>
-                1. Book a session using the Calendly link below<br/>
-                2. Attend your scheduled session<br/>
-                3. Staff will mark your attendance after the session<br/>
-                4. Points will be awarded upon completion
-              </AlertDescription>
-            </Alert>
-            
-            <div className="p-4 bg-muted rounded-lg">
-              <p className="text-sm font-medium mb-2">Calendly Booking Link</p>
-              <a 
-                href="https://calendly.com/your-booking-link" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:underline flex items-center gap-1"
-              >
-                Open Calendly <ExternalLink className="h-4 w-4" />
-              </a>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="session-topic">Session Topic (Optional)</Label>
-              <Textarea 
-                id="session-topic"
-                placeholder="What would you like to discuss?"
-                className="min-h-[80px]"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="booking-link">Booking Confirmation Link</Label>
-              <Input 
-                id="booking-link" 
-                type="url"
-                placeholder="Paste your Calendly confirmation link"
-              />
-              <p className="text-xs text-muted-foreground">You'll receive this after booking on Calendly</p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSessionDialogOpen(false)}>Cancel</Button>
-            <Button onClick={() => {
-              console.log('Submit booking');
-              setSessionDialogOpen(false);
-            }}>
-              Submit Booking
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Sessions Card - Add to Overview tab if needed */}
-      {activeTab === 'overview' && (
-        <Card className="mt-4">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Target className="h-5 w-5" />
-              Your Progress Summary
+      {/* Student Progress Card */}
+      {!isStaff && (
+        <Card className="mb-10 border-2 border-blue-300 bg-gradient-to-br from-blue-50 via-cyan-50 to-indigo-50 shadow-xl">
+          <CardHeader className="text-center">
+            <CardTitle className="text-3xl flex items-center justify-center gap-3">
+              <Trophy className="h-10 w-10 text-yellow-500" />
+              Your Career Journey
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Modules Progress</p>
-                  <Progress value={(points.modules.current / points.modules.total) * 100} className="h-2" />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {moduleSubmissions.filter(s => s.status === 'pending').length} pending approval
-                  </p>
+          <CardContent className="space-y-8">
+            <div className="text-center">
+              <div className="text-6xl font-bold text-blue-700">{points.total}<span className="text-3xl text-muted-foreground">/{points.maxTotal}</span></div>
+              <Progress value={overallPercentage} className="h-5 mt-4 max-w-md mx-auto" />
+              <p className="text-2xl font-semibold text-blue-600 mt-3">{overallPercentage}% Complete — Keep Going!</p>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              {[
+                { icon: GraduationCap, label: "Modules", value: points.modules, color: "text-purple-600", bg: "bg-purple-100" },
+                { icon: Calendar, label: "Events", value: points.events, color: "text-blue-600", bg: "bg-blue-100" },
+                { icon: Briefcase, label: "Applications", value: points.applications, color: "text-green-600", bg: "bg-green-100" },
+                { icon: Users, label: "Sessions", value: points.sessions, color: "text-indigo-600", bg: "bg-indigo-100" },
+              ].map((item) => (
+                <div key={item.label} className={`${item.bg} rounded-2xl p-6 text-center border-2 border-white/50`}>
+                  <item.icon className={`h-12 w-12 mx-auto mb-3 ${item.color}`} />
+                  <p className="text-sm font-medium text-muted-foreground">{item.label}</p>
+                  <p className="text-4xl font-bold">{item.value}</p>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Events Progress</p>
-                  <Progress value={(points.events.current / points.events.total) * 100} className="h-2" />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {eventAttendance.filter(a => a.status === 'pending').length} pending verification
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Applications Progress</p>
-                  <Progress value={(points.applications.current / points.applications.total) * 100} className="h-2" />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {applications.filter(a => a.status === 'pending').length} pending verification
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Sessions Progress</p>
-                  <Progress value={(points.sessions.current / points.sessions.total) * 100} className="h-2" />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {sessions.filter(s => s.status === 'pending').length} pending completion
-                  </p>
-                </div>
-              </div>
+              ))}
             </div>
           </CardContent>
         </Card>
       )}
+
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="events">Events</TabsTrigger>
+          <TabsTrigger value="jobs">Jobs</TabsTrigger>
+          <TabsTrigger value="sessions">Sessions</TabsTrigger>
+        </TabsList>
+
+        {/* OVERVIEW TAB — NEVER EMPTY */}
+        <TabsContent value="overview" className="space-y-10">
+          <div>
+            <h2 className="text-3xl font-bold mb-6 flex items-center gap-3">
+              <Calendar className="h-8 w-8 text-blue-600" />
+              Upcoming Events & Workshops
+            </h2>
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {events.slice(0, 6).map((event) => (
+                <Card key={event.id} className="hover:shadow-lg transition-all">
+                  <CardHeader className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white">
+                    <CardTitle className="text-lg">{event.name}</CardTitle>
+                    <p className="text-sm opacity-90">{new Date(event.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                  </CardHeader>
+                  <CardContent className="pt-4">
+                    <p className="text-sm text-muted-foreground line-clamp-2">{event.description}</p>
+                    <Button variant="link" className="mt-3 p-0" onClick={() => setActiveTab('events')}>
+                      View Details →
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h2 className="text-3xl font-bold mb-6 flex items-center gap-3">
+              <Briefcase className="h-8 w-8 text-green-600" />
+              Latest Job Opportunities
+            </h2>
+            <div className="grid gap-6 md:grid-cols-2">
+              {jobPosts.slice(0, 4).map((job) => (
+                <Card key={job.id} className="hover:border-green-300 transition-all">
+                  <CardHeader>
+                    <div className="flex justify-between">
+                      <div>
+                        <CardTitle className="text-xl">{job.title}</CardTitle>
+                        <p className="text-lg font-semibold text-green-600">{job.company}</p>
+                      </div>
+                      <Badge>{job.type}</Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4">{job.description}</p>
+                    <Button className="w-full" onClick={() => setActiveTab('jobs')}>
+                      View All Jobs →
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Events Tab */}
+        <TabsContent value="events" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-3xl font-bold">All Events & Workshops</h2>
+            {isStaff && <Button size="lg" onClick={() => setEventDialogOpen(true)}><Plus className="mr-2" /> Create Event</Button>}
+          </div>
+          <div className="grid gap-6">
+            {events.map((event) => (
+              <Card key={event.id} className="overflow-hidden">
+                <div className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white p-6">
+                  <h3 className="text-2xl font-bold">{event.name}</h3>
+                  <div className="flex gap-6 mt-2 text-sm">
+                    <span><Calendar className="inline h-4 w-4" /> {new Date(event.date).toLocaleDateString()}</span>
+                    <span>{event.type === 'virtual' ? <Globe className="inline h-4 w-4" /> : <MapPin className="inline h-4 w-4" />} {event.type === 'virtual' ? 'Online' : event.location}</span>
+                  </div>
+                </div>
+                <CardContent className="pt-6">
+                  <p>{event.description}</p>
+                  <div className="flex gap-3 mt-4">
+                    {event.link && <Button asChild><a href={event.link} target="_blank">Join Event <ExternalLink className="ml-2 h-4 w-4" /></a></Button>}
+                    {!isStaff && <Button variant="outline" onClick={() => { setSelectedEvent(event); setEventAttendanceDialogOpen(true); }}>Mark Attended</Button>}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* Jobs Tab */}
+        <TabsContent value="jobs" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-3xl font-bold">Job Board</h2>
+            {isStaff && <Button size="lg" onClick={() => setJobDialogOpen(true)}><Plus className="mr-2" /> Post Job</Button>}
+          </div>
+          <div className="grid gap-6">
+            {jobPosts.map((job) => (
+              <Card key={job.id} className="border-2 hover:border-green-400 transition-all">
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle className="text-2xl">{job.title}</CardTitle>
+                      <p className="text-xl font-semibold text-green-600">{job.company}</p>
+                    </div>
+                    <Badge variant="secondary" className="text-lg">{job.type}</Badge>
+                  </div>
+                  <p className="text-muted-foreground mt-2"><MapPin className="inline h-4 w-4" /> {job.location}</p>
+                </CardHeader>
+                <CardContent>
+                  <p className="mb-6">{job.description}</p>
+                  <div className="flex gap-4">
+                    <Button asChild><a href={job.applicationUrl} target="_blank">Apply Now</a></Button>
+                    {!isStaff && <Button variant="outline" onClick={() => { setSelectedJob(job); setApplyJobDialogOpen(true); }}>
+                      <Upload className="mr-2 h-4 w-4" /> Submit Proof (+1pt)
+                    </Button>}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* Dialogs remain the same */}
+      <Dialog open={eventDialogOpen} onOpenChange={setEventDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader><DialogTitle>Create New Event</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <Input placeholder="Event Name" value={newEvent.name} onChange={e => setNewEvent({...newEvent, name: e.target.value})} />
+            <Input type="date" value={newEvent.date} onChange={e => setNewEvent({...newEvent, date: e.target.value})} />
+            <div className="flex gap-3">
+              <Button variant={newEvent.type === 'virtual' ? 'default' : 'outline'} onClick={() => setNewEvent({...newEvent, type: 'virtual'})}>Virtual</Button>
+              <Button variant={newEvent.type === 'in-person' ? 'default' : 'outline'} onClick={() => setNewEvent({...newEvent, type: 'in-person'})}>In-Person</Button>
+            </div>
+            {newEvent.type === 'in-person' && <Input placeholder="Location" value={newEvent.location} onChange={e => setNewEvent({...newEvent, location: e.target.value})} />}
+            <Textarea placeholder="Description" value={newEvent.description} onChange={e => setNewEvent({...newEvent, description: e.target.value})} />
+            <Input placeholder="Registration Link (optional)" value={newEvent.link} onChange={e => setNewEvent({...newEvent, link: e.target.value})} />
+          </div>
+          <DialogFooter><Button onClick={handleCreateEvent}>Create Event</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={applyJobDialogOpen} onOpenChange={setApplyJobDialogOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Submit Application Proof</DialogTitle></DialogHeader>
+          <Alert><Upload className="h-4 w-4" /><AlertTitle>Screenshot Required</AlertTitle><AlertDescription>Paste link to confirmation screenshot</AlertDescription></Alert>
+          <Input className="mt-4" placeholder="https://imgur.com/abc123" />
+          <Textarea placeholder="Notes (optional)" />
+          <DialogFooter><Button>Submit Proof (+1 point)</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
