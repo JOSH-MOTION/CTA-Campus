@@ -17,6 +17,7 @@ import {
   MoreVertical,
   Search,
   Paperclip,
+  ExternalLink,
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import Picker from 'emoji-picker-react';
@@ -44,6 +45,33 @@ interface ChatProps {
   allUsers: UserData[];
 }
 
+// Function to linkify text
+const linkifyText = (text: string) => {
+  // URL regex pattern
+  const urlPattern = /(https?:\/\/[^\s]+)/g;
+  
+  const parts = text.split(urlPattern);
+  
+  return parts.map((part, index) => {
+    if (part.match(urlPattern)) {
+      return (
+        <a
+          key={index}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-500 hover:text-blue-600 underline inline-flex items-center gap-1"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {part}
+          <ExternalLink className="h-3 w-3 inline" />
+        </a>
+      );
+    }
+    return <span key={index}>{part}</span>;
+  });
+};
+
 const MessageBubble = React.memo(({ msg, currentUser, allUsers }: { msg: Message; currentUser: User | null, allUsers: UserData[] }) => {
     const isSender = msg.senderId === currentUser?.uid;
     const messageTime = msg.timestamp ? format(msg.timestamp.toDate(), 'HH:mm') : '';
@@ -60,7 +88,7 @@ const MessageBubble = React.memo(({ msg, currentUser, allUsers }: { msg: Message
                     <p className='text-xs text-muted-foreground mb-1'>{msg.senderName}</p>
                  )}
                  <div className={cn("relative w-fit rounded-lg p-3 text-sm shadow-sm", isSender ? 'bg-primary text-primary-foreground' : 'bg-background')}>
-                    <p className='whitespace-pre-wrap'>{msg.text}</p>
+                    <p className='whitespace-pre-wrap'>{linkifyText(msg.text)}</p>
                  </div>
                   <p className='text-xs text-muted-foreground mt-1'>{messageTime}</p>
             </div>

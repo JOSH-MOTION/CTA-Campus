@@ -1,9 +1,11 @@
-import type {Metadata} from 'next';
+// src/app/layout.tsx   ← NO "use client" here!
+import type { Metadata } from 'next';
 import './globals.css';
-import {cn} from '@/lib/utils';
-import {Toaster} from '@/components/ui/toaster';
-import {ThemeProvider} from '@/components/ThemeProvider';
-import {AuthProvider} from '@/contexts/AuthContext';
+import { cn } from '@/lib/utils';
+import { Toaster } from '@/components/ui/toaster';
+import { ThemeProvider } from '@/components/ThemeProvider';
+import { AuthProvider } from '@/contexts/AuthContext';
+import ClientLayout from './ClientLayout';
 
 export const metadata: Metadata = {
   title: 'Codetrain Campus',
@@ -12,9 +14,9 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -26,9 +28,11 @@ export default function RootLayout({
         />
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" sizes="any" />
       </head>
-      <body className={cn('min-h-screen bg-background font-body antialiased')} suppressHydrationWarning>
+      <body className={cn('min-h-screen bg-background font-body antialiased')}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <ClientLayout>{children}</ClientLayout>
+          </AuthProvider>
           <Toaster />
         </ThemeProvider>
       </body>
