@@ -8,6 +8,7 @@ import {
   Briefcase,
   BookCopy,
   Upload,
+  Wallet,
   Users,
   UserCheck,
   CalendarCheck,
@@ -61,7 +62,7 @@ export const studentNavItems = [
   {href: '/resources', label: 'Resources Library', icon: BookOpen},
   {href: '/directory', label: 'Directory', icon: Contact},
   {href: '/book-session', label: 'Book a Session', icon: CalendarPlus},
-  // {href: '/work-ready', label: 'Work Ready', icon: Rocket},
+{href: '/fees', label: 'Fee Payment', icon: Wallet},
   {href: '/my-report', label: 'My Report', icon: FileText}, // NEW
   {href: '/profile', label: 'Profile', icon: User},
 ];
@@ -89,6 +90,7 @@ export const teacherNavItems = [
   {href: '/reports', label: 'Student Reports', icon: FileText}, // NEW
   {href: '/profile', label: 'Profile', icon: User},
   {href: '/export', label: 'Gradebook', icon: FileSpreadsheet},
+  {href: '/finance', label: 'Fee Payment', icon: Wallet},
 ];
 
 // For admins, add to adminNavItems (around line 70)
@@ -107,7 +109,7 @@ export const adminNavItems = [
   {href: '/directory', label: 'Directory', icon: Contact},
   {href: '/export', label: 'Gradebook', icon: FileSpreadsheet},
   {href: '/reports', label: 'Student Reports', icon: FileText}, // NEW
-
+  {href: '/finance', label: 'Fee Payment', icon: Wallet},
   {href: '/profile', label: 'Profile', icon: User},
 
 ];
