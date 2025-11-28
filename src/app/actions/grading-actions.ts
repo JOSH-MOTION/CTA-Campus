@@ -1,103 +1,128 @@
 // src/app/actions/grading-actions.ts
 'use server';
 
-import { z } from 'zod';
-import { adminAuth, adminDb } from '@/lib/firebase-admin';
-import { gradeSubmissionFlow, GradeSubmissionInput } from '@/ai/flows/grade-submission-flow';
-import { awardPointsFlow, AwardPointsFlowInput } from '@/ai/flows/award-points-flow';
+import { adminAuth } from '@/lib/firebase-admin';
 
-const ActionResponseSchema = z.object({
-  success: z.boolean(),
-  message: z.string(),
-});
-
-async function getVerifiedUser(idToken: string) {
-  try {
-    const decodedToken = await adminAuth.verifyIdToken(idToken);
-    const uid = decodedToken.uid;
-
-    const userDoc = await adminDb.collection('users').doc(uid).get();
-    if (!userDoc.exists) {
-      throw new Error('User document not found');
-    }
-
-    const userData = userDoc.data();
-    if (!userData || !['teacher', 'admin'].includes(userData.role)) {
-      throw new Error('User does not have sufficient permissions');
-    }
-
-    return { uid, role: userData.role };
-  } catch (error: any) {
-    console.error('Error verifying ID token or fetching user role:', {
-      error: error.message,
-      stack: error.stack,
-    });
-    throw new Error(error.message || 'Session invalid. Please log in again.');
-  }
+interface AwardPointsInput {
+  studentId: string;
+  points: number;
+  reason: string;
+  activityId: string;
+  action: 'award' | 'revoke';
+  assignmentTitle?: string;
+  idToken: string;
 }
 
-export async function awardPointsAction(input: Omit<AwardPointsFlowInput, 'awardedBy'> & { idToken: string }) {
-  try {
-    const { idToken, ...flowInput } = input; // Destructure idToken to exclude it from flowInput
-    const { uid, role } = await getVerifiedUser(idToken);
+interface GradeSubmissionInput {
+  submissionId: string;
+  studentId: string;
+  assignmentTitle: string;
+  grade?: string;
+  feedback?: string;
+  idToken: string;
+}
 
-    if (!['teacher', 'admin'].includes(role)) {
+export async function awardPointsAction(input: AwardPointsInput) {
+  try {
+    // Verify the ID token
+    const decodedToken = await adminAuth.verifyIdToken(input.idToken);
+    
+    // Call the points API
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const response = await fetch(`${baseUrl}/api/points`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userId: input.studentId,
+        points: input.points,
+        reason: input.reason,
+        assignmentTitle: input.assignmentTitle,
+        activityId: input.activityId,
+        awardedBy: decodedToken.uid,
+        action: input.action,
+        idToken: input.idToken,
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!result.success) {
       return {
         success: false,
-        message: 'Unauthorized: Only teachers or admins can award points',
+        message: result.message || 'Failed to manage points',
       };
     }
 
-    const result = await awardPointsFlow({
-      ...flowInput,
-      awardedBy: uid,
-    });
-
-    return ActionResponseSchema.parse(result);
+    return {
+      success: true,
+      message: input.action === 'award' ? 'Points awarded successfully' : 'Points revoked successfully',
+    };
   } catch (error: any) {
-    console.error('Error in awardPointsAction:', {
-      error: error.message,
-      stack: error.stack,
-      studentId: input.studentId,
-      activityId: input.activityId,
-    });
+    console.error('Error in awardPointsAction:', error);
+    
+    if (error.code && error.code.startsWith('auth/')) {
+      return {
+        success: false,
+        message: 'Authentication failed. Please refresh and try again.',
+      };
+    }
+
     return {
       success: false,
-      message: error.message || 'Failed to award points',
+      message: error.message || 'An unexpected error occurred',
     };
   }
 }
 
-export async function gradeSubmissionAction(input: Omit<GradeSubmissionInput, 'gradedBy' | 'graderName'> & { idToken: string }) {
+export async function gradeSubmissionAction(input: GradeSubmissionInput) {
   try {
-    const { idToken, ...flowInput } = input; // Destructure idToken to exclude it from flowInput
-    const { uid, role } = await getVerifiedUser(idToken);
+    // Verify the ID token
+    const decodedToken = await adminAuth.verifyIdToken(input.idToken);
+    
+    // Call the submissions API
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const response = await fetch(`${baseUrl}/api/submissions/${input.submissionId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        grade: input.grade || 'Complete',
+        feedback: input.feedback || '',
+        gradedBy: decodedToken.uid,
+        graderName: decodedToken.name || 'Staff',
+        idToken: input.idToken,
+      }),
+    });
 
-    if (!['teacher', 'admin'].includes(role)) {
+    const result = await response.json();
+
+    if (!result.success) {
       return {
         success: false,
-        message: 'Unauthorized: Only teachers or admins can grade submissions',
+        message: result.message || 'Failed to grade submission',
       };
     }
 
-    const result = await gradeSubmissionFlow({
-      ...flowInput,
-      gradedBy: uid,
-      graderName: 'Teacher', // Or fetch from userData if needed
-      idToken, // Pass idToken to flow if it needs it for verification
-    });
-
-    return ActionResponseSchema.parse(result);
+    return {
+      success: true,
+      message: 'Submission graded successfully',
+    };
   } catch (error: any) {
-    console.error('Error in gradeSubmissionAction:', {
-      error: error.message,
-      stack: error.stack,
-      submissionId: input.submissionId,
-      studentId: input.studentId,
-    });
+    console.error('Error in gradeSubmissionAction:', error);
+    
+    if (error.code && error.code.startsWith('auth/')) {
+      return {
+        success: false,
+        message: 'Authentication failed. Please refresh and try again.',
+      };
+    }
+
     return {
       success: false,
-      message: error.message || 'Failed to grade submission',
+      message: error.message || 'An unexpected error occurred',
     };
   }
 }
