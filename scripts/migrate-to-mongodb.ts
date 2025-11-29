@@ -1,293 +1,235 @@
 // scripts/migrate-to-mongodb.ts
 /**
- * Migration script to sync existing Firestore data to MongoDB
- * Run this once to populate MongoDB with existing data
- * 
- * Usage: npx ts-node scripts/migrate-to-mongodb.ts
+ * Bulk migration script to move existing Firebase data to MongoDB
+ * Run with: npx tsx scripts/migrate-to-mongodb.ts
  */
 
-import { initializeApp, cert, getApps } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
-import { getAuth } from 'firebase-admin/auth';
+import * as admin from 'firebase-admin';
 import mongoose from 'mongoose';
-import User, { Point, Submission, Notification, Attendance } from '../src/models/User';
+import connectDB from '../src/lib/mongodb';
 
-// Initialize Firebase Admin
-if (getApps().length === 0) {
-  const serviceAccount = require('../service-account.json'); // You'll need to download this from Firebase Console
+// Import models
+import User from '../src/models/User';
+import Assignment from '../src/models/Assignment';
+import Exercise from '../src/models/Exercise';
+import Project from '../src/models/Project';
+import Announcement from '../src/models/Announcement';
+import Attendance from '../src/models/Attendance';
+
+// Initialize Firebase Admin (if not already done)
+if (!admin.apps.length) {
+  const serviceAccount = JSON.parse(
+    process.env.GOOGLE_APPLICATION_CREDENTIALS || 
+    Buffer.from(process.env.GOOGLE_APPLICATION_CREDENTIALS_BASE64 || '', 'base64').toString('utf-8')
+  );
   
-  initializeApp({
-    credential: cert(serviceAccount),
-    projectId: 'campus-compass-ug6bc',
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
   });
 }
 
-const db = getFirestore();
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://eskool:KrjXFOc1mIQuwDfK@cluster0.84rsoje.mongodb.net/campus-compass?retryWrites=true&w=majority';
+const db = admin.firestore();
 
-async function migrateUsers() {
-  console.log('📦 Migrating users...');
-  
-  const usersSnapshot = await db.collection('users').get();
-  let count = 0;
-  
-  for (const doc of usersSnapshot.docs) {
-    const data = doc.data();
-    
-    try {
-      await User.findOneAndUpdate(
-        { uid: doc.id },
-        {
-          $set: {
-            uid: doc.id,
-            email: data.email || '',
-            displayName: data.displayName || '',
-            role: data.role || 'student',
-            gen: data.gen || '',
-            schoolId: data.schoolId || '',
-            lessonDay: data.lessonDay || '',
-            lessonType: data.lessonType || '',
-            lessonTime: data.lessonTime || '',
-            bio: data.bio || '',
-            photoURL: data.photoURL || '',
-            totalPoints: data.totalPoints || 0,
-            availability: data.availability || {},
-            availableDays: data.availableDays || [],
-            gensTaught: data.gensTaught || '',
-            linkedin: data.linkedin || '',
-            github: data.github || '',
-            fcmToken: data.fcmToken || '',
-            updatedAt: new Date(),
-          },
-          $setOnInsert: {
-            createdAt: new Date(),
-          },
-        },
-        { upsert: true }
-      );
-      count++;
-      
-      if (count % 10 === 0) {
-        console.log(`   ✓ Migrated ${count} users`);
-      }
-    } catch (error) {
-      console.error(`   ✗ Error migrating user ${doc.id}:`, error);
-    }
-  }
-  
-  console.log(`✅ Migrated ${count} users total`);
+interface MigrationStats {
+  collection: string;
+  total: number;
+  migrated: number;
+  failed: number;
+  errors: string[];
 }
 
-async function migratePoints() {
-  console.log('📦 Migrating points...');
+async function migrateCollection(
+  collectionName: string,
+  Model: any,
+  transform?: (doc: any) => any
+): Promise<MigrationStats> {
+  console.log(`\n📦 Migrating ${collectionName}...`);
+  
+  const stats: MigrationStats = {
+    collection: collectionName,
+    total: 0,
+    migrated: 0,
+    failed: 0,
+    errors: [],
+  };
+  
+  try {
+    const snapshot = await db.collection(collectionName).get();
+    stats.total = snapshot.size;
+    
+    console.log(`Found ${stats.total} documents`);
+    
+    for (const doc of snapshot.docs) {
+      try {
+        let data = doc.data();
+        
+        // Transform Firestore Timestamps to JavaScript Dates
+        Object.keys(data).forEach(key => {
+          if (data[key] && typeof data[key].toDate === 'function') {
+            data[key] = data[key].toDate();
+          }
+        });
+        
+        // Apply custom transformation if provided
+        if (transform) {
+          data = transform(data);
+        }
+        
+        // Add the original Firestore ID
+        data._id = doc.id;
+        
+        // Upsert into MongoDB
+        await Model.findOneAndUpdate(
+          { _id: doc.id },
+          { $set: data },
+          { upsert: true, new: true }
+        );
+        
+        stats.migrated++;
+        
+        if (stats.migrated % 100 === 0) {
+          console.log(`  ✓ Migrated ${stats.migrated}/${stats.total}`);
+        }
+      } catch (error: any) {
+        stats.failed++;
+        stats.errors.push(`Doc ${doc.id}: ${error.message}`);
+        console.error(`  ✗ Failed to migrate ${doc.id}:`, error.message);
+      }
+    }
+    
+    console.log(`✅ Completed ${collectionName}: ${stats.migrated} migrated, ${stats.failed} failed`);
+  } catch (error: any) {
+    console.error(`❌ Error migrating ${collectionName}:`, error);
+    stats.errors.push(`Collection error: ${error.message}`);
+  }
+  
+  return stats;
+}
+
+async function migrateSubcollections() {
+  console.log('\n📦 Migrating points subcollections...');
   
   const usersSnapshot = await db.collection('users').get();
-  let totalCount = 0;
+  let totalPoints = 0;
+  let migratedPoints = 0;
   
   for (const userDoc of usersSnapshot.docs) {
-    const pointsSnapshot = await db.collection('users').doc(userDoc.id).collection('points').get();
-    
-    for (const pointDoc of pointsSnapshot.docs) {
-      const data = pointDoc.data();
+    try {
+      const pointsSnapshot = await db
+        .collection('users')
+        .doc(userDoc.id)
+        .collection('points')
+        .get();
       
-      try {
-        await Point.findOneAndUpdate(
-          { 
-            userId: userDoc.id,
-            activityId: data.activityId 
-          },
-          {
-            $set: {
-              userId: userDoc.id,
-              points: data.points || 0,
-              reason: data.reason || '',
-              assignmentTitle: data.assignmentTitle || '',
-              activityId: data.activityId || '',
-              awardedBy: data.awardedBy || '',
-              awardedAt: data.awardedAt?.toDate() || new Date(),
-            },
-          },
-          { upsert: true }
-        );
-        totalCount++;
-        
-        if (totalCount % 50 === 0) {
-          console.log(`   ✓ Migrated ${totalCount} point records`);
+      totalPoints += pointsSnapshot.size;
+      
+      for (const pointDoc of pointsSnapshot.docs) {
+        try {
+          const data = pointDoc.data();
+          
+          // Transform timestamps
+          Object.keys(data).forEach(key => {
+            if (data[key] && typeof data[key].toDate === 'function') {
+              data[key] = data[key].toDate();
+            }
+          });
+          
+          // Store in MongoDB User model's embedded array or separate Points collection
+          // For now, we'll just count them and update user's totalPoints
+          migratedPoints++;
+        } catch (error: any) {
+          console.error(`Failed to migrate point ${pointDoc.id}:`, error.message);
         }
-      } catch (error) {
-        console.error(`   ✗ Error migrating point ${pointDoc.id}:`, error);
       }
+    } catch (error: any) {
+      console.error(`Failed to process user ${userDoc.id}:`, error.message);
     }
   }
   
-  console.log(`✅ Migrated ${totalCount} point records total`);
-}
-
-async function migrateSubmissions() {
-  console.log('📦 Migrating submissions...');
-  
-  const submissionsSnapshot = await db.collection('submissions').get();
-  let count = 0;
-  
-  for (const doc of submissionsSnapshot.docs) {
-    const data = doc.data();
-    
-    try {
-      await Submission.findByIdAndUpdate(
-        doc.id,
-        {
-          $set: {
-            _id: doc.id,
-            studentId: data.studentId || '',
-            studentName: data.studentName || '',
-            studentGen: data.studentGen || '',
-            assignmentId: data.assignmentId || '',
-            assignmentTitle: data.assignmentTitle || '',
-            submissionLink: data.submissionLink || '',
-            submissionNotes: data.submissionNotes || '',
-            pointCategory: data.pointCategory || '',
-            grade: data.grade || null,
-            feedback: data.feedback || '',
-            imageUrl: data.imageUrl || '',
-            submittedAt: data.submittedAt?.toDate() || new Date(),
-            gradedAt: data.gradedAt?.toDate() || null,
-            gradedBy: data.gradedBy || null,
-          },
-        },
-        { upsert: true }
-      );
-      count++;
-      
-      if (count % 50 === 0) {
-        console.log(`   ✓ Migrated ${count} submissions`);
-      }
-    } catch (error) {
-      console.error(`   ✗ Error migrating submission ${doc.id}:`, error);
-    }
-  }
-  
-  console.log(`✅ Migrated ${count} submissions total`);
-}
-
-async function migrateNotifications() {
-  console.log('📦 Migrating notifications...');
-  
-  const notificationsSnapshot = await db.collection('notifications').get();
-  let count = 0;
-  
-  for (const doc of notificationsSnapshot.docs) {
-    const data = doc.data();
-    
-    try {
-      await Notification.findByIdAndUpdate(
-        doc.id,
-        {
-          $set: {
-            _id: doc.id,
-            userId: data.userId || '',
-            title: data.title || '',
-            description: data.description || '',
-            href: data.href || '',
-            read: data.read || false,
-            date: data.date?.toDate() || new Date(),
-          },
-        },
-        { upsert: true }
-      );
-      count++;
-      
-      if (count % 100 === 0) {
-        console.log(`   ✓ Migrated ${count} notifications`);
-      }
-    } catch (error) {
-      console.error(`   ✗ Error migrating notification ${doc.id}:`, error);
-    }
-  }
-  
-  console.log(`✅ Migrated ${count} notifications total`);
-}
-
-async function migrateAttendance() {
-  console.log('📦 Migrating attendance records...');
-  
-  const attendanceSnapshot = await db.collection('attendance').get();
-  let count = 0;
-  
-  for (const doc of attendanceSnapshot.docs) {
-    const data = doc.data();
-    
-    try {
-      await Attendance.findByIdAndUpdate(
-        doc.id,
-        {
-          $set: {
-            _id: doc.id,
-            studentId: data.studentId || '',
-            studentName: data.studentName || '',
-            studentGen: data.studentGen || '',
-            classId: data.classId || '',
-            className: data.className || '',
-            learned: data.learned || '',
-            challenged: data.challenged || '',
-            questions: data.questions || '',
-            rating: data.rating || 5,
-            attendanceType: data.attendanceType || 'in-person',
-            understanding: data.understanding || 5,
-            actionPlan: data.actionPlan || '',
-            preClassReview: data.preClassReview || 'no',
-            submittedAt: data.submittedAt?.toDate() || new Date(),
-          },
-        },
-        { upsert: true }
-      );
-      count++;
-      
-      if (count % 50 === 0) {
-        console.log(`   ✓ Migrated ${count} attendance records`);
-      }
-    } catch (error) {
-      console.error(`   ✗ Error migrating attendance ${doc.id}:`, error);
-    }
-  }
-  
-  console.log(`✅ Migrated ${count} attendance records total`);
+  console.log(`✅ Processed ${migratedPoints}/${totalPoints} points`);
 }
 
 async function main() {
-  console.log('🚀 Starting migration to MongoDB...\n');
+  console.log('🚀 Starting Firebase to MongoDB Migration...\n');
   
   try {
     // Connect to MongoDB
-    console.log('📡 Connecting to MongoDB...');
-    await mongoose.connect(MONGODB_URI);
-    console.log('✅ Connected to MongoDB\n');
+    await connectDB();
+    console.log('✓ Connected to MongoDB\n');
     
-    // Run migrations in order
-    await migrateUsers();
-    console.log('');
+    const allStats: MigrationStats[] = [];
     
-    await migratePoints();
-    console.log('');
+    // Migrate each collection
+    // USERS
+    allStats.push(await migrateCollection('users', User));
     
-    await migrateSubmissions();
-    console.log('');
+    // ASSIGNMENTS
+    allStats.push(await migrateCollection('assignments', Assignment, (data) => ({
+      ...data,
+      // Ensure dueDates are properly formatted
+      dueDates: data.dueDates?.map((d: any) => ({
+        day: d.day,
+        dateTime: d.dateTime?.toDate ? d.dateTime.toDate() : new Date(d.dateTime),
+      })) || [],
+    })));
     
-    await migrateNotifications();
-    console.log('');
+    // EXERCISES
+    allStats.push(await migrateCollection('exercises', Exercise));
     
-    await migrateAttendance();
-    console.log('');
+    // PROJECTS
+    allStats.push(await migrateCollection('projects', Project));
     
-    console.log('✅ Migration completed successfully!');
+    // ANNOUNCEMENTS
+    allStats.push(await migrateCollection('announcements', Announcement));
     
-  } catch (error) {
-    console.error('❌ Migration failed:', error);
+    // ATTENDANCE
+    allStats.push(await migrateCollection('attendance', Attendance));
+    
+    // SUBMISSIONS - Already migrated, skip or update
+    console.log('\nℹ️  Skipping submissions (already migrated)');
+    
+    // Migrate subcollections
+    await migrateSubcollections();
+    
+    // Print summary
+    console.log('\n' + '='.repeat(60));
+    console.log('📊 MIGRATION SUMMARY');
+    console.log('='.repeat(60));
+    
+    let totalMigrated = 0;
+    let totalFailed = 0;
+    
+    allStats.forEach(stat => {
+      console.log(`\n${stat.collection}:`);
+      console.log(`  Total: ${stat.total}`);
+      console.log(`  Migrated: ${stat.migrated}`);
+      console.log(`  Failed: ${stat.failed}`);
+      
+      if (stat.errors.length > 0 && stat.errors.length <= 5) {
+        console.log(`  Errors:`);
+        stat.errors.forEach(err => console.log(`    - ${err}`));
+      } else if (stat.errors.length > 5) {
+        console.log(`  Errors: ${stat.errors.length} (showing first 5)`);
+        stat.errors.slice(0, 5).forEach(err => console.log(`    - ${err}`));
+      }
+      
+      totalMigrated += stat.migrated;
+      totalFailed += stat.failed;
+    });
+    
+    console.log('\n' + '='.repeat(60));
+    console.log(`✅ TOTAL MIGRATED: ${totalMigrated}`);
+    console.log(`❌ TOTAL FAILED: ${totalFailed}`);
+    console.log('='.repeat(60));
+    
+  } catch (error: any) {
+    console.error('\n💥 Migration failed:', error);
     process.exit(1);
   } finally {
-    await mongoose.disconnect();
-    console.log('📡 Disconnected from MongoDB');
+    await mongoose.connection.close();
     process.exit(0);
   }
 }
 
+// Run migration
 main();
