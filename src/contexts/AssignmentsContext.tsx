@@ -1,16 +1,13 @@
-// src/contexts/AssignmentsContext.tsx
+// src/contexts/AssignmentsContext.tsx (MIGRATED TO MONGODB)
 'use client';
 
 import {createContext, useContext, useState, ReactNode, FC, useEffect, useCallback} from 'react';
 import { useNotifications } from './NotificationsContext';
-import { db } from '@/lib/firebase';
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, Timestamp, doc, updateDoc, deleteDoc, where } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
 
-
 export interface AssignmentDueDate {
-  day: string; // e.g., "Monday"
-  dateTime: string; // ISO string
+  day: string;
+  dateTime: string;
 }
 
 export interface Assignment {
@@ -18,12 +15,11 @@ export interface Assignment {
   title: string;
   description: string;
   dueDates: AssignmentDueDate[];
-  targetGen: string; // e.g., "Gen 30" or "All"
+  targetGen: string;
   authorId: string;
-  // Optional categorization by curriculum week
-  subject?: string; // e.g., "HTML", "CSS", "Backend - NodeJS"
-  week?: string; // e.g., "Week 1"
-  createdAt: Timestamp;
+  subject?: string;
+  week?: string;
+  createdAt: string;
 }
 
 export type AssignmentData = Omit<Assignment, 'id' | 'createdAt'>;
@@ -44,103 +40,138 @@ export const AssignmentsProvider: FC<{children: ReactNode}> = ({children}) => {
   const { addNotificationForGen } = useNotifications();
   const { user, userData, role, loading: authLoading } = useAuth();
 
-  useEffect(() => {
-     let unsubscribe: (() => void) | undefined;
-     if (authLoading) {
-      setLoading(true);
+  // Fetch assignments from MongoDB API
+  const fetchAssignments = useCallback(async () => {
+    if (authLoading || !user) {
+      setLoading(false);
+      setAssignments([]);
       return;
     }
 
-    if (!user) {
-        setAssignments([]);
-        setLoading(false);
-        return;
-    }
-    
     setLoading(true);
-    const assignmentsCol = collection(db, 'assignments');
-    
-    let q;
-    if (role === 'teacher' || role === 'admin') {
-      q = query(assignmentsCol, orderBy('createdAt', 'desc'));
-    } else if (role === 'student' && userData?.gen) {
-      q = query(
-        assignmentsCol,
-        where('targetGen', 'in', [userData.gen, 'All Students', 'Everyone']),
-        orderBy('createdAt', 'desc')
-      );
-    } else if (role === 'student' && !userData?.gen) {
-        // New student might not have a gen yet, prevent query from running
-        setLoading(false);
-        return;
-    } else {
-      q = query(
-        assignmentsCol,
-        where('targetGen', '==', 'Everyone'),
-        orderBy('createdAt', 'desc')
-      );
-    }
-
-    unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const fetchedAssignments = querySnapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-                id: doc.id,
-                ...data,
-            } as Assignment;
-        });
-        setAssignments(fetchedAssignments);
-        setLoading(false);
-    }, (error) => {
-        console.error("Error fetching assignments:", error);
-        setLoading(false);
-    });
-
-    return () => {
-      if (unsubscribe) {
-        unsubscribe();
+    try {
+      let url = '/api/assignments';
+      
+      // Filter by role
+      if (role === 'student' && userData?.gen) {
+        url += `?targetGen=${userData.gen}`;
       }
-    };
+
+      const response = await fetch(url);
+      const result = await response.json();
+
+      if (result.success) {
+        const fetchedAssignments = result.assignments.map((assignment: any) => ({
+          ...assignment,
+          id: assignment._id,
+          createdAt: new Date(assignment.createdAt).toISOString(),
+          dueDates: assignment.dueDates.map((dd: any) => ({
+            day: dd.day,
+            dateTime: new Date(dd.dateTime).toISOString(),
+          })),
+        }));
+        setAssignments(fetchedAssignments);
+      }
+    } catch (error) {
+      console.error('Error fetching assignments:', error);
+    } finally {
+      setLoading(false);
+    }
   }, [user, role, userData, authLoading]);
 
+  // Initial fetch + polling every 30 seconds
+  useEffect(() => {
+    fetchAssignments();
+    const interval = setInterval(fetchAssignments, 30000);
+    return () => clearInterval(interval);
+  }, [fetchAssignments]);
 
   const addAssignment = useCallback(async (assignment: AssignmentData, onNotifying?: () => void) => {
-    if(!user) throw new Error("User not authenticated");
+    if (!user) throw new Error("User not authenticated");
     
-    const newAssignmentData = {
-      ...assignment,
-      createdAt: serverTimestamp(),
-    };
-
-    await addDoc(collection(db, 'assignments'), newAssignmentData);
-    
-    if (onNotifying) {
-      onNotifying();
-    }
-
     try {
+      const response = await fetch('/api/assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...assignment,
+          createdAt: new Date().toISOString(),
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to create assignment');
+      }
+
+      // Notify callback
+      if (onNotifying) {
+        onNotifying();
+      }
+
+      // Send notifications
+      try {
         await addNotificationForGen(assignment.targetGen, {
-            title: `New Assignment: ${assignment.title}`,
-            description: assignment.description,
-            href: '/assignments',
+          title: `New Assignment: ${assignment.title}`,
+          description: assignment.description,
+          href: '/assignments',
         }, user.uid);
-    } catch (error) {
+      } catch (error) {
         console.error("Failed to send assignment notifications:", error);
-        // We don't re-throw the error, so the UI doesn't show a failure for the core action
+      }
+
+      // Refresh list
+      await fetchAssignments();
+    } catch (error: any) {
+      console.error('Error adding assignment:', error);
+      throw error;
     }
-  }, [user, addNotificationForGen]);
+  }, [user, addNotificationForGen, fetchAssignments]);
 
   const updateAssignment = useCallback(async (id: string, updates: Partial<AssignmentData>) => {
     if (!user) throw new Error("User not authenticated");
-    const assignmentDoc = doc(db, 'assignments', id);
-    await updateDoc(assignmentDoc, updates);
-  }, [user]);
+    
+    try {
+      const response = await fetch(`/api/assignments/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to update assignment');
+      }
+
+      await fetchAssignments();
+    } catch (error: any) {
+      console.error('Error updating assignment:', error);
+      throw error;
+    }
+  }, [user, fetchAssignments]);
 
   const deleteAssignment = useCallback(async (id: string) => {
     if (!user) throw new Error("User not authenticated");
-    const assignmentDoc = doc(db, 'assignments', id);
-    await deleteDoc(assignmentDoc);
-  }, [user]);
+    
+    try {
+      const response = await fetch(`/api/assignments/${id}`, {
+        method: 'DELETE',
+      });
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to delete assignment');
+      }
+
+      await fetchAssignments();
+    } catch (error: any) {
+      console.error('Error deleting assignment:', error);
+      throw error;
+    }
+  }, [user, fetchAssignments]);
 
   return (
     <AssignmentsContext.Provider value={{assignments, addAssignment, updateAssignment, deleteAssignment, loading}}>

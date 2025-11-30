@@ -1,19 +1,18 @@
-// src/contexts/ProjectsContext.tsx
+
+// src/contexts/ProjectsContext.tsx (MIGRATED TO MONGODB)
 'use client';
 
 import {createContext, useContext, useState, ReactNode, FC, useEffect, useCallback} from 'react';
 import { useNotifications } from './NotificationsContext';
-import { db } from '@/lib/firebase';
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, Timestamp, doc, updateDoc, deleteDoc, where } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
 
 export interface Project {
   id: string;
   title: string;
   description: string;
-  targetGen: string; // e.g., "Gen 30", "All Students", "Everyone"
+  targetGen: string;
   authorId: string;
-  createdAt: Timestamp;
+  createdAt: string;
 }
 
 export type ProjectData = Omit<Project, 'id' | 'createdAt'>;
@@ -34,99 +33,116 @@ export const ProjectsProvider: FC<{children: ReactNode}> = ({children}) => {
   const { addNotificationForGen } = useNotifications();
   const { user, userData, role, loading: authLoading } = useAuth();
 
-  useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
-    if (authLoading) {
-      setLoading(true);
+  const fetchProjects = useCallback(async () => {
+    if (authLoading || !user) {
+      setLoading(false);
+      setProjects([]);
       return;
     }
-    if (!user) {
-        setProjects([]);
-        setLoading(false);
-        return;
-    }
+
     setLoading(true);
-    const projectsCol = collection(db, 'projects');
-    
-    let q;
-    if (role === 'teacher' || role === 'admin') {
-      q = query(projectsCol, orderBy('createdAt', 'desc'));
-    } else if (role === 'student' && userData?.gen) {
-      q = query(
-        projectsCol,
-        where('targetGen', 'in', [userData.gen, 'All Students', 'Everyone']),
-        orderBy('createdAt', 'desc')
-      );
-    } else if (role === 'student' && !userData?.gen) {
-        // New student might not have a gen yet, prevent query from running
-        setLoading(false);
-        return;
-    } else {
-      q = query(
-        projectsCol,
-        where('targetGen', '==', 'Everyone'),
-        orderBy('createdAt', 'desc')
-      );
-    }
+    try {
+      let url = '/api/projects';
+      if (role === 'student' && userData?.gen) {
+        url += `?targetGen=${userData.gen}`;
+      }
 
-    unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const fetchedProjects = querySnapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-                id: doc.id,
-                ...data,
-            } as Project;
-        });
+      const response = await fetch(url);
+      const result = await response.json();
+
+      if (result.success) {
+        const fetchedProjects = result.projects.map((project: any) => ({
+          ...project,
+          id: project._id,
+          createdAt: new Date(project.createdAt).toISOString(),
+        }));
         setProjects(fetchedProjects);
-        setLoading(false);
-    }, (error) => {
-        console.error("Error fetching projects:", error);
-        setLoading(false);
-    });
-
-    return () => {
-        if (unsubscribe) {
-            unsubscribe();
-        }
-    };
+      }
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+    } finally {
+      setLoading(false);
+    }
   }, [user, role, userData, authLoading]);
 
-  const addProject = useCallback(async (project: ProjectData, onNotifying?: () => void) => {
-    if(!user) throw new Error("User not authenticated");
-    
-    const newProjectData = {
-      ...project,
-      createdAt: serverTimestamp(),
-    };
+  useEffect(() => {
+    fetchProjects();
+    const interval = setInterval(fetchProjects, 30000);
+    return () => clearInterval(interval);
+  }, [fetchProjects]);
 
-    await addDoc(collection(db, 'projects'), newProjectData);
+  const addProject = useCallback(async (project: ProjectData, onNotifying?: () => void) => {
+    if (!user) throw new Error("User not authenticated");
     
-    if (onNotifying) {
-        onNotifying();
-    }
     try {
-      await addNotificationForGen(project.targetGen, {
-        title: `New Project: ${project.title}`,
-        description: project.description,
-        href: '/projects',
-      }, user.uid);
-    } catch (error) {
+      const response = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...project,
+          createdAt: new Date().toISOString(),
+        }),
+      });
+
+      const result = await response.json();
+      if (!result.success) throw new Error(result.message);
+
+      if (onNotifying) onNotifying();
+
+      try {
+        await addNotificationForGen(project.targetGen, {
+          title: `New Project: ${project.title}`,
+          description: project.description,
+          href: '/projects',
+        }, user.uid);
+      } catch (error) {
         console.error("Failed to send project notifications:", error);
+      }
+
+      await fetchProjects();
+    } catch (error: any) {
+      console.error('Error adding project:', error);
+      throw error;
     }
-  }, [user, addNotificationForGen]);
+  }, [user, addNotificationForGen, fetchProjects]);
 
   const updateProject = useCallback(async (id: string, updates: Partial<ProjectData>) => {
     if (!user) throw new Error("User not authenticated");
-    const projectDoc = doc(db, 'projects', id);
-    const { id: projectId, ...updateData } = updates as Project;
-    await updateDoc(projectDoc, updateData);
-  }, [user]);
+    
+    try {
+      const response = await fetch(`/api/projects/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+
+      const result = await response.json();
+      if (!result.success) throw new Error(result.message);
+
+      await fetchProjects();
+    } catch (error: any) {
+      console.error('Error updating project:', error);
+      throw error;
+    }
+  }, [user, fetchProjects]);
 
   const deleteProject = useCallback(async (id: string) => {
     if (!user) throw new Error("User not authenticated");
-    const projectDoc = doc(db, 'projects', id);
-    await deleteDoc(projectDoc);
-  }, [user]);
+    
+    try {
+      const response = await fetch(`/api/projects/${id}`, {
+        method: 'DELETE',
+      });
+
+      const result = await response.json();
+      if (!result.success) throw new Error(result.message);
+
+      await fetchProjects();
+    } catch (error: any) {
+      console.error('Error deleting project:', error);
+      throw error;
+    }
+  }, [user, fetchProjects]);
 
   return (
     <ProjectsContext.Provider value={{projects, addProject, updateProject, deleteProject, loading}}>

@@ -1,23 +1,9 @@
-// src/services/student-reports.ts
-import {
-  collection,
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  serverTimestamp,
-  Timestamp,
-  getDocs,
-  query,
-  where,
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-
+// src/services/student-reports.ts (MIGRATED TO MONGODB)
 export interface CareerModule {
   name: string;
   completed: boolean;
   points: number;
-  completedAt?: Timestamp;
+  completedAt?: string;
 }
 
 export interface EventWorkshop {
@@ -109,287 +95,58 @@ export interface StudentReport {
   careerServiceComments: string;
   employerFeedback: string;
   
-  lastUpdated: Timestamp;
+  lastUpdated: string;
   updatedBy?: string;
 }
 
 /**
- * Calculate academic performance from existing points data
+ * Get or create a student report
  */
-const calculateAcademicPerformance = async (studentId: string) => {
+export const getStudentReport = async (
+  studentId: string
+): Promise<StudentReport | null> => {
   try {
-    const userDoc = await getDoc(doc(db, 'users', studentId));
+    const response = await fetch(`/api/student-reports/${studentId}`);
+    const result = await response.json();
     
-    if (!userDoc.exists()) {
-      console.warn('User document not found for:', studentId);
-      // Return default values if user not found
-      return getDefaultAcademicPerformance();
+    if (!result.success) {
+      if (result.message?.includes('not found')) {
+        // Create new report
+        return await createStudentReport(studentId);
+      }
+      throw new Error(result.message);
     }
-    
-    const userData = userDoc.data();
-    const totalPoints = userData?.totalPoints || 0;
-    
-    // Get points breakdown from the points subcollection
-    let pointsByCategory = {
-      attendance: 0,
-      assignments: 0,
-      exercises: 0,
-      weeklyProjects: 0,
-      monthlyProjects: 0,
-      hundredDays: 0,
-      codeReview: 0,
-      finalProject: 0,
-      softSkills: 0,
-      miniDemo: 0,
-    };
-    
-    try {
-      const pointsSnapshot = await getDocs(
-        collection(db, 'users', studentId, 'points')
-      );
-      
-      pointsSnapshot.forEach((pointDoc) => {
-        const data = pointDoc.data();
-        const reason = data.reason?.toLowerCase() || '';
-        
-        if (reason.includes('attendance')) pointsByCategory.attendance += data.points;
-        else if (reason.includes('assignment')) pointsByCategory.assignments += data.points;
-        else if (reason.includes('exercise')) pointsByCategory.exercises += data.points;
-        else if (reason.includes('weekly project')) pointsByCategory.weeklyProjects += data.points;
-        else if (reason.includes('monthly') || reason.includes('personal project')) pointsByCategory.monthlyProjects += data.points;
-        else if (reason.includes('100 days')) pointsByCategory.hundredDays += data.points;
-        else if (reason.includes('code review')) pointsByCategory.codeReview += data.points;
-        else if (reason.includes('final project')) pointsByCategory.finalProject += data.points;
-        else if (reason.includes('soft skill')) pointsByCategory.softSkills += data.points;
-        else if (reason.includes('demo')) pointsByCategory.miniDemo += data.points;
-      });
-    } catch (pointsError) {
-      console.warn('Error reading points subcollection:', pointsError);
-      // Continue with zero points if subcollection can't be read
-    }
-    
-    // Define totals based on grading system
-    const totals = {
-      attendance: 50,
-      assignments: 50,
-      exercises: 50,
-      weeklyProjects: 50,
-      monthlyProjects: 10,
-      hundredDaysOfCode: 50,
-      codeReview: 5,
-      finalProject: 10,
-      softSkills: 70,
-      miniDemoDays: 5,
-    };
-    
-    return {
-      attendance: {
-        current: pointsByCategory.attendance,
-        total: totals.attendance,
-        percentage: Math.round((pointsByCategory.attendance / totals.attendance) * 100),
-      },
-      assignments: {
-        current: pointsByCategory.assignments,
-        total: totals.assignments,
-        percentage: Math.round((pointsByCategory.assignments / totals.assignments) * 100),
-      },
-      exercises: {
-        current: pointsByCategory.exercises,
-        total: totals.exercises,
-        percentage: Math.round((pointsByCategory.exercises / totals.exercises) * 100),
-      },
-      weeklyProjects: {
-        current: pointsByCategory.weeklyProjects,
-        total: totals.weeklyProjects,
-        percentage: Math.round((pointsByCategory.weeklyProjects / totals.weeklyProjects) * 100),
-      },
-      monthlyProjects: {
-        current: pointsByCategory.monthlyProjects,
-        total: totals.monthlyProjects,
-        percentage: Math.round((pointsByCategory.monthlyProjects / totals.monthlyProjects) * 100),
-      },
-      hundredDaysOfCode: {
-        current: pointsByCategory.hundredDays,
-        total: totals.hundredDaysOfCode,
-        percentage: Math.round((pointsByCategory.hundredDays / totals.hundredDaysOfCode) * 100),
-      },
-      codeReview: {
-        current: pointsByCategory.codeReview,
-        total: totals.codeReview,
-        percentage: Math.round((pointsByCategory.codeReview / totals.codeReview) * 100),
-      },
-      finalProject: {
-        current: pointsByCategory.finalProject,
-        total: totals.finalProject,
-        percentage: Math.round((pointsByCategory.finalProject / totals.finalProject) * 100),
-      },
-      softSkills: {
-        current: pointsByCategory.softSkills,
-        total: totals.softSkills,
-        percentage: Math.round((pointsByCategory.softSkills / totals.softSkills) * 100),
-      },
-      miniDemoDays: {
-        current: pointsByCategory.miniDemo,
-        total: totals.miniDemoDays,
-        percentage: Math.round((pointsByCategory.miniDemo / totals.miniDemoDays) * 100),
-      },
-      totalPoints,
-      maxPoints: 291,
-    };
+
+    return mapReport(result.report);
   } catch (error) {
-    console.error('Error calculating academic performance:', error);
-    return getDefaultAcademicPerformance();
+    console.error('Error fetching student report:', error);
+    return null;
   }
 };
 
 /**
- * Helper function to return default academic performance
+ * Create a new student report
  */
-const getDefaultAcademicPerformance = () => {
-  return {
-    attendance: { current: 0, total: 50, percentage: 0 },
-    assignments: { current: 0, total: 50, percentage: 0 },
-    exercises: { current: 0, total: 50, percentage: 0 },
-    weeklyProjects: { current: 0, total: 50, percentage: 0 },
-    monthlyProjects: { current: 0, total: 10, percentage: 0 },
-    hundredDaysOfCode: { current: 0, total: 50, percentage: 0 },
-    codeReview: { current: 0, total: 5, percentage: 0 },
-    finalProject: { current: 0, total: 10, percentage: 0 },
-    softSkills: { current: 0, total: 70, percentage: 0 },
-    miniDemoDays: { current: 0, total: 5, percentage: 0 },
-    totalPoints: 0,
-    maxPoints: 291,
-  };
-};
-
-/**
- * Get or create a student report
- */
-export const getStudentReport = async (studentId: string): Promise<StudentReport | null> => {
+const createStudentReport = async (
+  studentId: string
+): Promise<StudentReport> => {
   try {
-    const reportRef = doc(db, 'student_reports', studentId);
-    const reportDoc = await getDoc(reportRef);
+    const response = await fetch('/api/student-reports', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studentId }),
+    });
+
+    const result = await response.json();
     
-    if (reportDoc.exists()) {
-      return { id: reportDoc.id, ...reportDoc.data() } as StudentReport;
+    if (!result.success) {
+      throw new Error(result.message || 'Failed to create report');
     }
-    
-    // Create a new report if it doesn't exist
-    // First check if user document exists
-    const userDocRef = doc(db, 'users', studentId);
-    let userData;
-    
-    try {
-      const userDoc = await getDoc(userDocRef);
-      if (!userDoc.exists()) {
-        throw new Error('Student not found');
-      }
-      userData = userDoc.data();
-    } catch (userError) {
-      console.error('Error fetching user document:', userError);
-      // If we can't access user document, use placeholder data
-      userData = {
-        displayName: 'Student',
-        gen: 'Unknown',
-        email: '',
-      };
-    }
-    
-    // Calculate academic performance
-    let academicPerformance;
-    try {
-      academicPerformance = await calculateAcademicPerformance(studentId);
-    } catch (perfError) {
-      console.error('Error calculating academic performance:', perfError);
-      // Use default values if calculation fails
-      academicPerformance = {
-        attendance: { current: 0, total: 50, percentage: 0 },
-        assignments: { current: 0, total: 50, percentage: 0 },
-        exercises: { current: 0, total: 50, percentage: 0 },
-        weeklyProjects: { current: 0, total: 50, percentage: 0 },
-        monthlyProjects: { current: 0, total: 10, percentage: 0 },
-        hundredDaysOfCode: { current: 0, total: 50, percentage: 0 },
-        codeReview: { current: 0, total: 5, percentage: 0 },
-        finalProject: { current: 0, total: 10, percentage: 0 },
-        softSkills: { current: 0, total: 6, percentage: 0 },
-        miniDemoDays: { current: 0, total: 5, percentage: 0 },
-        totalPoints: 0,
-        maxPoints: 350,
-      };
-    }
-    
-    const newReport: Omit<StudentReport, 'id'> = {
-      studentId,
-      studentName: userData.displayName || 'Unknown',
-      gen: userData.gen || 'Unknown',
-      email: userData.email || '',
-      
-      ...academicPerformance,
-      
-      careerModules: {
-        completed: 0,
-        total: 10,
-        modules: [
-          { name: 'Resume Writing', completed: false, points: 0 },
-          { name: 'LinkedIn Optimization', completed: false, points: 0 },
-          { name: 'Interview Prep', completed: false, points: 0 },
-          { name: 'Portfolio Building', completed: false, points: 0 },
-          { name: 'Networking Skills', completed: false, points: 0 },
-          { name: 'Personal Branding', completed: false, points: 0 },
-          { name: 'Job Search Strategies', completed: false, points: 0 },
-          { name: 'Salary Negotiation', completed: false, points: 0 },
-          { name: 'Professional Communication', completed: false, points: 0 },
-          { name: 'Career Planning', completed: false, points: 0 },
-        ],
-      },
-      
-      eventsWorkshops: {
-        attended: 0,
-        required: 12,
-        percentage: 0,
-        events: [],
-      },
-      
-      internshipApplications: {
-        submitted: 0,
-        required: 24,
-        percentage: 0,
-        applications: [],
-      },
-      
-      oneOnOneSessions: {
-        attended: 0,
-        required: 24,
-        percentage: 0,
-        sessions: [],
-      },
-      
-      cvPortfolio: {
-        cvStatus: 'Not Submitted',
-        portfolioStatus: 'Not Submitted',
-      },
-      
-      strengths: [],
-      areasForImprovement: [],
-      achievements: [],
-      recommendations: [],
-      teacherComments: '',
-      careerServiceComments: '',
-      employerFeedback: '',
-      
-      lastUpdated: serverTimestamp() as Timestamp,
-    };
-    
-    try {
-      await setDoc(reportRef, newReport);
-      return { id: studentId, ...newReport } as StudentReport;
-    } catch (createError) {
-      console.error('Error creating report:', createError);
-      throw new Error('Failed to create student report. Please contact an administrator.');
-    }
+
+    return mapReport(result.report);
   } catch (error) {
-    console.error('Error fetching student report:', error);
-    return null;
+    console.error('Error creating student report:', error);
+    throw error;
   }
 };
 
@@ -408,14 +165,22 @@ export const updateStudentReportFeedback = async (
     employerFeedback?: string;
   },
   updatedBy: string
-) => {
+): Promise<void> => {
   try {
-    const reportRef = doc(db, 'student_reports', studentId);
-    await updateDoc(reportRef, {
-      ...updates,
-      lastUpdated: serverTimestamp(),
-      updatedBy,
+    const response = await fetch(`/api/student-reports/${studentId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...updates,
+        updatedBy,
+      }),
     });
+
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.message || 'Failed to update report');
+    }
   } catch (error) {
     console.error('Error updating student report:', error);
     throw error;
@@ -429,32 +194,38 @@ export const updateCareerModule = async (
   studentId: string,
   moduleName: string,
   completed: boolean
-) => {
+): Promise<void> => {
   try {
-    const reportDoc = await getDoc(doc(db, 'student_reports', studentId));
-    if (!reportDoc.exists()) {
-      throw new Error('Report not found');
-    }
+    // First fetch the current report
+    const report = await getStudentReport(studentId);
+    if (!report) throw new Error('Report not found');
     
-    const report = reportDoc.data() as StudentReport;
-    const modules = report.careerModules.modules.map((m) =>
+    // Update the specific module
+    const updatedModules = report.careerModules.modules.map(m =>
       m.name === moduleName
         ? {
             ...m,
             completed,
             points: completed ? 10 : 0,
-            completedAt: completed ? (serverTimestamp() as Timestamp) : undefined,
+            completedAt: completed ? new Date().toISOString() : undefined,
           }
         : m
     );
     
-    const completedCount = modules.filter((m) => m.completed).length;
+    const completedCount = updatedModules.filter(m => m.completed).length;
     
-    await updateDoc(doc(db, 'student_reports', studentId), {
-      'careerModules.modules': modules,
-      'careerModules.completed': completedCount,
-      lastUpdated: serverTimestamp(),
+    // Update via API
+    const response = await fetch(`/api/student-reports/${studentId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        'careerModules.modules': updatedModules,
+        'careerModules.completed': completedCount,
+      }),
     });
+
+    const result = await response.json();
+    if (!result.success) throw new Error(result.message);
   } catch (error) {
     console.error('Error updating career module:', error);
     throw error;
@@ -467,25 +238,28 @@ export const updateCareerModule = async (
 export const addEventAttendance = async (
   studentId: string,
   event: Omit<EventWorkshop, 'attended'>
-) => {
+): Promise<void> => {
   try {
-    const reportDoc = await getDoc(doc(db, 'student_reports', studentId));
-    if (!reportDoc.exists()) {
-      throw new Error('Report not found');
-    }
+    const report = await getStudentReport(studentId);
+    if (!report) throw new Error('Report not found');
     
-    const report = reportDoc.data() as StudentReport;
     const newEvent = { ...event, attended: true };
     const events = [...report.eventsWorkshops.events, newEvent];
-    const attended = events.filter((e) => e.attended).length;
+    const attended = events.filter(e => e.attended).length;
     const percentage = Math.round((attended / 12) * 100);
     
-    await updateDoc(doc(db, 'student_reports', studentId), {
-      'eventsWorkshops.events': events,
-      'eventsWorkshops.attended': attended,
-      'eventsWorkshops.percentage': percentage,
-      lastUpdated: serverTimestamp(),
+    const response = await fetch(`/api/student-reports/${studentId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        'eventsWorkshops.events': events,
+        'eventsWorkshops.attended': attended,
+        'eventsWorkshops.percentage': percentage,
+      }),
     });
+
+    const result = await response.json();
+    if (!result.success) throw new Error(result.message);
   } catch (error) {
     console.error('Error adding event attendance:', error);
     throw error;
@@ -498,24 +272,27 @@ export const addEventAttendance = async (
 export const addInternshipApplication = async (
   studentId: string,
   application: InternshipApplication
-) => {
+): Promise<void> => {
   try {
-    const reportDoc = await getDoc(doc(db, 'student_reports', studentId));
-    if (!reportDoc.exists()) {
-      throw new Error('Report not found');
-    }
+    const report = await getStudentReport(studentId);
+    if (!report) throw new Error('Report not found');
     
-    const report = reportDoc.data() as StudentReport;
     const applications = [...report.internshipApplications.applications, application];
     const submitted = applications.length;
     const percentage = Math.round((submitted / 24) * 100);
     
-    await updateDoc(doc(db, 'student_reports', studentId), {
-      'internshipApplications.applications': applications,
-      'internshipApplications.submitted': submitted,
-      'internshipApplications.percentage': percentage,
-      lastUpdated: serverTimestamp(),
+    const response = await fetch(`/api/student-reports/${studentId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        'internshipApplications.applications': applications,
+        'internshipApplications.submitted': submitted,
+        'internshipApplications.percentage': percentage,
+      }),
     });
+
+    const result = await response.json();
+    if (!result.success) throw new Error(result.message);
   } catch (error) {
     console.error('Error adding internship application:', error);
     throw error;
@@ -528,25 +305,28 @@ export const addInternshipApplication = async (
 export const addOneOnOneSession = async (
   studentId: string,
   session: Omit<OneOnOneSession, 'completed'>
-) => {
+): Promise<void> => {
   try {
-    const reportDoc = await getDoc(doc(db, 'student_reports', studentId));
-    if (!reportDoc.exists()) {
-      throw new Error('Report not found');
-    }
+    const report = await getStudentReport(studentId);
+    if (!report) throw new Error('Report not found');
     
-    const report = reportDoc.data() as StudentReport;
     const newSession = { ...session, completed: true };
     const sessions = [...report.oneOnOneSessions.sessions, newSession];
-    const attended = sessions.filter((s) => s.completed).length;
+    const attended = sessions.filter(s => s.completed).length;
     const percentage = Math.round((attended / 24) * 100);
     
-    await updateDoc(doc(db, 'student_reports', studentId), {
-      'oneOnOneSessions.sessions': sessions,
-      'oneOnOneSessions.attended': attended,
-      'oneOnOneSessions.percentage': percentage,
-      lastUpdated: serverTimestamp(),
+    const response = await fetch(`/api/student-reports/${studentId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        'oneOnOneSessions.sessions': sessions,
+        'oneOnOneSessions.attended': attended,
+        'oneOnOneSessions.percentage': percentage,
+      }),
     });
+
+    const result = await response.json();
+    if (!result.success) throw new Error(result.message);
   } catch (error) {
     console.error('Error adding one-on-one session:', error);
     throw error;
@@ -559,15 +339,21 @@ export const addOneOnOneSession = async (
 export const updateCVPortfolioStatus = async (
   studentId: string,
   updates: Partial<CVPortfolio>
-) => {
+): Promise<void> => {
   try {
     const updateData: any = {};
     Object.entries(updates).forEach(([key, value]) => {
       updateData[`cvPortfolio.${key}`] = value;
     });
-    updateData.lastUpdated = serverTimestamp();
     
-    await updateDoc(doc(db, 'student_reports', studentId), updateData);
+    const response = await fetch(`/api/student-reports/${studentId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updateData),
+    });
+
+    const result = await response.json();
+    if (!result.success) throw new Error(result.message);
   } catch (error) {
     console.error('Error updating CV/Portfolio status:', error);
     throw error;
@@ -577,26 +363,19 @@ export const updateCVPortfolioStatus = async (
 /**
  * Refresh academic performance data
  */
-export const refreshAcademicPerformance = async (studentId: string) => {
+export const refreshAcademicPerformance = async (
+  studentId: string
+): Promise<void> => {
   try {
-    const academicPerformance = await calculateAcademicPerformance(studentId);
-    
-    const reportRef = doc(db, 'student_reports', studentId);
-    const reportDoc = await getDoc(reportRef);
-    
-    if (reportDoc.exists()) {
-      // Document exists, update it
-      await updateDoc(reportRef, {
-        ...academicPerformance,
-        lastUpdated: serverTimestamp(),
-      });
-    } else {
-      // Document doesn't exist, it will be created by getStudentReport
-      console.log('Report document does not exist yet, will be created on first access');
-    }
+    const response = await fetch(`/api/student-reports/${studentId}/refresh`, {
+      method: 'POST',
+    });
+
+    const result = await response.json();
+    if (!result.success) throw new Error(result.message);
   } catch (error) {
     console.error('Error refreshing academic performance:', error);
-    // Don't throw the error, just log it
+    // Don't throw - this is non-critical
   }
 };
 
@@ -605,18 +384,34 @@ export const refreshAcademicPerformance = async (studentId: string) => {
  */
 export const getReportsByGen = async (gen: string): Promise<StudentReport[]> => {
   try {
-    const reportsQuery = query(
-      collection(db, 'student_reports'),
-      where('gen', '==', gen)
-    );
+    const response = await fetch(`/api/student-reports?gen=${gen}`);
+    const result = await response.json();
     
-    const snapshot = await getDocs(reportsQuery);
-    return snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as StudentReport[];
+    if (!result.success) {
+      throw new Error(result.message || 'Failed to fetch reports');
+    }
+
+    return result.reports.map(mapReport);
   } catch (error) {
     console.error('Error fetching reports by generation:', error);
     return [];
   }
 };
+
+/**
+ * Helper: Map API response to StudentReport
+ */
+function mapReport(report: any): StudentReport {
+  return {
+    ...report,
+    id: report._id || report.id,
+    lastUpdated: new Date(report.lastUpdated).toISOString(),
+    careerModules: {
+      ...report.careerModules,
+      modules: report.careerModules.modules.map((m: any) => ({
+        ...m,
+        completedAt: m.completedAt ? new Date(m.completedAt).toISOString() : undefined,
+      })),
+    },
+  };
+}

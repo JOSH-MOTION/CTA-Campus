@@ -1,20 +1,18 @@
-// src/contexts/ResourcesContext.tsx
+// src/contexts/ResourcesContext.tsx (MIGRATED TO MONGODB)
 'use client';
 
 import {createContext, useContext, useState, ReactNode, FC, useEffect, useCallback} from 'react';
-import { db } from '@/lib/firebase';
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, Timestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
 
 export interface Resource {
   id: string;
   title: string;
   description: string;
-  content: string; // The full text content for the summarizer
-  url?: string; // Optional link to the resource
+  content: string;
+  url?: string;
   type: 'Article' | 'Video' | 'Link' | 'Document';
   authorId: string;
-  createdAt: Timestamp;
+  createdAt: string;
 }
 
 export type ResourceData = Omit<Resource, 'id' | 'createdAt'>;
@@ -32,56 +30,111 @@ const ResourcesContext = createContext<ResourcesContextType | undefined>(undefin
 export const ResourcesProvider: FC<{children: ReactNode}> = ({children}) => {
   const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
-  useEffect(() => {
+  // Fetch resources from MongoDB API
+  const fetchResources = useCallback(async () => {
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
+
     setLoading(true);
-    const resourcesCol = collection(db, 'resources');
-    const q = query(resourcesCol, orderBy('createdAt', 'desc'));
+    try {
+      const response = await fetch('/api/resources');
+      const result = await response.json();
 
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const fetchedResources = querySnapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-                id: doc.id,
-                ...data,
-            } as Resource;
-        });
+      if (result.success) {
+        const fetchedResources = result.resources.map((resource: any) => ({
+          ...resource,
+          id: resource._id,
+          createdAt: new Date(resource.createdAt).toISOString(),
+        }));
         setResources(fetchedResources);
-        setLoading(false);
-    }, (error) => {
-        console.error("Error fetching resources:", error);
-        setLoading(false);
-    });
+      }
+    } catch (error) {
+      console.error('Error fetching resources:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [authLoading]);
 
-    return () => {
-        if (unsubscribe) {
-            unsubscribe();
-        }
-    };
-  }, []);
+  // Initial fetch + polling every 60 seconds (resources change less frequently)
+  useEffect(() => {
+    fetchResources();
+    const interval = setInterval(fetchResources, 60000);
+    return () => clearInterval(interval);
+  }, [fetchResources]);
 
   const addResource = useCallback(async (resource: ResourceData) => {
-    if(!user) throw new Error("User not authenticated");
+    if (!user) throw new Error("User not authenticated");
     
-    const newResourceData = {
-      ...resource,
-      createdAt: serverTimestamp(),
-    };
-    await addDoc(collection(db, 'resources'), newResourceData);
-  }, [user]);
+    try {
+      const response = await fetch('/api/resources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...resource,
+          createdAt: new Date().toISOString(),
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to create resource');
+      }
+
+      await fetchResources();
+    } catch (error: any) {
+      console.error('Error adding resource:', error);
+      throw error;
+    }
+  }, [user, fetchResources]);
 
   const updateResource = useCallback(async (id: string, updates: Partial<ResourceData>) => {
     if (!user) throw new Error("User not authenticated");
-    const resourceDoc = doc(db, 'resources', id);
-    await updateDoc(resourceDoc, updates);
-  }, [user]);
+    
+    try {
+      const response = await fetch(`/api/resources/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to update resource');
+      }
+
+      await fetchResources();
+    } catch (error: any) {
+      console.error('Error updating resource:', error);
+      throw error;
+    }
+  }, [user, fetchResources]);
 
   const deleteResource = useCallback(async (id: string) => {
     if (!user) throw new Error("User not authenticated");
-    const resourceDoc = doc(db, 'resources', id);
-    await deleteDoc(resourceDoc);
-  }, [user]);
+    
+    try {
+      const response = await fetch(`/api/resources/${id}`, {
+        method: 'DELETE',
+      });
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to delete resource');
+      }
+
+      await fetchResources();
+    } catch (error: any) {
+      console.error('Error deleting resource:', error);
+      throw error;
+    }
+  }, [user, fetchResources]);
 
   return (
     <ResourcesContext.Provider value={{resources, addResource, updateResource, deleteResource, loading}}>

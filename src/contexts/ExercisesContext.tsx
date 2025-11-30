@@ -1,22 +1,19 @@
-// src/contexts/ExercisesContext.tsx
+// src/contexts/ExercisesContext.tsx (MIGRATED TO MONGODB)
 'use client';
 
 import {createContext, useContext, useState, ReactNode, FC, useEffect, useCallback} from 'react';
 import { useNotifications } from './NotificationsContext';
-import { db } from '@/lib/firebase';
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, Timestamp, doc, updateDoc, deleteDoc, where } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
 
 export interface Exercise {
   id: string;
   title: string;
   description: string;
-  targetGen: string; // e.g., "Gen 30", "All Students", "Everyone"
+  targetGen: string;
   authorId: string;
-  // Optional categorization by curriculum week
-  subject?: string; // e.g., "HTML", "CSS", "Backend - NodeJS"
-  week?: string; // e.g., "Week 1"
-  createdAt: Timestamp;
+  subject?: string;
+  week?: string;
+  createdAt: string;
 }
 
 export type ExerciseData = Omit<Exercise, 'id' | 'createdAt'>;
@@ -37,99 +34,116 @@ export const ExercisesProvider: FC<{children: ReactNode}> = ({children}) => {
   const { addNotificationForGen } = useNotifications();
   const { user, userData, role, loading: authLoading } = useAuth();
 
-  useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
-    if (authLoading) {
-      setLoading(true);
+  const fetchExercises = useCallback(async () => {
+    if (authLoading || !user) {
+      setLoading(false);
+      setExercises([]);
       return;
     }
-    if (!user) {
-        setExercises([]);
-        setLoading(false);
-        return;
-    }
+
     setLoading(true);
-    const exercisesCol = collection(db, 'exercises');
-    
-    let q;
-    if (role === 'teacher' || role === 'admin') {
-      q = query(exercisesCol, orderBy('createdAt', 'desc'));
-    } else if (role === 'student' && userData?.gen) {
-      q = query(
-        exercisesCol,
-        where('targetGen', 'in', [userData.gen, 'All Students', 'Everyone']),
-        orderBy('createdAt', 'desc')
-      );
-    } else if (role === 'student' && !userData?.gen) {
-        // New student might not have a gen yet, prevent query from running
-        setLoading(false);
-        return;
-    } else {
-       q = query(
-        exercisesCol,
-        where('targetGen', '==', 'Everyone'),
-        orderBy('createdAt', 'desc')
-      );
-    }
+    try {
+      let url = '/api/exercises';
+      if (role === 'student' && userData?.gen) {
+        url += `?targetGen=${userData.gen}`;
+      }
 
-    unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const fetchedExercises = querySnapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-                id: doc.id,
-                ...data,
-            } as Exercise;
-        });
+      const response = await fetch(url);
+      const result = await response.json();
+
+      if (result.success) {
+        const fetchedExercises = result.exercises.map((exercise: any) => ({
+          ...exercise,
+          id: exercise._id,
+          createdAt: new Date(exercise.createdAt).toISOString(),
+        }));
         setExercises(fetchedExercises);
-        setLoading(false);
-    }, (error) => {
-        console.error("Error fetching exercises:", error);
-        setLoading(false);
-    });
-
-    return () => {
-        if (unsubscribe) {
-            unsubscribe();
-        }
-    };
+      }
+    } catch (error) {
+      console.error('Error fetching exercises:', error);
+    } finally {
+      setLoading(false);
+    }
   }, [user, role, userData, authLoading]);
 
-  const addExercise = useCallback(async (exercise: ExerciseData, onNotifying?: () => void) => {
-    if(!user) throw new Error("User not authenticated");
-    
-    const newExerciseData = {
-      ...exercise,
-      createdAt: serverTimestamp(),
-    };
+  useEffect(() => {
+    fetchExercises();
+    const interval = setInterval(fetchExercises, 30000);
+    return () => clearInterval(interval);
+  }, [fetchExercises]);
 
-    await addDoc(collection(db, 'exercises'), newExerciseData);
+  const addExercise = useCallback(async (exercise: ExerciseData, onNotifying?: () => void) => {
+    if (!user) throw new Error("User not authenticated");
     
-    if (onNotifying) {
-        onNotifying();
-    }
     try {
+      const response = await fetch('/api/exercises', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...exercise,
+          createdAt: new Date().toISOString(),
+        }),
+      });
+
+      const result = await response.json();
+      if (!result.success) throw new Error(result.message);
+
+      if (onNotifying) onNotifying();
+
+      try {
         await addNotificationForGen(exercise.targetGen, {
           title: `New Exercise: ${exercise.title}`,
           description: exercise.description,
           href: '/exercises',
         }, user.uid);
-    } catch (error) {
+      } catch (error) {
         console.error("Failed to send exercise notifications:", error);
+      }
+
+      await fetchExercises();
+    } catch (error: any) {
+      console.error('Error adding exercise:', error);
+      throw error;
     }
-  }, [user, addNotificationForGen]);
+  }, [user, addNotificationForGen, fetchExercises]);
 
   const updateExercise = useCallback(async (id: string, updates: Partial<ExerciseData>) => {
     if (!user) throw new Error("User not authenticated");
-    const exerciseDoc = doc(db, 'exercises', id);
-    const { id: exerciseId, ...updateData } = updates as Exercise;
-    await updateDoc(exerciseDoc, updateData);
-  }, [user]);
+    
+    try {
+      const response = await fetch(`/api/exercises/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+
+      const result = await response.json();
+      if (!result.success) throw new Error(result.message);
+
+      await fetchExercises();
+    } catch (error: any) {
+      console.error('Error updating exercise:', error);
+      throw error;
+    }
+  }, [user, fetchExercises]);
 
   const deleteExercise = useCallback(async (id: string) => {
     if (!user) throw new Error("User not authenticated");
-    const exerciseDoc = doc(db, 'exercises', id);
-    await deleteDoc(exerciseDoc);
-  }, [user]);
+    
+    try {
+      const response = await fetch(`/api/exercises/${id}`, {
+        method: 'DELETE',
+      });
+
+      const result = await response.json();
+      if (!result.success) throw new Error(result.message);
+
+      await fetchExercises();
+    } catch (error: any) {
+      console.error('Error deleting exercise:', error);
+      throw error;
+    }
+  }, [user, fetchExercises]);
 
   return (
     <ExercisesContext.Provider value={{exercises, addExercise, updateExercise, deleteExercise, loading}}>
