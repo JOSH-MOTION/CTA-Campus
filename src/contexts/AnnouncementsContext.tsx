@@ -1,11 +1,8 @@
-
-// src/contexts/AnnouncementsContext.tsx
+// src/contexts/AnnouncementsContext.tsx (MIGRATED TO MONGODB)
 'use client';
 
 import {createContext, useContext, useState, ReactNode, FC, useEffect, useCallback} from 'react';
 import { useNotifications } from './NotificationsContext';
-import { db } from '@/lib/firebase';
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, Timestamp, doc, updateDoc, deleteDoc, where } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
 
 export interface Announcement {
@@ -15,7 +12,7 @@ export interface Announcement {
   author: string;
   authorId: string;
   date: string;
-  targetGen: string; // e.g., "Gen 30", "All Students", or "Everyone"
+  targetGen: string;
   imageUrl?: string;
 }
 
@@ -37,112 +34,125 @@ export const AnnouncementsProvider: FC<{children: ReactNode}> = ({children}) => 
   const { addNotificationForGen } = useNotifications();
   const { user, userData, role, loading: authLoading } = useAuth();
 
-  useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
-    // Wait for auth to finish loading and user to be determined
-    if (authLoading) {
-      setLoading(true);
+  // Fetch announcements from MongoDB API
+  const fetchAnnouncements = useCallback(async () => {
+    if (authLoading || !user) {
+      setLoading(false);
+      setAnnouncements([]);
       return;
-    }
-    
-    if (!user) {
-        setLoading(false);
-        setAnnouncements([]);
-        return;
     }
 
     setLoading(true);
-    const announcementsCol = collection(db, 'announcements');
-    
-    // Build a query based on the user's role and generation
-    let q;
-    if (role === 'teacher' || role === 'admin') {
-        // Teachers and admins can see all announcements
-        q = query(announcementsCol, orderBy('date', 'desc'));
-    } else if (role === 'student' && userData?.gen) {
-        // Students see announcements for their gen, 'All Students', or 'Everyone'
-        q = query(
-            announcementsCol, 
-            where('targetGen', 'in', [userData.gen, 'All Students', 'Everyone']),
-            orderBy('date', 'desc')
-        );
-    } else if (role === 'student' && !userData?.gen) {
-      // New student might not have a gen yet, prevent query from running
+    try {
+      let url = '/api/announcements';
+      
+      // Filter by role
+      if (role === 'student' && userData?.gen) {
+        url += `?targetGen=${userData.gen}`;
+      }
+
+      const response = await fetch(url);
+      const result = await response.json();
+
+      if (result.success) {
+        const fetchedAnnouncements = result.announcements.map((ann: any) => ({
+          ...ann,
+          id: ann._id,
+          date: new Date(ann.date).toISOString(),
+        }));
+        setAnnouncements(fetchedAnnouncements);
+      }
+    } catch (error) {
+      console.error('Error fetching announcements:', error);
+    } finally {
       setLoading(false);
-      return;
-    } else {
-        // Fallback for users without a specific role/gen, only see 'Everyone'
-        q = query(
-            announcementsCol, 
-            where('targetGen', '==', 'Everyone'),
-            orderBy('date', 'desc')
-        );
     }
-
-
-    unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const fetchedAnnouncements = querySnapshot.docs.map(doc => {
-        const data = doc.data();
-        let dateString: string;
-        if (data.date && typeof data.date.toDate === 'function') {
-            // It's a Firestore Timestamp
-            dateString = data.date.toDate().toISOString();
-        } else if (typeof data.date === 'string') {
-            // It's already a string
-            dateString = data.date;
-        } else {
-            // Fallback for any other case
-            dateString = new Date().toISOString();
-        }
-
-        return {
-          id: doc.id,
-          ...data,
-          date: dateString,
-        } as Announcement;
-      });
-      setAnnouncements(fetchedAnnouncements);
-      setLoading(false);
-    }, (error) => {
-        console.error("Error fetching announcements:", error);
-        setLoading(false);
-    });
-
-    return () => {
-        if (unsubscribe) {
-            unsubscribe();
-        }
-    };
   }, [user, role, userData, authLoading]);
+
+  // Initial fetch + polling every 30 seconds
+  useEffect(() => {
+    fetchAnnouncements();
+    const interval = setInterval(fetchAnnouncements, 30000);
+    return () => clearInterval(interval);
+  }, [fetchAnnouncements]);
 
   const addAnnouncement = useCallback(async (announcement: Omit<Announcement, 'id' | 'date'>) => {
     if (!user) throw new Error("User not authenticated");
 
-    const newAnnouncementData = {
-      ...announcement,
-      date: serverTimestamp(),
-    };
-    
-    await addDoc(collection(db, 'announcements'), newAnnouncementData);
-    
-    await addNotificationForGen(announcement.targetGen, {
-      title: `New Announcement: ${announcement.title}`,
-      description: `From ${announcement.author}`,
-      href: '/announcements',
-    });
-  }, [user, addNotificationForGen]);
+    try {
+      const response = await fetch('/api/announcements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...announcement,
+          date: new Date().toISOString(),
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to create announcement');
+      }
+
+      // Send notifications
+      await addNotificationForGen(announcement.targetGen, {
+        title: `New Announcement: ${announcement.title}`,
+        description: `From ${announcement.author}`,
+        href: '/announcements',
+      });
+
+      // Refresh list
+      await fetchAnnouncements();
+    } catch (error: any) {
+      console.error('Error adding announcement:', error);
+      throw error;
+    }
+  }, [user, addNotificationForGen, fetchAnnouncements]);
 
   const updateAnnouncement = useCallback(async (id: string, updates: Partial<AnnouncementData>) => {
     if (!user) throw new Error("User not authenticated");
-    const announcementDoc = doc(db, 'announcements', id);
-    await updateDoc(announcementDoc, updates);
-  }, [user]);
+
+    try {
+      const response = await fetch(`/api/announcements/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to update announcement');
+      }
+
+      await fetchAnnouncements();
+    } catch (error: any) {
+      console.error('Error updating announcement:', error);
+      throw error;
+    }
+  }, [user, fetchAnnouncements]);
 
   const deleteAnnouncement = useCallback(async (id: string) => {
     if (!user) throw new Error("User not authenticated");
-    const announcementDoc = doc(db, 'announcements', id);
-    await deleteDoc(announcementDoc);
-  }, [user]);
+
+    try {
+      const response = await fetch(`/api/announcements/${id}`, {
+        method: 'DELETE',
+      });
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to delete announcement');
+      }
+
+      await fetchAnnouncements();
+    } catch (error: any) {
+      console.error('Error deleting announcement:', error);
+      throw error;
+    }
+  }, [user, fetchAnnouncements]);
 
   return (
     <AnnouncementsContext.Provider value={{announcements, addAnnouncement, updateAnnouncement, deleteAnnouncement, loading}}>

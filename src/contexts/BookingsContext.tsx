@@ -1,8 +1,7 @@
+// src/contexts/BookingsContext.tsx (MIGRATED TO MONGODB)
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type FC, type ReactNode } from 'react';
-import { db } from '@/lib/firebase';
-import { addDoc, collection, doc, onSnapshot, orderBy, query, serverTimestamp, Timestamp, updateDoc, where } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationsContext';
 
@@ -15,14 +14,14 @@ export interface Booking {
   studentName?: string;
   staffId: string;
   staffName?: string;
-  dateTime: Timestamp;
+  dateTime: string;
   reason: string;
   meetingType: MeetingType;
   status: BookingStatus;
-  meetingLink?: string; // NEW: Google Meet link
-  responseNote?: string; // NEW: Optional note from teacher
-  createdAt: Timestamp;
-  respondedAt?: Timestamp; // NEW: When teacher responded
+  meetingLink?: string;
+  responseNote?: string;
+  createdAt: string;
+  respondedAt?: string;
 }
 
 export type NewBookingInput = {
@@ -52,63 +51,49 @@ export const BookingsProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
-
-    if (authLoading) {
-      setLoading(true);
-      return;
-    }
-
-    if (!user) {
-      setBookings([]);
+  const fetchBookings = useCallback(async () => {
+    if (authLoading || !user) {
       setLoading(false);
+      setBookings([]);
       return;
     }
 
     setLoading(true);
-    const bookingsCol = collection(db, 'bookings');
-
-    let q;
-    if (role === 'teacher') {
-      // Teachers see bookings where they are the staff member
-      q = query(
-        bookingsCol, 
-        where('staffId', '==', user.uid), 
-        orderBy('dateTime', 'desc')
-      );
-    } else if (role === 'admin') {
-      // Admins see all bookings
-      q = query(bookingsCol, orderBy('dateTime', 'desc'));
-    } else {
-      // Students see their own bookings
-      q = query(
-        bookingsCol, 
-        where('studentId', '==', user.uid), 
-        orderBy('dateTime', 'desc')
-      );
-    }
-
-    unsubscribe = onSnapshot(
-      q,
-      (snap) => {
-        const list = snap.docs.map((d) => ({ 
-          id: d.id, 
-          ...(d.data() as Omit<Booking, 'id'>) 
-        })) as Booking[];
-        setBookings(list);
-        setLoading(false);
-      },
-      (err) => {
-        console.error('Error fetching bookings:', err);
-        setLoading(false);
+    try {
+      let url = '/api/bookings';
+      
+      if (role === 'teacher') {
+        url += `?staffId=${user.uid}`;
+      } else if (role === 'student') {
+        url += `?studentId=${user.uid}`;
       }
-    );
+      // Admin sees all bookings (no filter)
 
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
+      const response = await fetch(url);
+      const result = await response.json();
+
+      if (result.success) {
+        const fetchedBookings = result.bookings.map((booking: any) => ({
+          ...booking,
+          id: booking._id,
+          dateTime: new Date(booking.dateTime).toISOString(),
+          createdAt: new Date(booking.createdAt).toISOString(),
+          respondedAt: booking.respondedAt ? new Date(booking.respondedAt).toISOString() : undefined,
+        }));
+        setBookings(fetchedBookings);
+      }
+    } catch (error) {
+      console.error('Error fetching bookings:', error);
+    } finally {
+      setLoading(false);
+    }
   }, [user, role, authLoading]);
+
+  useEffect(() => {
+    fetchBookings();
+    const interval = setInterval(fetchBookings, 30000);
+    return () => clearInterval(interval);
+  }, [fetchBookings]);
 
   const addBooking = useCallback(
     async (input: NewBookingInput) => {
@@ -118,32 +103,43 @@ export const BookingsProvider: FC<{ children: ReactNode }> = ({ children }) => {
       
       const staff = allUsers.find((u) => u.uid === input.staffId);
 
-      const payload = {
-        studentId: user.uid,
-        studentName: userData?.displayName ?? 'Student',
-        staffId: input.staffId,
-        staffName: staff?.displayName ?? 'Staff',
-        dateTime: Timestamp.fromDate(input.dateTime),
-        reason: input.reason,
-        meetingType: input.meetingType,
-        status: 'pending' as BookingStatus,
-        createdAt: serverTimestamp(),
-      };
-
-      await addDoc(collection(db, 'bookings'), payload);
-
-      // Notify the staff member
       try {
+        const response = await fetch('/api/bookings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            studentId: user.uid,
+            studentName: userData?.displayName ?? 'Student',
+            staffId: input.staffId,
+            staffName: staff?.displayName ?? 'Staff',
+            dateTime: input.dateTime.toISOString(),
+            reason: input.reason,
+            meetingType: input.meetingType,
+            status: 'pending',
+            createdAt: new Date().toISOString(),
+          }),
+        });
+
+        const result = await response.json();
+        
+        if (!result.success) {
+          throw new Error(result.message || 'Failed to create booking');
+        }
+
+        // Notify the staff member
         await addNotificationForUser(input.staffId, {
           title: 'New booking request',
-          description: `${payload.studentName} requested a ${payload.meetingType} session`,
+          description: `${userData?.displayName ?? 'Student'} requested a ${input.meetingType} session`,
           href: '/bookings',
         });
-      } catch (e) {
-        console.error('Failed to notify staff about booking request:', e);
+
+        await fetchBookings();
+      } catch (error: any) {
+        console.error('Error creating booking:', error);
+        throw error;
       }
     },
-    [user, role, userData, allUsers, addNotificationForUser]
+    [user, role, userData, allUsers, addNotificationForUser, fetchBookings]
   );
 
   const updateBookingStatus = useCallback(
@@ -162,26 +158,33 @@ export const BookingsProvider: FC<{ children: ReactNode }> = ({ children }) => {
         throw new Error('Booking not found');
       }
 
-      const bookingRef = doc(db, 'bookings', bookingId);
-      const updateData: any = { 
-        status,
-        respondedAt: serverTimestamp()
-      };
-
-      // Add meeting link if provided and it's an online meeting
-      if (meetingLink && booking.meetingType === 'online') {
-        updateData.meetingLink = meetingLink;
-      }
-
-      // Add response note if provided
-      if (responseNote) {
-        updateData.responseNote = responseNote;
-      }
-
-      await updateDoc(bookingRef, updateData);
-
-      // Notify the student
       try {
+        const updateData: any = { 
+          status,
+          respondedAt: new Date().toISOString(),
+        };
+
+        if (meetingLink && booking.meetingType === 'online') {
+          updateData.meetingLink = meetingLink;
+        }
+
+        if (responseNote) {
+          updateData.responseNote = responseNote;
+        }
+
+        const response = await fetch(`/api/bookings/${bookingId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updateData),
+        });
+
+        const result = await response.json();
+        
+        if (!result.success) {
+          throw new Error(result.message || 'Failed to update booking');
+        }
+
+        // Notify the student
         let description = `${booking.staffName ?? 'Staff'} ${status} your ${booking.meetingType} session`;
         
         if (status === 'accepted') {
@@ -200,11 +203,14 @@ export const BookingsProvider: FC<{ children: ReactNode }> = ({ children }) => {
           description,
           href: '/book-session',
         });
-      } catch (e) {
-        console.error('Failed to notify student about booking status:', e);
+
+        await fetchBookings();
+      } catch (error: any) {
+        console.error('Error updating booking:', error);
+        throw error;
       }
     },
-    [user, role, bookings, addNotificationForUser]
+    [user, role, bookings, addNotificationForUser, fetchBookings]
   );
 
   const value = useMemo(
