@@ -1,10 +1,8 @@
+// src/contexts/NotificationsContext.tsx (MIGRATED TO MONGODB)
 'use client';
 
 import { createContext, useContext, useState, ReactNode, FC, useCallback, useEffect } from 'react';
-import { v4 as uuidv4 } from 'uuid';
 import { useAuth, UserData } from './AuthContext';
-import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, query, where, onSnapshot, orderBy, doc, updateDoc, writeBatch } from 'firebase/firestore';
 
 export interface Notification {
   id: string;
@@ -25,76 +23,90 @@ interface NotificationsContextType {
   addNotificationForGen: (targetGen: string, notification: Omit<Notification, 'id' | 'date' | 'read' | 'userId'>, authorId?: string) => Promise<void>;
   markAsRead: (notificationId: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
+  loading: boolean;
 }
 
 const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined);
 
 export const NotificationsProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const { user, userData: authorData, allUsers } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const { user, allUsers, loading: authLoading } = useAuth();
 
-  useEffect(() => {
-    let unsubscribe: (() => void) | undefined = undefined;
-
-    if (user) {
-      const notificationsCol = collection(db, 'notifications');
-      const q = query(
-        notificationsCol,
-        where('userId', '==', user.uid),
-        orderBy('date', 'desc')
-      );
-
-      unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const fetchedNotifications = querySnapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            ...data,
-            date: data.date?.toDate().toISOString() || new Date().toISOString(),
-          } as Notification;
-        });
-        setNotifications(fetchedNotifications);
-      }, (error) => {
-        console.error('Error fetching notifications:', {
-          error: error.message,
-          stack: error.stack,
-        });
-      });
-    } else {
+  // Fetch notifications from MongoDB API
+  const fetchNotifications = useCallback(async () => {
+    if (authLoading || !user) {
+      setLoading(false);
       setNotifications([]);
+      return;
     }
 
-    return () => {
-      if (unsubscribe) {
-        unsubscribe();
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/notifications?userId=${user.uid}`);
+      const result = await response.json();
+
+      if (result.success) {
+        const fetchedNotifications = result.notifications.map((n: any) => ({
+          ...n,
+          id: n._id,
+          date: new Date(n.date).toISOString(),
+        }));
+        setNotifications(fetchedNotifications);
       }
-    };
-  }, [user]);
-
-  const addNotificationForUser = useCallback(async (userId: string, notificationData: Omit<Notification, 'id' | 'date' | 'read' | 'userId'>) => {
-    try {
-      const newNotification = {
-        ...notificationData,
-        userId,
-        read: false,
-        date: serverTimestamp(),
-      };
-      await addDoc(collection(db, 'notifications'), newNotification);
-    } catch (error: any) {
-      console.error('Error adding notification for user:', {
-        error: error.message,
-        userId,
-        stack: error.stack,
-      });
-      throw new Error('Failed to add notification.');
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    } finally {
+      setLoading(false);
     }
-  }, []);
+  }, [user, authLoading]);
 
-  const addNotificationForGen = useCallback(async (targetGen: string, notificationData: Omit<Notification, 'id' | 'date' | 'read' | 'userId'>, authorId?: string) => {
+  // Initial fetch + polling every 30 seconds
+  useEffect(() => {
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
+  }, [fetchNotifications]);
+
+  const addNotificationForUser = useCallback(async (
+    userId: string, 
+    notificationData: Omit<Notification, 'id' | 'date' | 'read' | 'userId'>
+  ) => {
     try {
-      const batch = writeBatch(db);
-      const notificationsCol = collection(db, 'notifications');
+      const response = await fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...notificationData,
+          userId,
+          read: false,
+          date: new Date().toISOString(),
+        }),
+      });
 
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to create notification');
+      }
+
+      // Refresh if it's for current user
+      if (userId === user?.uid) {
+        await fetchNotifications();
+      }
+    } catch (error: any) {
+      console.error('Error adding notification:', error);
+      throw error;
+    }
+  }, [user, fetchNotifications]);
+
+  const addNotificationForGen = useCallback(async (
+    targetGen: string, 
+    notificationData: Omit<Notification, 'id' | 'date' | 'read' | 'userId'>, 
+    authorId?: string
+  ) => {
+    try {
+      // Filter users based on target gen
       const usersToNotify = allUsers.filter(u => {
         if (u.uid === authorId) return false;
         if (targetGen === 'Everyone') return true;
@@ -104,66 +116,88 @@ export const NotificationsProvider: FC<{ children: ReactNode }> = ({ children })
         return false;
       });
 
-      for (const userData of usersToNotify) {
-        const newNotification = {
-          ...notificationData,
-          userId: userData.uid,
-          read: false,
-          date: serverTimestamp(),
-        };
-        const notificationRef = doc(notificationsCol);
-        batch.set(notificationRef, newNotification);
-      }
+      // Create notifications in batch
+      const promises = usersToNotify.map(userData =>
+        fetch('/api/notifications', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...notificationData,
+            userId: userData.uid,
+            read: false,
+            date: new Date().toISOString(),
+          }),
+        })
+      );
 
-      await batch.commit();
+      await Promise.all(promises);
+
+      // Refresh if current user is in the target group
+      if (usersToNotify.some(u => u.uid === user?.uid)) {
+        await fetchNotifications();
+      }
     } catch (error: any) {
-      console.error('Error adding notifications for gen:', {
-        error: error.message,
-        targetGen,
-        stack: error.stack,
-      });
-      throw new Error('Failed to add notifications for group.');
+      console.error('Error adding notifications for gen:', error);
+      throw error;
     }
-  }, [allUsers]);
+  }, [allUsers, user, fetchNotifications]);
 
   const markAsRead = useCallback(async (notificationId: string) => {
     try {
-      const notifDoc = doc(db, 'notifications', notificationId);
-      await updateDoc(notifDoc, { read: true });
-    } catch (error: any) {
-      console.error('Error marking notification as read:', {
-        error: error.message,
-        notificationId,
-        stack: error.stack,
+      const response = await fetch(`/api/notifications/${notificationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ read: true }),
       });
-      throw new Error('Failed to mark notification as read.');
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to mark notification as read');
+      }
+
+      await fetchNotifications();
+    } catch (error: any) {
+      console.error('Error marking notification as read:', error);
+      throw error;
     }
-  }, []);
+  }, [fetchNotifications]);
 
   const markAllAsRead = useCallback(async () => {
-    try {
-      const unreadNotifications = notifications.filter(n => !n.read);
-      if (unreadNotifications.length === 0) return;
+    if (!user) return;
 
-      const batch = writeBatch(db);
-      unreadNotifications.forEach(notif => {
-        const notifDoc = doc(db, 'notifications', notif.id);
-        batch.update(notifDoc, { read: true });
+    try {
+      const response = await fetch('/api/notifications/mark-all-read', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.uid }),
       });
-      await batch.commit();
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to mark all as read');
+      }
+
+      await fetchNotifications();
     } catch (error: any) {
-      console.error('Error marking all notifications as read:', {
-        error: error.message,
-        stack: error.stack,
-      });
-      throw new Error('Failed to mark all notifications as read.');
+      console.error('Error marking all notifications as read:', error);
+      throw error;
     }
-  }, [notifications]);
+  }, [user, fetchNotifications]);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
-    <NotificationsContext.Provider value={{ notifications, unreadCount, addNotificationForUser, addNotificationForGen, markAsRead, markAllAsRead }}>
+    <NotificationsContext.Provider value={{ 
+      notifications, 
+      unreadCount, 
+      addNotificationForUser, 
+      addNotificationForGen, 
+      markAsRead, 
+      markAllAsRead,
+      loading 
+    }}>
       {children}
     </NotificationsContext.Provider>
   );

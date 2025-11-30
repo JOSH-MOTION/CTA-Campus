@@ -1,9 +1,8 @@
-// src/contexts/RoadmapContext.tsx
+// src/contexts/RoadmapContext.tsx (MIGRATED TO MONGODB)
 'use client';
 
-import { createContext, useContext, useState, ReactNode, FC, useEffect, useMemo } from 'react';
+import { createContext, useContext, useState, ReactNode, FC, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from './AuthContext';
-import { onRoadmapStatus, setWeekCompletion, WeekCompletionStatusMap } from '@/services/roadmap';
 
 export interface Topic {
   id: string;
@@ -27,10 +26,14 @@ export interface WeekWithSubject extends Week {
   weekTitle: string;
 }
 
+export interface WeekCompletionStatusMap {
+  [weekId: string]: { [gen: string]: boolean };
+}
+
 interface RoadmapContextType {
   completedWeeks: Set<string>;
   completionMap: WeekCompletionStatusMap;
-  toggleWeekCompletion: (weekId: string, gen: string, currentStatus: boolean) => void;
+  toggleWeekCompletion: (weekId: string, gen: string, currentStatus: boolean) => Promise<void>;
   roadmapData: RoadmapSubject[];
   loading: boolean;
   currentWeek: WeekWithSubject | null;
@@ -475,21 +478,33 @@ export const RoadmapProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const [teacherViewingGen, setTeacherViewingGen] = useState<string>('');
   const { user, userData, role } = useAuth();
 
-  useEffect(() => {
-    let unsubscribe: () => void;
+  // Fetch roadmap status from MongoDB API
+  const fetchRoadmapStatus = useCallback(async () => {
     if (!user) {
       setLoading(false);
       return;
     }
-    unsubscribe = onRoadmapStatus((statusMap) => {
-      setCompletionMap(statusMap);
-      setLoading(false);
-    });
 
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
+    try {
+      const response = await fetch('/api/roadmap/status');
+      const result = await response.json();
+      
+      if (result.success) {
+        setCompletionMap(result.statusMap || {});
+      }
+    } catch (error) {
+      console.error('Error fetching roadmap status:', error);
+    } finally {
+      setLoading(false);
+    }
   }, [user]);
+
+  // Initial fetch + polling every 30 seconds
+  useEffect(() => {
+    fetchRoadmapStatus();
+    const interval = setInterval(fetchRoadmapStatus, 30000);
+    return () => clearInterval(interval);
+  }, [fetchRoadmapStatus]);
 
   const completedWeeks = useMemo(() => {
     const completed = new Set<string>();
@@ -550,27 +565,60 @@ export const RoadmapProvider: FC<{ children: ReactNode }> = ({ children }) => {
     };
   }, [completedWeeks, allFlattenedWeeks]);
 
-  const toggleWeekCompletion = (weekId: string, gen: string, currentStatus: boolean) => {
-    setWeekCompletion(weekId, gen, !currentStatus);
-  };
+  const toggleWeekCompletion = useCallback(async (
+    weekId: string, 
+    gen: string, 
+    currentStatus: boolean
+  ) => {
+    try {
+      const response = await fetch('/api/roadmap/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          weekId,
+          gen,
+          completed: !currentStatus,
+        }),
+      });
 
-  return (
-    <RoadmapContext.Provider
-      value={{
-        roadmapData,
-        completedWeeks,
-        completionMap,
-        toggleWeekCompletion,
-        loading,
-        currentWeek,
-        nextWeek,
-        allWeeksCompleted,
-        setTeacherViewingGen,
-      }}
-    >
-      {children}
-    </RoadmapContext.Provider>
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to update roadmap status');
+      }
+
+      // Refresh the roadmap status
+      await fetchRoadmapStatus();
+    } catch (error) {
+      console.error('Error toggling week completion:', error);
+      throw error;
+    }
+  }, [fetchRoadmapStatus]);
+
+  const value = useMemo(
+    () => ({
+      roadmapData,
+      completedWeeks,
+      completionMap,
+      toggleWeekCompletion,
+      loading,
+      currentWeek,
+      nextWeek,
+      allWeeksCompleted,
+      setTeacherViewingGen,
+    }),
+    [
+      completedWeeks,
+      completionMap,
+      toggleWeekCompletion,
+      loading,
+      currentWeek,
+      nextWeek,
+      allWeeksCompleted,
+    ]
   );
+
+  return <RoadmapContext.Provider value={value}>{children}</RoadmapContext.Provider>;
 };
 
 export const useRoadmap = (): RoadmapContextType => {
